@@ -1,0 +1,63 @@
+import type {
+  CampaignAdSetRow,
+  CampaignEntityStatus,
+  DateRange,
+} from "@/lib/services/meta/types"
+import { fetchAllPages } from "./fetch-all-pages"
+import {
+  fetchCachedAdGroupMetricsByDateRange,
+  getAddToCart,
+  getMetricNumber,
+  getPurchases,
+  getPurchaseValue,
+} from "./report"
+import { isTikTokEditableDailyBudget } from "./budget-mode"
+import type { TikTokAdGroup } from "./types"
+
+function normalizeStatus(status?: string): CampaignEntityStatus {
+  if (status === "ENABLE" || status === "ACTIVE") return "ACTIVE"
+  if (status === "DISABLE" || status === "PAUSED") return "PAUSED"
+  if (status === "DELETE" || status === "DELETED") return "DELETED"
+  return "UNKNOWN"
+}
+
+export async function getTikTokCampaignAdGroupsByCampaignId(
+  campaignId: string,
+  dateRange: DateRange
+): Promise<CampaignAdSetRow[]> {
+  const [adGroups, metricsByAdGroup] = await Promise.all([
+    fetchAllPages<TikTokAdGroup>("/adgroup/get/", {
+      filtering: JSON.stringify({
+        campaign_ids: [campaignId],
+      }),
+    }),
+    fetchCachedAdGroupMetricsByDateRange(dateRange),
+  ])
+
+  return adGroups.map((adGroup) => {
+    const metrics = metricsByAdGroup.get(adGroup.adgroup_id) ?? {}
+    const spend = getMetricNumber(metrics, "spend")
+    const purchases = getPurchases(metrics)
+    const purchaseValue = getPurchaseValue(metrics)
+
+    return {
+      id: adGroup.adgroup_id,
+      name: adGroup.adgroup_name || "Sin nombre",
+      status: normalizeStatus(adGroup.operation_status),
+      campaignId: adGroup.campaign_id,
+      dailyBudget: isTikTokEditableDailyBudget(adGroup.budget_mode)
+        ? (adGroup.budget ?? 0)
+        : null,
+      budgetMode: adGroup.budget_mode ?? null,
+      campaignAutomationType: adGroup.campaign_automation_type ?? null,
+      spend,
+      impressions: getMetricNumber(metrics, "impressions"),
+      ctr: getMetricNumber(metrics, "ctr"),
+      cpc: getMetricNumber(metrics, "cpc"),
+      results: purchases,
+      costPerResult: purchases > 0 ? spend / purchases : 0,
+      roas: spend > 0 ? purchaseValue / spend : 0,
+      addToCart: getAddToCart(metrics),
+    }
+  })
+}
