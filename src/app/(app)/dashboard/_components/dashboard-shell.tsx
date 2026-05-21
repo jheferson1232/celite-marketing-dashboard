@@ -146,7 +146,7 @@ export function DashboardShell({
           <SheetContent
             side="right"
             showCloseButton={false}
-            className="flex h-full w-full max-w-md flex-col gap-0 p-0 sm:max-w-md"
+            className="flex h-[100dvh] max-h-[100dvh] w-full max-w-md flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
           >
             <DashboardAssistantPanel {...panelProps} />
           </SheetContent>

@@ -2,8 +2,42 @@ import type { AdInsightRow, MetaAction } from "@/lib/services/meta/types"
 import {
   formatCurrency,
   META_DASHBOARD_CURRENCY,
+  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
+
+/** Gasto mínimo (PEN) para mostrar un creativo en el dashboard TikTok. */
+export const TIKTOK_MIN_CREATIVE_SPEND_PEN = 5
+
+export function passesTikTokCreativeSpendFilter(
+  spend: number | string,
+  currency: CurrencyCode
+): boolean {
+  if (currency !== TIKTOK_DASHBOARD_CURRENCY) return true
+  const value = typeof spend === "string" ? parseFloat(spend) : spend
+  return Number.isFinite(value) && value >= TIKTOK_MIN_CREATIVE_SPEND_PEN
+}
+
+/** Hay al menos un creativo visible (gasto agrupado ≥ umbral en TikTok). */
+export function hasVisibleCreativesForAdsView(
+  rows: AdInsightRow[],
+  currency: CurrencyCode
+): boolean {
+  if (!rows.length) return false
+  if (currency !== TIKTOK_DASHBOARD_CURRENCY) return true
+
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = getCreativeKey(row)
+    const spend = parseFloat(row.spend) || 0
+    map.set(key, (map.get(key) ?? 0) + spend)
+  }
+
+  for (const totalSpend of map.values()) {
+    if (passesTikTokCreativeSpendFilter(totalSpend, currency)) return true
+  }
+  return false
+}
 
 export function extractAction(
   actions: MetaAction[] | undefined,

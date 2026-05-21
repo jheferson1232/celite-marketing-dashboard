@@ -22,6 +22,8 @@ import {
 import {
   formatLandingPagePath,
   META_DASHBOARD_CURRENCY,
+  TIKTOK_DASHBOARD_CURRENCY,
+  type CurrencyCode,
 } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
 import { CreativePreviewImage } from "./creative-preview-image"
@@ -41,11 +43,14 @@ import {
   sumPurchasesByGender,
   countUniqueIds,
   genderPurchasePercent,
+  passesTikTokCreativeSpendFilter,
 } from "./utils"
 import { cn } from "@/lib/utils"
 
 interface MetaCreativesTableProps {
   rows: AdInsightRow[]
+  /** Por defecto Meta (COP). TikTok pasa PEN. */
+  currency?: CurrencyCode
 }
 
 export interface MergedMetaCreativeRow extends AdInsightRow {
@@ -214,7 +219,10 @@ function UrlCell({ row }: { row: MergedMetaCreativeRow }) {
   )
 }
 
-export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
+export function MetaCreativesTable({
+  rows,
+  currency = META_DASHBOARD_CURRENCY,
+}: MetaCreativesTableProps) {
   const [sortKey, setSortKey] = React.useState<MetricKey>("spend")
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc")
 
@@ -228,20 +236,37 @@ export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
     return Array.from(map.values()).map(mergeMetaCreativeGroup)
   }, [rows])
 
+  const visibleGrouped = React.useMemo(
+    () =>
+      grouped.filter((row) =>
+        passesTikTokCreativeSpendFilter(row.spend, currency)
+      ),
+    [grouped, currency]
+  )
+
   const sorted = React.useMemo(() => {
-    return [...grouped].sort((a, b) => {
+    return [...visibleGrouped].sort((a, b) => {
       const va = getMetricValue(a, sortKey)
       const vb = getMetricValue(b, sortKey)
       return sortDir === "desc" ? vb - va : va - vb
     })
-  }, [grouped, sortKey, sortDir])
+  }, [visibleGrouped, sortKey, sortDir])
 
   const totals = React.useMemo(() => {
-    const totalSpend = grouped.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0)
-    const totalPurchases = grouped.reduce((s, r) => s + extractPurchases(r), 0)
-    const totalMale = grouped.reduce((s, r) => s + r.purchasesMale, 0)
-    const totalFemale = grouped.reduce((s, r) => s + r.purchasesFemale, 0)
-    const totalUnknown = grouped.reduce((s, r) => s + r.purchasesUnknown, 0)
+    const totalSpend = visibleGrouped.reduce(
+      (s, r) => s + (parseFloat(r.spend) || 0),
+      0
+    )
+    const totalPurchases = visibleGrouped.reduce(
+      (s, r) => s + extractPurchases(r),
+      0
+    )
+    const totalMale = visibleGrouped.reduce((s, r) => s + r.purchasesMale, 0)
+    const totalFemale = visibleGrouped.reduce((s, r) => s + r.purchasesFemale, 0)
+    const totalUnknown = visibleGrouped.reduce(
+      (s, r) => s + r.purchasesUnknown,
+      0
+    )
     const genderTotal = totalMale + totalFemale + totalUnknown
 
     return {
@@ -253,7 +278,7 @@ export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
       malePct: genderPurchasePercent(totalMale, genderTotal),
       femalePct: genderPurchasePercent(totalFemale, genderTotal),
     }
-  }, [grouped])
+  }, [visibleGrouped])
 
   const handleSort = (key: MetricKey) => {
     if (sortKey === key) {
@@ -290,26 +315,47 @@ export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
             <TableHead className="min-w-[160px]">URL</TableHead>
             <TableHead className="text-center">Campaña</TableHead>
             <TableHead className="text-center">Conjuntos</TableHead>
-            <TableHead className="text-right">
+            <TableHead
+              className="text-right"
+              title={
+                currency === TIKTOK_DASHBOARD_CURRENCY
+                  ? "Estimado según reparto de gasto (audiencia TikTok)"
+                  : undefined
+              }
+            >
               <span className="inline-flex items-center gap-1">
                 <RiMenLine className="size-4 text-blue-600" />
                 Hombres
+                {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+                  <span className="text-[10px] font-normal text-muted-foreground">
+                    ~
+                  </span>
+                ) : null}
               </span>
             </TableHead>
-            <TableHead className="text-right">
+            <TableHead
+              className="text-right"
+              title={
+                currency === TIKTOK_DASHBOARD_CURRENCY
+                  ? "Estimado según reparto de gasto (audiencia TikTok)"
+                  : undefined
+              }
+            >
               <span className="inline-flex items-center gap-1">
                 <RiWomenLine className="size-4 text-pink-600" />
                 Mujeres
+                {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+                  <span className="text-[10px] font-normal text-muted-foreground">
+                    ~
+                  </span>
+                ) : null}
               </span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.map((row) => {
-            const displayTitle = getCreativeCardDisplayTitle(
-              row,
-              META_DASHBOARD_CURRENCY
-            )
+            const displayTitle = getCreativeCardDisplayTitle(row, currency)
             const genderTotal =
               row.purchasesMale + row.purchasesFemale + row.purchasesUnknown
             const malePct = genderPurchasePercent(row.purchasesMale, genderTotal)
@@ -358,7 +404,7 @@ export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
                     {formatMetricValue(
                       getMetricValue(row, m.key),
                       m.key,
-                      META_DASHBOARD_CURRENCY
+                      currency
                     )}
                   </TableCell>
                 ))}
@@ -393,17 +439,13 @@ export function MetaCreativesTable({ rows }: MetaCreativesTableProps) {
           <TableRow>
             <TableCell>Totales</TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatMetricValue(totals.spend, "spend", META_DASHBOARD_CURRENCY)}
+              {formatMetricValue(totals.spend, "spend", currency)}
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatMetricValue(
-                totals.purchases,
-                "purchases",
-                META_DASHBOARD_CURRENCY
-              )}
+              {formatMetricValue(totals.purchases, "purchases", currency)}
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatMetricValue(totals.cpa, "cpa", META_DASHBOARD_CURRENCY)}
+              {formatMetricValue(totals.cpa, "cpa", currency)}
             </TableCell>
             <TableCell />
             <TableCell />

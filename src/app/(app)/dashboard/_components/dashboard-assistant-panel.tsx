@@ -31,11 +31,12 @@ const META_SUGGESTIONS = [
   "¿Cuánto gasté entre Meta y TikTok hoy?",
 ]
 
+/** Textos cortos para el panel lateral / móvil (evitan recorte). */
 const TIKTOK_SUGGESTIONS = [
   "¿Cómo nos fue hoy en TikTok?",
   NOTION_LAUNCH_SUGGESTION,
   "Apaga la campaña cbo urbano",
-  "Sube 20% el presupuesto del mejor conjunto hoy",
+  "Sube 20% presupuesto del mejor conjunto",
   "Prende la campaña Hertz Art",
 ]
 
@@ -140,10 +141,10 @@ export function DashboardAssistantPanel({
             <p className="truncate text-sm font-semibold">
               Asistente de Marketing IA
             </p>
-            <p className="text-muted-foreground truncate text-xs">
+            <p className="text-muted-foreground text-xs leading-snug">
               {platform === "tiktok"
-                ? "TikTok (S/) y Meta ($ COP)"
-                : "Meta ($ COP) y TikTok (S/)"}
+                ? "TikTok (S/) · Meta (COP)"
+                : "Meta (COP) · TikTok (S/)"}
             </p>
           </div>
         </div>

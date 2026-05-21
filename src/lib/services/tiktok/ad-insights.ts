@@ -13,6 +13,7 @@ import {
 } from "./landing-page-url"
 import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
 import { withTikTokCache } from "./tiktok-cache"
+import { fetchTikTokPurchaseGenderByAdId } from "./purchase-gender"
 import type { TikTokAd, TikTokAdImage, TikTokAdVideo, TikTokApiResponse } from "./types"
 
 const AD_INSIGHTS_TTL_MS = 2 * 60 * 1000
@@ -122,6 +123,21 @@ async function fetchTikTokAdInsights(
   ])
   const adsById = new Map(ads.map((ad) => [ad.ad_id, ad]))
 
+  const purchasesByAdId = new Map<string, number>()
+  for (const row of reportRows) {
+    const adId = row.dimensions.ad_id
+    if (!adId) continue
+    purchasesByAdId.set(adId, getPurchases(row.metrics))
+  }
+
+  const genderByAdId = await fetchTikTokPurchaseGenderByAdId(
+    dateRange,
+    purchasesByAdId
+  ).catch((error) => {
+    console.error("Error fetching TikTok gender audience breakdown:", error)
+    return new Map<string, { male: number; female: number; unknown: number }>()
+  })
+
   const imageIds = [
     ...new Set(
       ads.flatMap((ad) => ad.image_ids ?? []).filter(Boolean)
@@ -179,6 +195,7 @@ async function fetchTikTokAdInsights(
           adgroupId: ad?.adgroup_id,
         }),
         created_time: ad?.create_time || "",
+        purchasesByGender: genderByAdId.get(adId),
       } satisfies AdInsightRow
     })
     .filter((row) => parseFloat(row.spend) > 0)

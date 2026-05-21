@@ -97,8 +97,10 @@ export function ChatUI({
         {messages.length === 0 ? (
           <div
             className={cn(
-              "flex h-full flex-col gap-4",
-              compact ? "justify-end pb-2" : "items-center justify-center gap-6"
+              "flex min-h-0 flex-col gap-3",
+              compact
+                ? "h-full justify-end pb-1"
+                : "h-full items-center justify-center gap-6"
             )}
           >
             {!compact && (
@@ -117,13 +119,19 @@ export function ChatUI({
                 onClose={() => setShowNotionLaunch(false)}
               />
             ) : (
-              <ul className={cn("flex flex-col gap-1.5", compact && "w-full")}>
+              <ul
+                className={cn(
+                  "flex w-full flex-col gap-1.5",
+                  compact &&
+                    "max-h-[min(50dvh,18rem)] shrink overflow-y-auto overscroll-contain"
+                )}
+              >
                 {resolvedSuggestions.map((suggestion) => (
-                  <li key={suggestion}>
+                  <li key={suggestion} className="shrink-0">
                     <button
                       type="button"
                       onClick={() => handleSuggestion(suggestion)}
-                      className="hover:bg-muted/80 w-full rounded-lg border bg-muted/40 px-3 py-2.5 text-left text-sm transition-colors"
+                      className="hover:bg-muted/80 w-full rounded-lg border bg-muted/40 px-3 py-2.5 text-left text-sm leading-snug whitespace-normal break-words transition-colors"
                     >
                       {suggestion}
                     </button>

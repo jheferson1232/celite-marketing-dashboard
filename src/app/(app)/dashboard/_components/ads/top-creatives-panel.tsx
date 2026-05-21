@@ -34,6 +34,7 @@ import {
   pickCampaignNameFromGroup,
   pickHighestSpendRow,
   pickUrlFromGroup,
+  passesTikTokCreativeSpendFilter,
 } from "./utils"
 import { CreativePreviewDialog } from "./creative-preview-dialog"
 import { CreativePreviewImage } from "./creative-preview-image"
@@ -289,13 +290,21 @@ export function TopCreativesPanel({
   }, [rows])
 
   const primaryMetric = selectedMetrics[0] || "spend"
+  const visibleGroups = React.useMemo(
+    () =>
+      groupedRows.filter((g) =>
+        passesTikTokCreativeSpendFilter(g.merged.spend, currency)
+      ),
+    [groupedRows, currency]
+  )
+
   const sortedRows = React.useMemo(() => {
-    return [...groupedRows].sort(
+    return [...visibleGroups].sort(
       (a, b) =>
         getMetricValue(b.merged, primaryMetric) -
         getMetricValue(a.merged, primaryMetric)
     )
-  }, [groupedRows, primaryMetric])
+  }, [visibleGroups, primaryMetric])
 
   const toggleMetric = (key: MetricKey) => {
     setSelectedMetrics((prev) => {

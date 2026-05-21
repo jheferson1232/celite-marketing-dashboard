@@ -145,6 +145,8 @@ export function getRoas(metrics: Record<string, string>): number {
   return spend > 0 ? value / spend : 0
 }
 
+export type TikTokReportType = "BASIC" | "AUDIENCE"
+
 export async function fetchIntegratedReport(
   dataLevel: TikTokDataLevel,
   dimensions: string[],
@@ -154,6 +156,7 @@ export async function fetchIntegratedReport(
   options?: {
     /** Filtro ya serializado (formato TikTok: field_name, filter_type, filter_value). */
     filtering?: string
+    reportType?: TikTokReportType
   }
 ): Promise<TikTokReportRow[]> {
   const api = getTikTokClient()
@@ -169,7 +172,7 @@ export async function fetchIntegratedReport(
         params: {
           advertiser_id: advertiserId,
           service_type: "AUCTION",
-          report_type: "BASIC",
+          report_type: options?.reportType ?? "BASIC",
           data_level: dataLevel,
           dimensions: JSON.stringify(dimensions),
           metrics: JSON.stringify(metrics),

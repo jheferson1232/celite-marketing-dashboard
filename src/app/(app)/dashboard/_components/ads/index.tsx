@@ -7,9 +7,9 @@ import {
 } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
 import { TopCreativesPanel } from "./top-creatives-panel"
-import { CreativeAdsTable } from "./creatives-table"
 import { MetaCreativesTable } from "./meta-creatives-table"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import { hasVisibleCreativesForAdsView } from "./utils"
 import { AdsGridSkeleton } from "./ads-grid-skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RiLayoutGridLine, RiListCheck2 } from "@remixicon/react"
@@ -20,11 +20,13 @@ interface AdsViewProps {
   currency?: CurrencyCode
 }
 
-function AdsEmptyState() {
+function AdsEmptyState({ currency }: { currency: CurrencyCode }) {
   return (
     <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed">
       <p className="text-sm text-muted-foreground">
-        No se encontraron anuncios con gasto en el periodo seleccionado.
+        {currency === TIKTOK_DASHBOARD_CURRENCY
+          ? "No hay creativos con gasto de S/ 5 o más en el periodo seleccionado."
+          : "No se encontraron anuncios con gasto en el periodo seleccionado."}
       </p>
     </div>
   )
@@ -39,8 +41,8 @@ export function AdsView({
     return <AdsGridSkeleton />
   }
 
-  if (!data?.length) {
-    return <AdsEmptyState />
+  if (!data?.length || !hasVisibleCreativesForAdsView(data, currency)) {
+    return <AdsEmptyState currency={currency} />
   }
 
   return (
@@ -64,11 +66,7 @@ export function AdsView({
       </TabsContent>
 
       <TabsContent value="table" className="mt-0 border-none p-0 shadow-none">
-        {currency === TIKTOK_DASHBOARD_CURRENCY ? (
-          <CreativeAdsTable rows={data} currency={currency} />
-        ) : (
-          <MetaCreativesTable rows={data} />
-        )}
+        <MetaCreativesTable rows={data} currency={currency} />
       </TabsContent>
     </Tabs>
   )

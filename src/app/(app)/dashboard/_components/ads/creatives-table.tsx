@@ -38,6 +38,7 @@ import {
   pickCampaignNameFromGroup,
   pickHighestSpendRow,
   pickUrlFromGroup,
+  passesTikTokCreativeSpendFilter,
 } from "./utils"
 import { cn } from "@/lib/utils"
 
@@ -114,20 +115,28 @@ export function CreativeAdsTable({
     return Array.from(map.values()).map(mergeGroup)
   }, [rows])
 
+  const visibleGrouped = React.useMemo(
+    () =>
+      grouped.filter((row) =>
+        passesTikTokCreativeSpendFilter(row.spend, currency)
+      ),
+    [grouped, currency]
+  )
+
   const sorted = React.useMemo(() => {
-    return [...grouped].sort((a, b) => {
+    return [...visibleGrouped].sort((a, b) => {
       const va = getMetricValue(a, sortKey)
       const vb = getMetricValue(b, sortKey)
       return sortDir === "desc" ? vb - va : va - vb
     })
-  }, [grouped, sortKey, sortDir])
+  }, [visibleGrouped, sortKey, sortDir])
 
   const totals = React.useMemo(() => {
-    const totalSpend = grouped.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0)
-    const totalImpressions = grouped.reduce((s, r) => s + (parseFloat(r.impressions) || 0), 0)
-    const totalClicks = grouped.reduce((s, r) => s + (parseFloat(r.clicks) || 0), 0)
-    const totalPurchases = grouped.reduce((s, r) => s + extractPurchases(r), 0)
-    const totalPurchaseValue = grouped.reduce((s, r) => s + extractPurchaseValue(r), 0)
+    const totalSpend = visibleGrouped.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0)
+    const totalImpressions = visibleGrouped.reduce((s, r) => s + (parseFloat(r.impressions) || 0), 0)
+    const totalClicks = visibleGrouped.reduce((s, r) => s + (parseFloat(r.clicks) || 0), 0)
+    const totalPurchases = visibleGrouped.reduce((s, r) => s + extractPurchases(r), 0)
+    const totalPurchaseValue = visibleGrouped.reduce((s, r) => s + extractPurchaseValue(r), 0)
 
     return {
       spend: totalSpend,
@@ -140,7 +149,7 @@ export function CreativeAdsTable({
       roas: totalSpend > 0 ? totalPurchaseValue / totalSpend : 0,
       cpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
     }
-  }, [grouped])
+  }, [visibleGrouped])
 
   const handleSort = (key: MetricKey) => {
     if (sortKey === key) {
