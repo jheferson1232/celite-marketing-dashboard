@@ -25,10 +25,15 @@ import type { AdInsightRow } from "@/lib/services/meta/types"
 import {
   MetricKey,
   METRIC_OPTIONS,
+  META_CREATIVES_TABLE_METRICS,
   getMetricValue,
   formatMetricValue,
   getCreativeKey,
   mergeEarliestCreatedTime,
+  getCreativeCardDisplayTitle,
+  pickCampaignNameFromGroup,
+  pickHighestSpendRow,
+  pickUrlFromGroup,
 } from "./utils"
 import { CreativePreviewDialog } from "./creative-preview-dialog"
 import { CreativePreviewImage } from "./creative-preview-image"
@@ -105,17 +110,15 @@ function mergeRows(group: AdInsightRow[]): AdInsightRow {
     )
   }
 
-  // Pick the representative thumbnail/video from the row with highest spend
-  const best = group.reduce((a, b) =>
-    (parseFloat(a.spend) || 0) >= (parseFloat(b.spend) || 0) ? a : b
-  )
+  const best = pickHighestSpendRow(group)
   base.ad_id = best.ad_id
   base.ad_name = best.ad_name
   base.thumbnail_url = best.thumbnail_url
   base.image_url = best.image_url
   base.video_url = best.video_url
   base.video_id = best.video_id
-  base.url = best.url
+  base.url = pickUrlFromGroup(group)
+  base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
   base.created_time = mergeEarliestCreatedTime(group) ?? best.created_time
 
   return base
@@ -125,23 +128,26 @@ function CreativeCard({
   creativeKey,
   row,
   metrics,
+  metricOptions,
   currency,
   adsCount,
 }: {
   creativeKey: string
   row: AdInsightRow
   metrics: MetricKey[]
+  metricOptions: { key: MetricKey; label: string }[]
   currency: CurrencyCode
   adsCount: number
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
   const hasVideo = !!row.video_id
+  const displayTitle = getCreativeCardDisplayTitle(row, currency)
 
   // We need to adapt AdInsightRow to CreativeRow for CreativePreviewDialog
   const creativeRowAdapter = {
     id: creativeKey,
     adId: row.ad_id,
-    name: row.ad_name,
+    name: displayTitle,
     thumbnailUrl: row.thumbnail_url,
     imageUrl: row.image_url || row.thumbnail_url,
     videoId: row.video_id,
@@ -168,7 +174,7 @@ function CreativeCard({
               <CreativePreviewImage
                 thumbnailUrl={row.thumbnail_url}
                 imageUrl={row.image_url}
-                alt={row.ad_name}
+                alt={displayTitle}
                 className="aspect-9/16 w-full"
               />
             ) : (
@@ -200,8 +206,8 @@ function CreativeCard({
 
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
-            <p className="truncate text-sm font-semibold" title={row.ad_name}>
-              {row.ad_name}
+            <p className="truncate text-sm font-semibold" title={displayTitle}>
+              {displayTitle}
             </p>
             <p className="text-xs text-muted-foreground">
               {adsCount} anuncio{adsCount === 1 ? "" : "s"}
@@ -228,7 +234,7 @@ function CreativeCard({
                 className="flex items-center justify-between gap-3 text-sm"
               >
                 <dt className="text-muted-foreground">
-                  {METRIC_OPTIONS.find((m) => m.key === metric)?.label}
+                  {metricOptions.find((m) => m.key === metric)?.label}
                 </dt>
                 <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">
                   {formatMetricValue(
@@ -256,6 +262,11 @@ export function TopCreativesPanel({
   rows,
   currency = META_DASHBOARD_CURRENCY,
 }: TopCreativesPanelProps) {
+  const metricOptions =
+    currency === META_DASHBOARD_CURRENCY
+      ? META_CREATIVES_TABLE_METRICS
+      : METRIC_OPTIONS
+
   const [selectedMetrics, setSelectedMetrics] = React.useState<MetricKey[]>([
     "spend",
     "created_at",
@@ -313,7 +324,7 @@ export function TopCreativesPanel({
                 <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   Seleccionar métricas (máx. 4)
                 </p>
-                {METRIC_OPTIONS.map((opt) => {
+                {metricOptions.map((opt) => {
                   const isActive = selectedMetrics.includes(opt.key)
                   return (
                     <div
@@ -348,7 +359,7 @@ export function TopCreativesPanel({
                 <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
                   {idx + 1}
                 </span>
-                {METRIC_OPTIONS.find((m) => m.key === metric)?.label}
+                {metricOptions.find((m) => m.key === metric)?.label}
               </Badge>
             ))}
           </div>
@@ -358,7 +369,7 @@ export function TopCreativesPanel({
           <p className="text-xs text-muted-foreground">
             Ordenado por:{" "}
             <strong>
-              {METRIC_OPTIONS.find((m) => m.key === primaryMetric)?.label}
+              {metricOptions.find((m) => m.key === primaryMetric)?.label}
             </strong>
           </p>
         </div>
@@ -371,6 +382,7 @@ export function TopCreativesPanel({
             creativeKey={key}
             row={merged}
             metrics={selectedMetrics}
+            metricOptions={metricOptions}
             currency={currency}
             adsCount={count}
           />

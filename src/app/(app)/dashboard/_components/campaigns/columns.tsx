@@ -43,6 +43,8 @@ export function getCampaignColumns({
   enableTikTokManage = false,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
+  const showAddToCart =
+    enableTikTokManage || currency === META_DASHBOARD_CURRENCY
 
   const dataColumns: ColumnDef<CampaignRow>[] = [
     {
@@ -57,17 +59,27 @@ export function getCampaignColumns({
           className="pl-3"
         />
       ),
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2 pl-3 font-medium">
-          <div
-            className={cn(
-              "h-2 w-2 rounded-full",
-              row.original.status === "ACTIVE" ? "bg-blue-500" : "bg-gray-400"
-            )}
-          />
-          <span>{row.original.name}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const isActive = row.original.status === "ACTIVE"
+        return (
+          <div className="flex items-center gap-2 pl-3 font-medium">
+            <div
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                isActive ? "bg-blue-500" : "bg-gray-400"
+              )}
+              title={
+                !enableTikTokManage
+                  ? isActive
+                    ? "Campaña activa"
+                    : "Campaña desactivada"
+                  : undefined
+              }
+            />
+            <span>{row.original.name}</span>
+          </div>
+        )
+      },
     },
     {
       id: "spend",
@@ -124,12 +136,9 @@ export function getCampaignColumns({
     {
       id: "activeAdsCount",
       accessorKey: "activeAdsCount",
-      meta: columnMeta(enableTikTokManage ? "Conj. activos" : "Activos"),
+      meta: columnMeta("Conj. activos"),
       header: (context) => (
-        <SortableHeader
-          context={context}
-          label={enableTikTokManage ? "Conj. activos" : "Activos"}
-        />
+        <SortableHeader context={context} label="Conj. activos" />
       ),
       cell: ({ row }) => (
         <div className="text-right">
@@ -203,20 +212,17 @@ export function getCampaignColumns({
     },
     {
       id: "roas",
-      accessorFn: (row) =>
-        enableTikTokManage ? (row.addToCart ?? 0) : row.roas,
-      meta: columnMeta(
-        enableTikTokManage ? "Agreg. carrito" : "ROAS"
-      ),
+      accessorFn: (row) => (row.addToCart ?? 0),
+      meta: columnMeta(showAddToCart ? "Agreg. carrito" : "ROAS"),
       header: (context) => (
         <SortableHeader
           context={context}
-          label={enableTikTokManage ? "Agreg. carrito" : "ROAS"}
+          label={showAddToCart ? "Agreg. carrito" : "ROAS"}
         />
       ),
       cell: ({ row }) => (
         <div className="text-right">
-          {enableTikTokManage ? (
+          {showAddToCart ? (
             (row.original.addToCart ?? 0) > 0 ? (
               formatNumber(row.original.addToCart ?? 0)
             ) : (

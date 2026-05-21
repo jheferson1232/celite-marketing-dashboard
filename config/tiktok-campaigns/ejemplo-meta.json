@@ -1,0 +1,22 @@
+{
+  "campaign": {
+    "name": "Lokal Bing Meta",
+    "daily_budget": 10000,
+    "ad_text": "Consigue los tuyos ahora 🔥 Envío gratis",
+    "default_url": "https://lp.calzadoselite.co/oferta/lokal-big-blanco",
+    "cta": "SHOP_NOW",
+    "launch": true
+  },
+  "adsets": [
+    {
+      "name": "blanco-1",
+      "video": "/Users/Jheferson/Downloads/lokal 08-05/blanco 1.mp4",
+      "url": "https://lp.calzadoselite.co/oferta/lokal-big-blanco"
+    },
+    {
+      "name": "negro-blanco",
+      "video": "/Users/Jheferson/Downloads/lokal 08-05/negro:blanco.mp4",
+      "url": "https://lp.calzadoselite.co/oferta/lokal-big-negro"
+    }
+  ]
+}

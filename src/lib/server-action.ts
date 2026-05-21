@@ -32,15 +32,13 @@ export function createServerAction<R, A = void>(action: (args: A) => Promise<R>)
             | string
             | undefined
 
-          let message =
+          const message =
             metaUserMessage ||
-            (error instanceof Error ? error.message : "Error desconocido")
-
-          if (!(error instanceof ServerActionError) && !metaUserMessage) {
-            message =
-              "Error desconocido al ejecutar acción por favor contacta con el desarrollador"
-            console.error(error)
-          }
+            (error instanceof ServerActionError
+              ? error.message
+              : error instanceof Error && error.message.trim()
+                ? error.message
+                : "Error desconocido al ejecutar acción. Contacta al desarrollador.")
 
           return {
             ok: false,

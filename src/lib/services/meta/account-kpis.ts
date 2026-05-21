@@ -1,3 +1,4 @@
+import { getAddToCartFromActions } from "./add-to-cart"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
 import {
@@ -24,8 +25,7 @@ async function fetchAccountKpis(dateRange: DateRange): Promise<AccountKpis> {
 
   const response = await api.get<MetaInsightsResponse>("/insights", {
     params: {
-      fields:
-        "spend,impressions,clicks,ctr,cpm,actions,cost_per_action_type,purchase_roas",
+      fields: "spend,impressions,clicks,ctr,cpm,actions,cost_per_action_type",
       time_range: timeRange,
     },
   })
@@ -38,7 +38,6 @@ async function fetchAccountKpis(dateRange: DateRange): Promise<AccountKpis> {
     cpm: "0",
     actions: [],
     cost_per_action_type: [],
-    purchase_roas: [],
   }
 
   const spend = parseFloat(data.spend || "0")
@@ -48,7 +47,7 @@ async function fetchAccountKpis(dateRange: DateRange): Promise<AccountKpis> {
     data.cost_per_action_type,
     spend
   )
-  const roas = data.purchase_roas?.[0]?.value || "0"
+  const addToCart = getAddToCartFromActions(data.actions)
 
   return {
     totalSpend: spend,
@@ -58,6 +57,7 @@ async function fetchAccountKpis(dateRange: DateRange): Promise<AccountKpis> {
     cpa,
     cpm: parseFloat(data.cpm || "0"),
     purchases: Math.round(purchases),
-    roas: parseFloat(roas),
+    roas: 0,
+    addToCart,
   }
 }

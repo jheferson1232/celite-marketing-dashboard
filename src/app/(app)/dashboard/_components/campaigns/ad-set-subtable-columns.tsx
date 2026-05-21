@@ -79,7 +79,7 @@ export function getAdSetSubtableColumnMeta(
   if (isTikTokAdSetManageColumnId(columnId)) {
     return TIKTOK_AD_SET_MANAGE_COLUMN_META[columnId]
   }
-  if (columnId === "roas" && currency === TIKTOK_DASHBOARD_CURRENCY) {
+  if (columnId === "roas") {
     return { label: "Agreg. carrito", align: "right" as const }
   }
   return AD_SET_SUBTABLE_COLUMN_META[columnId]
@@ -166,16 +166,9 @@ export function renderAdSetSubtableCell(
       )
     }
     case "roas":
-      if (currency === TIKTOK_DASHBOARD_CURRENCY) {
-        return (
-          <div className="text-right">
-            {(row.addToCart ?? 0) > 0 ? formatNumber(row.addToCart ?? 0) : "-"}
-          </div>
-        )
-      }
       return (
         <div className="text-right">
-          {row.roas > 0 ? `${row.roas.toFixed(2)}x` : "-"}
+          {(row.addToCart ?? 0) > 0 ? formatNumber(row.addToCart ?? 0) : "-"}
         </div>
       )
   }

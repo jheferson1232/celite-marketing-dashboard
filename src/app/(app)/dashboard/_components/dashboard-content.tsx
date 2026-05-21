@@ -90,7 +90,11 @@ export function DashboardContent() {
         </div>
       </div>
 
-      <KpiCards data={kpis} isLoading={isLoadingKpis} />
+      <KpiCards
+        data={kpis}
+        isLoading={isLoadingKpis}
+        lastMetric="addToCart"
+      />
 
       <Tabs defaultValue="campaigns" className="flex flex-col gap-4">
         <TabsList>

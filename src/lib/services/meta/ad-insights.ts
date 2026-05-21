@@ -6,6 +6,9 @@ import {
   resolveCreativeMediaUrls,
 } from "./creative-media"
 import { fetchVideoSourcesByIds } from "./creative-video-source"
+import { hasAdDeliveryInPeriod } from "./ad-insights-filter"
+import { fetchPurchaseGenderByAdId } from "./purchase-gender"
+import { extractCreativeDestinationUrl } from "./creative-url"
 import { extractVideoIdFromCreative } from "./extract-video-id"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
@@ -75,6 +78,13 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
 
   if (insights.length === 0) return []
 
+  const genderByAdId = await fetchPurchaseGenderByAdId(dateRange).catch(
+    (error) => {
+      console.error("Error fetching gender purchase breakdown:", error)
+      return new Map<string, { male: number; female: number; unknown: number }>()
+    }
+  )
+
   // 2. Fetch creative metadata in batches of 50
   const adIds = [...new Set(insights.map((r) => r.ad_id).filter(Boolean))]
   const creativeMap = new Map<string, MetaAdCreative>()
@@ -84,9 +94,9 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
   const videoIdMap = new Map<string, string>()
 
   const CREATIVE_FIELDS =
-    "id,effective_status,created_time,creative{id,thumbnail_url,image_url,image_hash,video_id,link_url," +
+    "id,effective_status,created_time,creative{id,thumbnail_url,image_url,image_hash,video_id,link_url,object_url," +
     "object_story_spec{photo_data{url,image_hash},video_data{video_id,image_url,call_to_action{value{link}}}," +
-    "link_data{picture,image_url,link}}," +
+    "link_data{picture,image_url,link,call_to_action{value{link}},child_attachments{link}},template_data{link}}," +
     "asset_feed_spec{link_urls{website_url},videos{video_id}}}"
   const BATCH_SIZE = 50
 
@@ -115,15 +125,7 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
           creativeMap.set(id, ad.creative as MetaAdCreative)
         }
 
-        const spec = ad.creative?.object_story_spec
-        const assetFeed = ad.creative?.asset_feed_spec
-        const url =
-          spec?.link_data?.link ||
-          spec?.video_data?.call_to_action?.value?.link ||
-          assetFeed?.link_urls?.[0]?.website_url ||
-          ad.creative?.link_url ||
-          ""
-        urlMap.set(id, url)
+        urlMap.set(id, extractCreativeDestinationUrl(ad.creative))
 
         const vId = extractVideoIdFromCreative(ad.creative)
         if (vId) videoIdMap.set(id, vId)
@@ -161,7 +163,7 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
     console.error("Error fetching creative media:", error)
   }
 
-  return insights.map((r) => {
+  const rows = insights.map((r) => {
     const adId = r.ad_id
     const vId = videoIdMap.get(adId)
     const creative = creativeMap.get(adId)
@@ -180,6 +182,9 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
       effective_status: statusMap.get(adId) || "",
       url: urlMap.get(adId) || "",
       created_time: createdTimeMap.get(adId) || "",
+      purchasesByGender: genderByAdId.get(adId),
     } as AdInsightRow
   })
+
+  return rows.filter(hasAdDeliveryInPeriod)
 }

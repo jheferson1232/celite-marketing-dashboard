@@ -1,5 +1,9 @@
 import type { AdInsightRow, MetaAction } from "@/lib/services/meta/types"
-import { formatCurrency, type CurrencyCode } from "@/lib/format"
+import {
+  formatCurrency,
+  META_DASHBOARD_CURRENCY,
+  type CurrencyCode,
+} from "@/lib/format"
 
 export function extractAction(
   actions: MetaAction[] | undefined,
@@ -97,6 +101,49 @@ export const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
   { key: "comments", label: "Comentarios" },
 ]
 
+/** Columnas numéricas ordenables en la tabla de creativos Meta. */
+export const META_CREATIVES_TABLE_METRICS: { key: MetricKey; label: string }[] =
+  [
+    { key: "spend", label: "Gasto" },
+    { key: "purchases", label: "Compras" },
+    { key: "cpa", label: "CPA" },
+    { key: "created_at", label: "Fecha de creación" },
+  ]
+
+export function sumPurchasesByGender(
+  group: AdInsightRow[]
+): { male: number; female: number; unknown: number } {
+  return group.reduce(
+    (acc, row) => {
+      const g = row.purchasesByGender
+      if (!g) return acc
+      return {
+        male: acc.male + g.male,
+        female: acc.female + g.female,
+        unknown: acc.unknown + g.unknown,
+      }
+    },
+    { male: 0, female: 0, unknown: 0 }
+  )
+}
+
+export function countUniqueIds(
+  group: AdInsightRow[],
+  field: "campaign_id" | "adset_id"
+): number {
+  return new Set(
+    group.map((row) => row[field]).filter((id): id is string => Boolean(id))
+  ).size
+}
+
+export function genderPurchasePercent(
+  count: number,
+  total: number
+): number {
+  if (total <= 0) return 0
+  return Math.round((count / total) * 100)
+}
+
 export function getMetricValue(row: AdInsightRow, metric: MetricKey): number {
   switch (metric) {
     case "spend":
@@ -166,6 +213,41 @@ export function normThumb(url: string): string {
   } catch {
     return url
   }
+}
+
+/** Fila con mayor gasto en el grupo (miniatura / video representativos). */
+export function pickHighestSpendRow(group: AdInsightRow[]): AdInsightRow {
+  return group.reduce((a, b) =>
+    (parseFloat(a.spend) || 0) >= (parseFloat(b.spend) || 0) ? a : b
+  )
+}
+
+/** Primera URL disponible en el grupo (no solo la del anuncio con más gasto). */
+export function pickUrlFromGroup(group: AdInsightRow[]): string {
+  for (const row of group) {
+    const url = row.url?.trim()
+    if (url) return url
+  }
+  return ""
+}
+
+export function pickCampaignNameFromGroup(group: AdInsightRow[]): string {
+  for (const row of group) {
+    const name = row.campaign_name?.trim()
+    if (name) return name
+  }
+  return ""
+}
+
+/** Meta: sin URL en la card → título = nombre de campaña. */
+export function getCreativeCardDisplayTitle(
+  row: AdInsightRow,
+  currency: CurrencyCode = META_DASHBOARD_CURRENCY
+): string {
+  if (currency === META_DASHBOARD_CURRENCY && !row.url?.trim()) {
+    return row.campaign_name?.trim() || row.ad_name?.trim() || "Sin nombre"
+  }
+  return row.ad_name?.trim() || "Sin nombre"
 }
 
 export function getCreativeKey(row: AdInsightRow): string {

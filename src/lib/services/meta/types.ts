@@ -14,6 +14,8 @@ export interface MetaActionValue {
 }
 
 export interface MetaInsightRow {
+  date_start?: string
+  date_stop?: string
   campaign_name?: string
   campaign_id?: string
   adset_id?: string
@@ -49,6 +51,12 @@ export interface MetaAdSet {
   status: string
 }
 
+export interface MetaCampaign {
+  id: string
+  status?: string
+  effective_status?: string
+}
+
 export type CampaignEntityStatus =
   | "ACTIVE"
   | "PAUSED"
@@ -68,7 +76,7 @@ export interface CampaignAdSetRow {
   results: number
   costPerResult: number
   roas: number
-  /** Agregados al carrito (TikTok web_event_add_to_cart). */
+  /** Agregados al carrito (Meta actions / TikTok web_event_add_to_cart). */
   addToCart?: number
   /** Presupuesto diario en PEN (TikTok ad groups con BUDGET_MODE_DAY). */
   dailyBudget?: number | null
@@ -105,6 +113,8 @@ export interface AccountKpis {
   cpm: number
   purchases: number
   roas: number
+  /** Agregados al carrito (Meta actions / TikTok web_event_add_to_cart). */
+  addToCart?: number
 }
 
 export interface CampaignRow {
@@ -219,6 +229,12 @@ export interface AdInsightRow {
   effective_status: string
   url: string
   created_time?: string
+  /** Compras desglosadas por género (insights con breakdowns=gender). */
+  purchasesByGender?: {
+    male: number
+    female: number
+    unknown: number
+  }
 }
 
 export interface CreativeRow {

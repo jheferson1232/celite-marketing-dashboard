@@ -1,3 +1,4 @@
+import { getAddToCartFromActions } from "./add-to-cart"
 import { OBJECTIVE_TO_ACTION_TYPE } from "./objective"
 import { getMetaClient } from "./meta"
 import type {
@@ -34,6 +35,7 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
       results: 0,
       costPerResult: 0,
       roas: 0,
+      addToCart: 0,
     }
   }
 
@@ -44,9 +46,6 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
     insight.cost_per_action_type?.find(
       (action) => action.action_type === actionType
     )?.value || "0"
-  const roasValue =
-    insight.action_values?.find((action) => action.action_type === actionType)
-      ?.value || "0"
   const spend = parseFloat(insight.spend || "0")
 
   return {
@@ -56,7 +55,8 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
     cpc: parseFloat(insight.cpc || "0"),
     results: parseInt(results, 10),
     costPerResult: parseFloat(costPerResult),
-    roas: spend > 0 ? parseFloat(roasValue) / spend : 0,
+    roas: 0,
+    addToCart: getAddToCartFromActions(insight.actions),
   }
 }
 

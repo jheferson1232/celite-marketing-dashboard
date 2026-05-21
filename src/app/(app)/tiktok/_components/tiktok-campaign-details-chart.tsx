@@ -16,7 +16,11 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import {
+  formatCurrency,
+  TIKTOK_DASHBOARD_CURRENCY,
+  type CurrencyCode,
+} from "@/lib/format"
 import type { TikTokCampaignDailyInsight } from "@/lib/services/tiktok/campaign-daily-insights"
 
 const chartConfig = {
@@ -31,11 +35,13 @@ const chartConfig = {
 } satisfies ChartConfig
 
 interface TikTokCampaignDetailsChartProps {
-  days: TikTokCampaignDailyInsight[]
+  days: Array<Pick<TikTokCampaignDailyInsight, "date" | "spend" | "purchases">>
+  currency?: CurrencyCode
 }
 
 export function TikTokCampaignDetailsChart({
   days,
+  currency = TIKTOK_DASHBOARD_CURRENCY,
 }: TikTokCampaignDetailsChartProps) {
   const data = days.map((day) => ({
     ...day,
@@ -78,7 +84,7 @@ export function TikTokCampaignDetailsChart({
               formatter={(value, name) => {
                 if (name === "spend") {
                   return [
-                    formatCurrency(Number(value), TIKTOK_DASHBOARD_CURRENCY),
+                    formatCurrency(Number(value), currency),
                     "Gasto",
                   ]
                 }

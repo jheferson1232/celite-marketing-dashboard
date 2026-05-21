@@ -34,6 +34,10 @@ import {
   extractPurchaseValue,
   extractRoas,
   mergeEarliestCreatedTime,
+  getCreativeCardDisplayTitle,
+  pickCampaignNameFromGroup,
+  pickHighestSpendRow,
+  pickUrlFromGroup,
 } from "./utils"
 import { cn } from "@/lib/utils"
 
@@ -81,11 +85,13 @@ function mergeGroup(group: AdInsightRow[]): AdInsightRow & { _count: number } {
     base.purchase_roas = [{ action_type: "omni_purchase_roas", value: String(totalPurchaseValue / spend) }]
   }
 
-  const best = group.reduce((a, b) => (parseFloat(a.spend) || 0) >= (parseFloat(b.spend) || 0) ? a : b)
+  const best = pickHighestSpendRow(group)
   base.thumbnail_url = best.thumbnail_url
   base.image_url = best.image_url
   base.video_url = best.video_url
   base.video_id = best.video_id
+  base.url = pickUrlFromGroup(group)
+  base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
   base.created_time = mergeEarliestCreatedTime(group) ?? best.created_time
 
   return { ...base, _count: group.length }
@@ -168,41 +174,55 @@ export function CreativeAdsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((row) => (
-            <TableRow key={row.ad_id} className="group">
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <div className="relative size-12 shrink-0 overflow-hidden rounded border bg-muted">
-                    {row.thumbnail_url || row.image_url ? (
-                      <CreativePreviewImage
-                        thumbnailUrl={row.thumbnail_url}
-                        imageUrl={row.image_url}
-                        alt=""
-                        className="size-full"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center">
-                        {row.video_id ? <RiPlayCircleLine className="size-6 text-muted-foreground" /> : <RiImageLine className="size-6 text-muted-foreground" />}
-                      </div>
-                    )}
+          {sorted.map((row) => {
+            const displayTitle = getCreativeCardDisplayTitle(row, currency)
+            return (
+              <TableRow key={row.ad_id} className="group">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="relative size-12 shrink-0 overflow-hidden rounded border bg-muted">
+                      {row.thumbnail_url || row.image_url ? (
+                        <CreativePreviewImage
+                          thumbnailUrl={row.thumbnail_url}
+                          imageUrl={row.image_url}
+                          alt=""
+                          className="size-full"
+                        />
+                      ) : (
+                        <div className="flex size-full items-center justify-center">
+                          {row.video_id ? (
+                            <RiPlayCircleLine className="size-6 text-muted-foreground" />
+                          ) : (
+                            <RiImageLine className="size-6 text-muted-foreground" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="truncate text-sm font-medium"
+                        title={displayTitle}
+                      >
+                        {displayTitle}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {row._count} anuncio{row._count === 1 ? "" : "s"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={row.ad_name}>
-                      {row.ad_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {row._count} anuncio{row._count === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-              </TableCell>
-              {METRIC_OPTIONS.map((m) => (
-                <TableCell key={m.key} className="text-right tabular-nums">
-                  {formatMetricValue(getMetricValue(row, m.key), m.key, currency)}
                 </TableCell>
-              ))}
-            </TableRow>
-          ))}
+                {METRIC_OPTIONS.map((m) => (
+                  <TableCell key={m.key} className="text-right tabular-nums">
+                    {formatMetricValue(
+                      getMetricValue(row, m.key),
+                      m.key,
+                      currency
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            )
+          })}
         </TableBody>
         <TableFooter className="bg-muted/50 font-medium">
           <TableRow>

@@ -8,6 +8,8 @@ import {
 import type { AdInsightRow } from "@/lib/services/meta/types"
 import { TopCreativesPanel } from "./top-creatives-panel"
 import { CreativeAdsTable } from "./creatives-table"
+import { MetaCreativesTable } from "./meta-creatives-table"
+import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { AdsGridSkeleton } from "./ads-grid-skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RiLayoutGridLine, RiListCheck2 } from "@remixicon/react"
@@ -62,7 +64,11 @@ export function AdsView({
       </TabsContent>
 
       <TabsContent value="table" className="mt-0 border-none p-0 shadow-none">
-        <CreativeAdsTable rows={data} currency={currency} />
+        {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+          <CreativeAdsTable rows={data} currency={currency} />
+        ) : (
+          <MetaCreativesTable rows={data} />
+        )}
       </TabsContent>
     </Tabs>
   )

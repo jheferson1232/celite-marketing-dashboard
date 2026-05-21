@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import type { ChatPlatform } from "@/lib/chat/kpi-response"
 import { cn } from "@/lib/utils"
+import {
+  NOTION_LAUNCH_SUGGESTION,
+  NotionLaunchFlow,
+} from "@/app/(app)/tiktok/_components/notion-launch-flow"
 
 const META_SUGGESTIONS = [
   "¿Cómo nos fue hoy?",
@@ -18,6 +22,7 @@ const META_SUGGESTIONS = [
 
 const TIKTOK_SUGGESTIONS = [
   "¿Cómo nos fue hoy en TikTok?",
+  NOTION_LAUNCH_SUGGESTION,
   "Pausa la campaña cbo urbano",
   "Sube 20% el presupuesto del conjunto con más gasto hoy",
   "Enciende la campaña Hertz Art",
@@ -46,6 +51,7 @@ export function ChatUI({
       ? "métricas de TikTok Ads (soles peruanos)"
       : "campañas y métricas de Meta Ads (pesos colombianos)"
   const [input, setInput] = useState("")
+  const [showNotionLaunch, setShowNotionLaunch] = useState(false)
 
   const { messages, sendMessage, status } = useChat({
     id: chatId,
@@ -78,6 +84,10 @@ export function ChatUI({
 
   function handleSuggestion(text: string) {
     if (isLoading) return
+    if (text === NOTION_LAUNCH_SUGGESTION && platform === "tiktok") {
+      setShowNotionLaunch(true)
+      return
+    }
     sendMessage({ text })
   }
 
@@ -101,19 +111,26 @@ export function ChatUI({
                 </p>
               </div>
             )}
-            <ul className={cn("flex flex-col gap-1.5", compact && "w-full")}>
-              {resolvedSuggestions.map((suggestion) => (
-                <li key={suggestion}>
-                  <button
-                    type="button"
-                    onClick={() => handleSuggestion(suggestion)}
-                    className="hover:bg-muted/80 w-full rounded-lg border bg-muted/40 px-3 py-2.5 text-left text-sm transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {showNotionLaunch && platform === "tiktok" ? (
+              <NotionLaunchFlow
+                compact={compact}
+                onClose={() => setShowNotionLaunch(false)}
+              />
+            ) : (
+              <ul className={cn("flex flex-col gap-1.5", compact && "w-full")}>
+                {resolvedSuggestions.map((suggestion) => (
+                  <li key={suggestion}>
+                    <button
+                      type="button"
+                      onClick={() => handleSuggestion(suggestion)}
+                      className="hover:bg-muted/80 w-full rounded-lg border bg-muted/40 px-3 py-2.5 text-left text-sm transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         ) : (
           <div

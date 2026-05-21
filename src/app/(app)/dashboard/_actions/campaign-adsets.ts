@@ -1,6 +1,7 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
+import { getAddToCartFromActions } from "@/lib/services/meta/add-to-cart"
 import { OBJECTIVE_TO_ACTION_TYPE } from "@/lib/services/meta/objective"
 import { getMetaClient } from "@/lib/services/meta/meta"
 import type {
@@ -40,6 +41,7 @@ function mapInsightToMetrics(
       results: 0,
       costPerResult: 0,
       roas: 0,
+      addToCart: 0,
     }
   }
 
@@ -50,9 +52,6 @@ function mapInsightToMetrics(
     insight.cost_per_action_type?.find(
       (action) => action.action_type === actionType
     )?.value || "0"
-  const roasValue =
-    insight.action_values?.find((action) => action.action_type === actionType)
-      ?.value || "0"
   const spend = parseFloat(insight.spend || "0")
 
   return {
@@ -62,7 +61,8 @@ function mapInsightToMetrics(
     cpc: parseFloat(insight.cpc || "0"),
     results: parseInt(results, 10),
     costPerResult: parseFloat(costPerResult),
-    roas: spend > 0 ? parseFloat(roasValue) / spend : 0,
+    roas: 0,
+    addToCart: getAddToCartFromActions(insight.actions),
   }
 }
 

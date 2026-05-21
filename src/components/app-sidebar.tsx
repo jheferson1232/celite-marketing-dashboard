@@ -2,7 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { RiMegaphoneLine, RiMetaLine, RiTiktokLine } from "@remixicon/react"
+import {
+  RiBarChartGroupedLine,
+  RiMegaphoneLine,
+  RiMetaLine,
+  RiTiktokLine,
+} from "@remixicon/react"
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +22,12 @@ import {
 } from "@/components/ui/sidebar"
 
 const navItems = [
+  {
+    id: "resumen",
+    title: "Resumen",
+    href: "/resumen",
+    icon: RiBarChartGroupedLine,
+  },
   {
     id: "meta",
     title: "Meta",
@@ -65,10 +76,14 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={
-                      item.id === "tiktok"
-                        ? pathname === "/tiktok"
-                        : pathname === "/dashboard" ||
-                          pathname.startsWith("/dashboard/")
+                      item.id === "resumen"
+                        ? pathname === "/resumen" ||
+                          pathname.startsWith("/resumen/")
+                        : item.id === "tiktok"
+                          ? pathname === "/tiktok" ||
+                            pathname.startsWith("/tiktok/")
+                          : pathname === "/dashboard" ||
+                            pathname.startsWith("/dashboard/")
                     }
                     tooltip={item.title}
                   >

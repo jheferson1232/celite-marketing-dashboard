@@ -8,6 +8,13 @@ import type { DateRange } from "@/lib/services/meta/types"
 import { getTikTokAccountKpis } from "@/lib/services/tiktok/account-kpis"
 import { getTikTokCampaignAdGroupsByCampaignId } from "@/lib/services/tiktok/campaign-adgroups"
 import { getTikTokCampaignsList } from "@/lib/services/tiktok/campaigns-list"
+import { fetchAllPages } from "@/lib/services/tiktok/fetch-all-pages"
+import {
+  fetchCachedAdGroupMetricsByDateRange,
+  getMetricNumber,
+  getPurchases,
+} from "@/lib/services/tiktok/report"
+import type { TikTokAdGroup } from "@/lib/services/tiktok/types"
 import {
   getTikTokAdGroupDailyBudget,
   setTikTokCampaignStatusOnly,
@@ -24,7 +31,6 @@ import {
   assertCallbackDataLength,
   encodeCallback,
 } from "./callback-data"
-import { getConfirmCancelRow } from "./keyboards"
 
 function pen(amount: number): string {
   return formatCurrency(amount, TIKTOK_DASHBOARD_CURRENCY)
@@ -89,6 +95,135 @@ export async function formatTikTokActiveCampaignsMessage(
   )
 }
 
+function formatPurchaseCount(count: number): string {
+  return count > 0
+    ? `${count} compra${count === 1 ? "" : "s"}`
+    : "0 compras"
+}
+
+/** Misma lista que el botón «TT conjuntos activos»: campaña activa, conjunto ON, gasto > 0 hoy. */
+export type VisibleTikTokAdSet = {
+  adgroupId: string
+  name: string
+  campaignId: string
+  campaignName: string
+  spend: number
+  purchases: number
+}
+
+export async function getTikTokVisibleActiveAdSets(
+  dateRange: DateRange
+): Promise<VisibleTikTokAdSet[]> {
+  const [adGroups, metricsByAdGroup, campaigns] = await Promise.all([
+    fetchAllPages<TikTokAdGroup>("/adgroup/get/"),
+    fetchCachedAdGroupMetricsByDateRange(dateRange),
+    getTikTokCampaignsList(dateRange),
+  ])
+
+  const campaignById = new Map(campaigns.map((c) => [c.id, c]))
+
+  return adGroups
+    .filter((g) => g.operation_status === "ENABLE")
+    .map((g) => {
+      const metrics = metricsByAdGroup.get(g.adgroup_id) ?? {}
+      const spend = getMetricNumber(metrics, "spend")
+      const campaign = campaignById.get(g.campaign_id)
+      return {
+        adgroupId: g.adgroup_id,
+        name: g.adgroup_name || "Sin nombre",
+        campaignId: g.campaign_id,
+        campaignName: campaign?.name ?? "Campaña",
+        spend,
+        purchases: getPurchases(metrics),
+        operationStatus: campaign?.operationStatus,
+      }
+    })
+    .filter(
+      (g) => g.spend > 0 && g.operationStatus === "ENABLE"
+    )
+    .map(({ operationStatus: _, ...g }) => g)
+    .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name))
+}
+
+function adGroupPickerLabel(name: string, spend: number, max = 38): string {
+  const spendLabel = pen(spend)
+  const room = Math.max(8, max - spendLabel.length - 3)
+  const namePart =
+    name.length <= room ? name : `…${name.slice(-(room - 1))}`
+  return `${namePart} · ${spendLabel}`
+}
+
+/** Conjuntos TikTok activos con gasto, agrupados por campaña. */
+export async function formatTikTokActiveAdSetsMessage(
+  dateRange: DateRange,
+  periodLabel = "hoy"
+): Promise<string> {
+  const activeAdSets = await getTikTokVisibleActiveAdSets(dateRange)
+
+  if (activeAdSets.length === 0) {
+    return `**TikTok — conjuntos activos (${periodLabel})**\n\nNo hay conjuntos activos con gasto en este periodo.`
+  }
+
+  const campaigns = await getTikTokCampaignsList(dateRange)
+  const campaignById = new Map(campaigns.map((c) => [c.id, c]))
+
+  const byCampaign = new Map<
+    string,
+    {
+      name: string
+      spend: number
+      purchases: number
+      adSets: VisibleTikTokAdSet[]
+    }
+  >()
+
+  for (const adSet of activeAdSets) {
+    const campaign = campaignById.get(adSet.campaignId)
+    const existing = byCampaign.get(adSet.campaignId)
+    if (existing) {
+      existing.adSets.push(adSet)
+      continue
+    }
+    byCampaign.set(adSet.campaignId, {
+      name: adSet.campaignName,
+      spend: campaign?.spend ?? 0,
+      purchases: campaign?.results ?? 0,
+      adSets: [adSet],
+    })
+  }
+
+  const sections = [...byCampaign.values()]
+    .map((section) => ({
+      ...section,
+      adSets: [...section.adSets].sort(
+        (a, b) => b.spend - a.spend || a.name.localeCompare(b.name)
+      ),
+    }))
+    .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name))
+    .slice(0, 10)
+
+  const totalSpend = activeAdSets.reduce((sum, g) => sum + g.spend, 0)
+  const totalPurchases = activeAdSets.reduce((sum, g) => sum + g.purchases, 0)
+
+  const blocks = sections.map((section) => {
+    const adSetLines = section.adSets.map((g) => {
+      return `   **${g.name}**\n      Gasto ${pen(g.spend)} · ${formatPurchaseCount(g.purchases)}`
+    })
+    return (
+      `* **${section.name}**\n` +
+      `   Gasto ${pen(section.spend)} · ${formatPurchaseCount(section.purchases)}\n` +
+      adSetLines.join("\n")
+    )
+  })
+
+  return (
+    `**TikTok — conjuntos activos (${periodLabel})**\n` +
+    `${activeAdSets.length} conjunto${activeAdSets.length === 1 ? "" : "s"} · ` +
+    `Gasto ${pen(totalSpend)} · ${totalPurchases} compras\n\n` +
+    blocks.join("\n\n")
+  )
+}
+
 export async function formatTikTokCampaignsMessage(
   dateRange: DateRange
 ): Promise<string> {
@@ -120,6 +255,24 @@ function truncateLabel(name: string, max = 28): string {
   const trimmed = name.trim()
   if (trimmed.length <= max) return trimmed
   return `${trimmed.slice(0, max - 1)}…`
+}
+
+export async function buildAdGroupPausePickerKeyboard(
+  dateRange: DateRange
+): Promise<InlineKeyboardButton[][]> {
+  const visible = await getTikTokVisibleActiveAdSets(dateRange)
+
+  const rows: InlineKeyboardButton[][] = visible.slice(0, 8).map((g) => [
+    {
+      text: `⏸ ${adGroupPickerLabel(g.name, g.spend)}`,
+      callback_data: assertCallbackDataLength(
+        encodeCallback({ type: "select_pause_adgroup", adgroupId: g.adgroupId })
+      ),
+    },
+  ])
+
+  rows.push([{ text: "❌ Cancelar", callback_data: "x" }])
+  return rows
 }
 
 export async function buildCampaignPickerKeyboard(
@@ -247,34 +400,13 @@ export async function resolveCampaignName(
   return campaigns.find((c) => c.id === campaignId)?.name ?? campaignId
 }
 
-export async function getConfirmPauseMessage(
-  campaignId: string,
-  dateRange: DateRange
-): Promise<{ text: string; keyboard: InlineKeyboardButton[][] }> {
-  const name = await resolveCampaignName(campaignId, dateRange)
-  return {
-    text: `¿**Pausar** la campaña?\n\n**${name}**\n\nSolo se apaga la campaña (los conjuntos no cambian).`,
-    keyboard: getConfirmCancelRow(
-      assertCallbackDataLength(
-        encodeCallback({ type: "confirm_pause", campaignId })
-      )
-    ),
-  }
-}
-
-export async function getConfirmActivateMessage(
-  campaignId: string,
-  dateRange: DateRange
-): Promise<{ text: string; keyboard: InlineKeyboardButton[][] }> {
-  const name = await resolveCampaignName(campaignId, dateRange)
-  return {
-    text: `¿**Activar** la campaña?\n\n**${name}**`,
-    keyboard: getConfirmCancelRow(
-      assertCallbackDataLength(
-        encodeCallback({ type: "confirm_activate", campaignId })
-      )
-    ),
-  }
+export async function resolveAdGroupName(
+  adgroupId: string
+): Promise<string> {
+  const adGroups = await fetchAllPages<TikTokAdGroup>("/adgroup/get/")
+  return (
+    adGroups.find((g) => g.adgroup_id === adgroupId)?.adgroup_name ?? adgroupId
+  )
 }
 
 export async function getBudgetPickerMessage(
@@ -306,7 +438,7 @@ export async function getBudgetPickerMessage(
     current != null && current > 0 ? pen(current) : "sin definir"
 
   return {
-    text: `**${groupName}**\nPresupuesto actual: ${currentLabel}\n\nElige monto o % (luego confirma):`,
+    text: `**${groupName}**\nPresupuesto actual: ${currentLabel}\n\nToca el monto o % para aplicar:`,
     keyboard: await buildBudgetAmountKeyboard(adgroupId, current),
   }
 }
@@ -373,7 +505,9 @@ export async function activateCampaignByNameQuery(
     return { text: `No encontré campaña TikTok con "${nameQuery}".` }
   }
   if (matches.length === 1) {
-    return getConfirmActivateMessage(matches[0]!.campaignId, dateRange)
+    return {
+      text: await executeConfirmActivate(matches[0]!.campaignId),
+    }
   }
 
   const rows: InlineKeyboardButton[][] = matches.slice(0, 6).map((c) => [
@@ -402,8 +536,9 @@ export async function pauseCampaignByNameQuery(
     return { text: `No encontré campaña TikTok con "${nameQuery}".` }
   }
   if (matches.length === 1) {
-    const msg = await getConfirmPauseMessage(matches[0]!.campaignId, dateRange)
-    return msg
+    return {
+      text: await executeConfirmPause(matches[0]!.campaignId),
+    }
   }
 
   const rows: InlineKeyboardButton[][] = matches.slice(0, 6).map((c) => [
@@ -421,46 +556,67 @@ export async function pauseCampaignByNameQuery(
   }
 }
 
+export async function pauseAdGroupByNameQuery(
+  nameQuery: string
+): Promise<{ text: string; keyboard?: InlineKeyboardButton[][] }> {
+  const dateRange = parseDateRangeArg("hoy")
+  const normalized = nameQuery.trim().toLowerCase()
+  const visible = await getTikTokVisibleActiveAdSets(dateRange)
+  const matches = visible.filter((g) =>
+    g.name.toLowerCase().includes(normalized)
+  )
+
+  if (matches.length === 0) {
+    return {
+      text: `No encontré "${nameQuery}" entre los conjuntos activos con gasto hoy. Revisa **🎯 TT conjuntos activos**.`,
+    }
+  }
+  if (matches.length === 1) {
+    return {
+      text: await executeConfirmPauseAdGroup(matches[0]!.adgroupId),
+    }
+  }
+
+  const rows: InlineKeyboardButton[][] = matches.slice(0, 6).map((g) => [
+    {
+      text: adGroupPickerLabel(g.name, g.spend),
+      callback_data: assertCallbackDataLength(
+        encodeCallback({ type: "select_pause_adgroup", adgroupId: g.adgroupId })
+      ),
+    },
+  ])
+  rows.push([{ text: "❌ Cancelar", callback_data: "x" }])
+  return {
+    text: `Varios conjuntos activos coinciden con "${nameQuery}". Elige uno:`,
+    keyboard: rows,
+  }
+}
+
 export async function setAdGroupBudgetByQuery(
   nameQuery: string,
   budget: number
 ): Promise<{ text: string; keyboard?: InlineKeyboardButton[][] }> {
   const dateRange = parseDateRangeArg("hoy")
-  const campaigns = await getTikTokCampaignsList(dateRange)
+  const normalized = nameQuery.trim().toLowerCase()
+  const visible = await getTikTokVisibleActiveAdSets(dateRange)
+  const matches = visible.filter((g) =>
+    g.name.toLowerCase().includes(normalized)
+  )
 
-  let allMatches: { adgroupId: string; name: string }[] = []
-
-  for (const campaign of campaigns) {
-    const adGroups = await getTikTokCampaignAdGroupsByCampaignId(
-      campaign.id,
-      dateRange
-    )
-    allMatches.push(
-      ...findTikTokAdGroupsByName(adGroups, nameQuery).map((g) => ({
-        adgroupId: g.adgroupId,
-        name: g.name,
-      }))
-    )
-  }
-
-  if (allMatches.length === 0) {
-    return { text: `No encontré conjunto con "${nameQuery}".` }
-  }
-  if (allMatches.length === 1) {
-    const id = allMatches[0]!.adgroupId
+  if (matches.length === 0) {
     return {
-      text: `¿Poner **${allMatches[0]!.name}** en **${pen(budget)}/día**?`,
-      keyboard: getConfirmCancelRow(
-        assertCallbackDataLength(
-          encodeCallback({ type: "confirm_budget", adgroupId: id, budget })
-        )
-      ),
+      text: `No encontré "${nameQuery}" entre los conjuntos activos con gasto hoy.`,
+    }
+  }
+  if (matches.length === 1) {
+    return {
+      text: await executeConfirmBudget(matches[0]!.adgroupId, budget),
     }
   }
 
-  const rows: InlineKeyboardButton[][] = allMatches.slice(0, 6).map((g) => [
+  const rows: InlineKeyboardButton[][] = matches.slice(0, 6).map((g) => [
     {
-      text: truncateLabel(g.name),
+      text: adGroupPickerLabel(g.name, g.spend),
       callback_data: assertCallbackDataLength(
         encodeCallback({
           type: "confirm_budget",
@@ -481,7 +637,9 @@ export async function setAdGroupBudgetByQuery(
 export async function executeConfirmPauseAdGroup(
   adgroupId: string
 ): Promise<string> {
+  const name = await resolveAdGroupName(adgroupId)
   await updateTikTokAdGroupStatus([adgroupId], "DISABLE")
   clearTikTokCache()
-  return `✅ Conjunto pausado en TikTok.`
+  return `✅ Conjunto **${name}** pausado en TikTok.`
 }
+

@@ -11,6 +11,7 @@ import {
   sendTelegramAssistantReply,
   sendTelegramMessage,
   splitTelegramMessage,
+  type InlineKeyboardButton,
 } from "./bot"
 import { handleTelegramCallback } from "./callback-handler"
 import { isTelegramUserAllowed } from "./config"
@@ -27,11 +28,14 @@ import {
 } from "./keyboards"
 import {
   buildAdGroupBudgetPickerKeyboard,
+  buildAdGroupPausePickerKeyboard,
   buildCampaignPickerKeyboard,
+  formatTikTokActiveAdSetsMessage,
   formatTikTokActiveCampaignsMessage,
   formatTikTokCampaignsMessage,
   parseDateRangeArg,
   activateCampaignByNameQuery,
+  pauseAdGroupByNameQuery,
   pauseCampaignByNameQuery,
   setAdGroupBudgetByQuery,
 } from "./tiktok-quick-actions"
@@ -71,9 +75,16 @@ const HELP_TEXT = `**Comandos**
 /tiktok — Modo TikTok (PEN)
 /meta — Modo Meta (COP)
 
+**TikTok — acciones**
+/pausar — Pausar campaña (elige o nombre)
+/pausarconjunto — Pausar conjunto activo
+/activar — Activar campaña
+/presupuesto — Subir presupuesto de conjunto
+
 **Teclado**
 📊 Gasto total hoy · 📅 Gasto total ayer
 📘 FB campañas activas · 🎵 TT campañas activas
+🎯 TT conjuntos activos
 
 También puedes escribir en español y el asistente responderá.`
 
@@ -84,6 +95,18 @@ function getCommand(text: string): string | null {
 
 function getCommandArgs(text: string): string {
   return text.replace(/^\/[a-z0-9_]+(?:@\w+)?\s*/i, "").trim()
+}
+
+async function sendTikTokActionResult(
+  chatId: number,
+  result: { text: string; keyboard?: InlineKeyboardButton[][] }
+): Promise<void> {
+  await sendTelegramMessage(chatId, result.text, {
+    html: true,
+    replyMarkup: result.keyboard
+      ? { inline_keyboard: result.keyboard }
+      : getTelegramReplyKeyboard(),
+  })
 }
 
 async function sendWithReplyKeyboard(
@@ -132,6 +155,12 @@ async function handleShortcut(
     case REPLY_SHORTCUT.TT_ACTIVAS: {
       const range = parseDateRangeArg("hoy")
       const text = await formatTikTokActiveCampaignsMessage(range, "hoy")
+      await sendWithReplyKeyboard(chatId, text, { html: true })
+      return
+    }
+    case REPLY_SHORTCUT.TT_CONJUNTOS: {
+      const range = parseDateRangeArg("hoy")
+      const text = await formatTikTokActiveAdSetsMessage(range, "hoy")
       await sendWithReplyKeyboard(chatId, text, { html: true })
       return
     }
@@ -222,13 +251,24 @@ async function handleCommand(
         })
         return
       }
-      const result = await pauseCampaignByNameQuery(args)
-      await sendTelegramMessage(chatId, result.text, {
-        html: true,
-        replyMarkup: result.keyboard
-          ? { inline_keyboard: result.keyboard }
-          : getTelegramReplyKeyboard(),
-      })
+      await sendTikTokActionResult(chatId, await pauseCampaignByNameQuery(args))
+      return
+    }
+
+    case "pausarconjunto":
+    case "pausar_conjunto": {
+      await setTelegramPlatform(telegramUserId, "tiktok")
+      if (!args) {
+        const keyboard = await buildAdGroupPausePickerKeyboard(
+          parseDateRangeArg("hoy")
+        )
+        await sendTelegramMessage(chatId, "Elige el **conjunto** a pausar:", {
+          html: true,
+          replyMarkup: { inline_keyboard: keyboard },
+        })
+        return
+      }
+      await sendTikTokActionResult(chatId, await pauseAdGroupByNameQuery(args))
       return
     }
 
@@ -245,13 +285,7 @@ async function handleCommand(
         })
         return
       }
-      const activateResult = await activateCampaignByNameQuery(args)
-      await sendTelegramMessage(chatId, activateResult.text, {
-        html: true,
-        replyMarkup: activateResult.keyboard
-          ? { inline_keyboard: activateResult.keyboard }
-          : getTelegramReplyKeyboard(),
-      })
+      await sendTikTokActionResult(chatId, await activateCampaignByNameQuery(args))
       return
     }
 
@@ -277,13 +311,10 @@ async function handleCommand(
         )
         return
       }
-      const result = await setAdGroupBudgetByQuery(nameQuery, budget)
-      await sendTelegramMessage(chatId, result.text, {
-        html: true,
-        replyMarkup: result.keyboard
-          ? { inline_keyboard: result.keyboard }
-          : getTelegramReplyKeyboard(),
-      })
+      await sendTikTokActionResult(
+        chatId,
+        await setAdGroupBudgetByQuery(nameQuery, budget)
+      )
       return
     }
 
@@ -294,6 +325,63 @@ async function handleCommand(
         { html: true }
       )
   }
+}
+
+/** Frases en español → acciones TikTok sin pasar por el asistente. */
+async function handleNaturalTikTokAction(
+  chatId: number,
+  text: string
+): Promise<boolean> {
+  const normalized = text.trim()
+
+  const pauseAdGroup = normalized.match(
+    /^(?:apagar|pausar|desactivar)\s+(?:el\s+)?(?:conjunto\s+)?(.+)$/i
+  )
+  if (pauseAdGroup?.[1]) {
+    await sendTikTokActionResult(
+      chatId,
+      await pauseAdGroupByNameQuery(pauseAdGroup[1].trim())
+    )
+    return true
+  }
+
+  const pauseCampaign = normalized.match(
+    /^(?:apagar|pausar|desactivar)\s+(?:la\s+)?campa(?:ñ|n)a\s+(.+)$/i
+  )
+  if (pauseCampaign?.[1]) {
+    await sendTikTokActionResult(
+      chatId,
+      await pauseCampaignByNameQuery(pauseCampaign[1].trim())
+    )
+    return true
+  }
+
+  const activateCampaign = normalized.match(
+    /^(?:activar|encender|prender)\s+(?:la\s+)?campa(?:ñ|n)a\s+(.+)$/i
+  )
+  if (activateCampaign?.[1]) {
+    await sendTikTokActionResult(
+      chatId,
+      await activateCampaignByNameQuery(activateCampaign[1].trim())
+    )
+    return true
+  }
+
+  const budgetMatch = normalized.match(
+    /^(?:presupuesto|sube?\s+presupuesto|pon(?:er)?)\s+(.+?)\s+(?:a\s+|en\s+)?(?:s\/?\s*)?(\d+(?:[.,]\d+)?)\s*$/i
+  )
+  if (budgetMatch?.[1] && budgetMatch[2]) {
+    const budget = Number(budgetMatch[2].replace(",", "."))
+    if (Number.isFinite(budget) && budget > 0) {
+      await sendTikTokActionResult(
+        chatId,
+        await setAdGroupBudgetByQuery(budgetMatch[1].trim(), budget)
+      )
+      return true
+    }
+  }
+
+  return false
 }
 
 async function handleQuestion(
@@ -353,7 +441,13 @@ async function handleCallbackQuery(
     return
   }
 
-  await handleTelegramCallback(chatId, messageId, query.id, query.data)
+  await handleTelegramCallback(
+    telegramUserId,
+    chatId,
+    messageId,
+    query.id,
+    query.data
+  )
 }
 
 export async function processTelegramUpdate(
@@ -387,6 +481,10 @@ export async function processTelegramUpdate(
   const command = getCommand(text)
   if (command) {
     await handleCommand(telegramUserId, telegramChatId, command, getCommandArgs(text))
+    return
+  }
+
+  if (await handleNaturalTikTokAction(telegramChatId, text)) {
     return
   }
 

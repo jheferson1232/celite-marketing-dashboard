@@ -66,7 +66,27 @@ export function getCampaignPerformanceStatus(
   return "EN_CURSO"
 }
 
-/** Fondo de celda Costo/Res según CPA (umbrales en PEN para TikTok). */
+const COST_PER_RESULT_CELL_CLASSES = {
+  green:
+    "bg-green-50 text-green-800 dark:bg-green-500/15 dark:text-green-400",
+  orange:
+    "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400",
+  red: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400",
+} as const
+
+function getMetaCostPerResultCellClassName(costPerResult: number): string {
+  if (costPerResult > 20_000) return COST_PER_RESULT_CELL_CLASSES.red
+  if (costPerResult >= 10_000) return COST_PER_RESULT_CELL_CLASSES.orange
+  return COST_PER_RESULT_CELL_CLASSES.green
+}
+
+function getTikTokCostPerResultCellClassName(costPerResult: number): string {
+  if (costPerResult > 20) return COST_PER_RESULT_CELL_CLASSES.red
+  if (costPerResult > 10) return COST_PER_RESULT_CELL_CLASSES.orange
+  return COST_PER_RESULT_CELL_CLASSES.green
+}
+
+/** Fondo de celda Costo/Res: verde (bajo), naranja en curso, rojo crítico. */
 export function getCostPerResultCellClassName(
   costPerResult: number,
   currency: CurrencyCode = "COP"
@@ -74,18 +94,8 @@ export function getCostPerResultCellClassName(
   if (costPerResult <= 0) return undefined
 
   if (currency === TIKTOK_DASHBOARD_CURRENCY) {
-    if (costPerResult > 20) {
-      return "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400"
-    }
-    if (costPerResult > 10) {
-      return "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400"
-    }
-    return "bg-green-50 dark:bg-green-500/15"
+    return getTikTokCostPerResultCellClassName(costPerResult)
   }
 
-  if (costPerResult > 0 && costPerResult < 10_000) {
-    return "bg-green-50 dark:bg-green-500/15"
-  }
-
-  return undefined
+  return getMetaCostPerResultCellClassName(costPerResult)
 }

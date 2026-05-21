@@ -13,12 +13,15 @@ interface KpiCardsProps {
   data?: AccountKpis
   isLoading: boolean
   currency?: CurrencyCode
+  /** Meta: agregados al carrito. TikTok: ROAS (por defecto). */
+  lastMetric?: "roas" | "addToCart"
 }
 
 export function KpiCards({
   data,
   isLoading,
   currency = META_DASHBOARD_CURRENCY,
+  lastMetric = "roas",
 }: KpiCardsProps) {
   const formatNumber = (val: number) =>
     new Intl.NumberFormat("es-ES").format(val)
@@ -51,7 +54,15 @@ export function KpiCards({
         : formatCurrency(0, currency),
     },
     { label: "COMPRAS", value: data ? formatNumber(data.purchases) : "0" },
-    { label: "ROAS", value: data ? formatMultiplier(data.roas) : "0.00x" },
+    lastMetric === "addToCart"
+      ? {
+          label: "AGREG. CARRITO",
+          value: data ? formatNumber(data.addToCart ?? 0) : "0",
+        }
+      : {
+          label: "ROAS",
+          value: data ? formatMultiplier(data.roas) : "0.00x",
+        },
   ]
 
   return (

@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { TikTokCampaignDetailsContent } from "@/app/(app)/tiktok/_components/tiktok-campaign-details-content"
+import { MetaCampaignDetailsContent } from "./meta-campaign-details-content"
 
 interface CampaignDetailsSheetProps {
   campaign: CampaignRow | null
@@ -35,18 +36,20 @@ export function CampaignDetailsSheet({
               Rendimiento de los últimos 7 días en TikTok Ads
             </SheetDescription>
           ) : (
-            <SheetDescription>Detalles de campaña</SheetDescription>
+            <SheetDescription>
+              Rendimiento de los últimos 7 días en Meta Ads
+            </SheetDescription>
           )}
         </SheetHeader>
 
         {platform === "tiktok" && campaign?.id ? (
           <TikTokCampaignDetailsContent campaignId={campaign.id} />
-        ) : (
-          <p className="px-4 text-sm text-muted-foreground">
-            Los detalles con gráfico diario están disponibles en el dashboard
-            TikTok.
-          </p>
-        )}
+        ) : platform === "meta" && campaign?.id ? (
+          <MetaCampaignDetailsContent
+            campaignId={campaign.id}
+            objective={campaign.objective ?? ""}
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   )
