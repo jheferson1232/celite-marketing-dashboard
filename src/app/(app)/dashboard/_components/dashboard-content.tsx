@@ -64,21 +64,22 @@ export function DashboardContent() {
   })
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 p-6 lg:gap-8 lg:p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Meta
-        </h1>
-        <div className="flex items-center gap-2">
+    <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Meta</h1>
+        </div>
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
             onRangeChange={(range) => setDateRange(range)}
+            className="w-full sm:w-auto"
           />
           <Button
             type="button"
             variant="outline"
-            className="h-9 gap-2 px-3"
+            className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
             onClick={handleReload}
             disabled={isReloading}
           >
@@ -96,21 +97,24 @@ export function DashboardContent() {
         lastMetric="addToCart"
       />
 
-      <Tabs defaultValue="campaigns" className="flex flex-col gap-4">
-        <TabsList>
-          <TabsTrigger value="campaigns">
+      <Tabs
+        defaultValue="campaigns"
+        className="flex min-w-0 w-full flex-col gap-4"
+      >
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="campaigns" className="flex-1 sm:flex-none">
             <RiMegaphoneLine />
             Campañas
           </TabsTrigger>
-          <TabsTrigger value="ads">
+          <TabsTrigger value="ads" className="flex-1 sm:flex-none">
             <RiAdvertisementLine />
             Anuncios
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="campaigns">
+        <TabsContent value="campaigns" className="min-w-0 outline-none">
           <CampaignsTable data={campaigns} isLoading={isLoadingCampaigns} />
         </TabsContent>
-        <TabsContent value="ads">
+        <TabsContent value="ads" className="min-w-0 outline-none">
           <AdsView data={adInsights} isLoading={isLoadingAdInsights} />
         </TabsContent>
       </Tabs>

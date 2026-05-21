@@ -35,7 +35,11 @@ import type {
   CampaignPerformanceFilter,
   CampaignPerformanceStatus,
 } from "./types"
-import { usePersistedColumnVisibility } from "./use-persisted-column-visibility"
+import {
+  META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
+  usePersistedColumnVisibility,
+} from "./use-persisted-column-visibility"
+import type { VisibilityState } from "@tanstack/react-table"
 import {
   getCampaignPerformanceStatus,
   getTikTokCampaignPerformanceStatus,
@@ -51,6 +55,8 @@ interface CampaignsTableProps {
   adSetsQueryKeyPrefix?: string
   fetchCampaignAdSets?: FetchCampaignAdSetsAction
   enableTikTokManage?: boolean
+  columnVisibilityStorageKey?: string
+  defaultColumnVisibility?: VisibilityState
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -69,6 +75,8 @@ export function CampaignsTable({
   adSetsQueryKeyPrefix,
   fetchCampaignAdSets,
   enableTikTokManage = false,
+  columnVisibilityStorageKey = META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
+  defaultColumnVisibility = {},
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -80,7 +88,10 @@ export function CampaignsTable({
     React.useState<CampaignRow | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false)
   const { columnVisibility, setColumnVisibility } =
-    usePersistedColumnVisibility()
+    usePersistedColumnVisibility(
+      columnVisibilityStorageKey,
+      defaultColumnVisibility
+    )
   const tableData = data ?? EMPTY_DATA
 
   const handleToggleAdSets = React.useCallback((campaignId: string) => {
@@ -224,8 +235,8 @@ export function CampaignsTable({
     .map((column) => column.id)
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="min-w-0 w-full max-w-full space-y-3">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <CampaignStatusFilters
           counts={statusCounts}
           selectedFilter={selectedPerformanceFilter}
@@ -239,14 +250,8 @@ export function CampaignsTable({
         <ColumnVisibilityToggle table={table} />
       </div>
 
-      <div
-        className={
-          enableTikTokManage
-            ? "overflow-x-auto overscroll-x-contain rounded-lg border [-webkit-overflow-scrolling:touch]"
-            : "rounded-lg border"
-        }
-      >
-        <Table className={enableTikTokManage ? "min-w-[72rem] w-max" : undefined}>
+      <div className="min-w-0 w-full max-w-full rounded-lg border">
+        <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">

@@ -39,12 +39,10 @@ import {
 } from "./utils"
 import { CreativePreviewDialog } from "./creative-preview-dialog"
 import { CreativePreviewImage } from "./creative-preview-image"
-import { cn } from "@/lib/utils"
 
 interface TopCreativesPanelProps {
   rows: AdInsightRow[]
   currency?: CurrencyCode
-  compactTabletLayout?: boolean
 }
 
 function mergeRows(group: AdInsightRow[]): AdInsightRow {
@@ -266,7 +264,6 @@ function CreativeCard({
 export function TopCreativesPanel({
   rows,
   currency = META_DASHBOARD_CURRENCY,
-  compactTabletLayout = false,
 }: TopCreativesPanelProps) {
   const metricOptions =
     currency === META_DASHBOARD_CURRENCY
@@ -389,30 +386,17 @@ export function TopCreativesPanel({
         </div>
       </div>
 
-      <div
-        className={cn(
-          compactTabletLayout
-            ? "flex gap-4 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch] snap-x snap-mandatory xl:grid xl:grid-cols-4 xl:overflow-visible xl:snap-none 2xl:grid-cols-6"
-            : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
-        )}
-      >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
         {sortedRows.map(({ key, merged, count }) => (
-          <div
+          <CreativeCard
             key={key}
-            className={cn(
-              compactTabletLayout &&
-                "w-[11.5rem] shrink-0 snap-start xl:w-auto xl:shrink"
-            )}
-          >
-            <CreativeCard
-              creativeKey={key}
-              row={merged}
-              metrics={selectedMetrics}
-              metricOptions={metricOptions}
-              currency={currency}
-              adsCount={count}
-            />
-          </div>
+            creativeKey={key}
+            row={merged}
+            metrics={selectedMetrics}
+            metricOptions={metricOptions}
+            currency={currency}
+            adsCount={count}
+          />
         ))}
       </div>
     </div>

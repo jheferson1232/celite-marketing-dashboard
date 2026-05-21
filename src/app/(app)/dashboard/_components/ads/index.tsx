@@ -18,8 +18,6 @@ interface AdsViewProps {
   data?: AdInsightRow[]
   isLoading: boolean
   currency?: CurrencyCode
-  /** TikTok tablet: fila horizontal deslizable de creativos. */
-  compactTabletLayout?: boolean
 }
 
 function AdsEmptyState({ currency }: { currency: CurrencyCode }) {
@@ -38,7 +36,6 @@ export function AdsView({
   data,
   isLoading,
   currency = META_DASHBOARD_CURRENCY,
-  compactTabletLayout = false,
 }: AdsViewProps) {
   if (isLoading) {
     return <AdsGridSkeleton />
@@ -49,15 +46,15 @@ export function AdsView({
   }
 
   return (
-    <Tabs defaultValue="grid" className="space-y-6">
-      <div className="flex items-center justify-between">
+    <Tabs defaultValue="grid" className="min-w-0 w-full space-y-6">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold">Creativos</h2>
-        <TabsList>
-          <TabsTrigger value="grid" className="gap-2">
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="grid" className="flex-1 gap-2 sm:flex-none">
             <RiLayoutGridLine className="size-4" />
             Cards
           </TabsTrigger>
-          <TabsTrigger value="table" className="gap-2">
+          <TabsTrigger value="table" className="flex-1 gap-2 sm:flex-none">
             <RiListCheck2 className="size-4" />
             Tabla
           </TabsTrigger>
@@ -65,11 +62,7 @@ export function AdsView({
       </div>
 
       <TabsContent value="grid" className="mt-0 border-none p-0 shadow-none">
-        <TopCreativesPanel
-          rows={data}
-          currency={currency}
-          compactTabletLayout={compactTabletLayout}
-        />
+        <TopCreativesPanel rows={data} currency={currency} />
       </TabsContent>
 
       <TabsContent value="table" className="mt-0 border-none p-0 shadow-none">

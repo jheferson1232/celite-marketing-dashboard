@@ -8,7 +8,6 @@ import {
   type CurrencyCode,
 } from "@/lib/format"
 import type { AccountKpis } from "@/lib/services/meta/types"
-import { cn } from "@/lib/utils"
 
 interface KpiCardsProps {
   data?: AccountKpis
@@ -16,7 +15,6 @@ interface KpiCardsProps {
   currency?: CurrencyCode
   /** Meta: agregados al carrito. TikTok: ROAS (por defecto). */
   lastMetric?: "roas" | "addToCart"
-  className?: string
 }
 
 export function KpiCards({
@@ -24,7 +22,6 @@ export function KpiCards({
   isLoading,
   currency = META_DASHBOARD_CURRENCY,
   lastMetric = "roas",
-  className,
 }: KpiCardsProps) {
   const formatNumber = (val: number) =>
     new Intl.NumberFormat("es-ES").format(val)
@@ -69,12 +66,7 @@ export function KpiCards({
   ]
 
   return (
-    <div
-      className={cn(
-        "grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8",
-        className
-      )}
-    >
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
       {kpis.map((kpi, i) => (
         <Card key={i} className="border-border/50 shadow-none" size="sm">
           <CardContent className="flex flex-col gap-1 p-4">

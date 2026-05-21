@@ -62,7 +62,13 @@ export function getCampaignColumns({
       cell: ({ row }) => {
         const isActive = row.original.status === "ACTIVE"
         return (
-          <div className="flex items-center gap-2 pl-3 font-medium">
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2 pl-3 font-medium",
+              enableTikTokManage &&
+                "max-w-[10rem] sm:max-w-[14rem] md:max-w-[18rem] lg:max-w-none"
+            )}
+          >
             <div
               className={cn(
                 "h-2 w-2 shrink-0 rounded-full",
@@ -76,7 +82,9 @@ export function getCampaignColumns({
                   : undefined
               }
             />
-            <span>{row.original.name}</span>
+            <span className="truncate" title={row.original.name}>
+              {row.original.name}
+            </span>
           </div>
         )
       },

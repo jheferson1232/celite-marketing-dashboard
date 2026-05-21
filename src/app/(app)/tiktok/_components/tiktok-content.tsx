@@ -17,8 +17,10 @@ import { AdsView } from "@/app/(app)/dashboard/_components/ads"
 import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-picker"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { TikTokManageProvider } from "./tiktok-manage-provider"
-import { TikTokTabletLayout } from "./tiktok-tablet-layout"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import {
+  TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
+  TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
+} from "@/app/(app)/dashboard/_components/campaigns/use-persisted-column-visibility"
 import {
   RiAdvertisementLine,
   RiMegaphoneLine,
@@ -75,28 +77,24 @@ export function TikTokContent() {
   })
 
   return (
-    <TikTokTabletLayout>
-    <div className="flex w-full min-w-0 flex-col gap-4 p-3 sm:gap-6 sm:p-4 lg:gap-8 lg:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <SidebarTrigger
-            className="shrink-0 xl:hidden"
-            title="Mostrar u ocultar menú"
-          />
-          <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
+    <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
             Dashboard TikTok
           </h1>
         </div>
-        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
             onRangeChange={(range) => setDateRange(range)}
+            className="w-full sm:w-auto"
           />
           <Button
             type="button"
             variant="outline"
-            className="h-9 gap-2 px-3"
+            className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
             onClick={handleReload}
             disabled={isReloading}
           >
@@ -108,27 +106,29 @@ export function TikTokContent() {
         </div>
       </div>
 
-      <div className="-mx-3 overflow-x-auto overscroll-x-contain px-3 sm:-mx-4 sm:px-4 xl:mx-0 xl:overflow-visible xl:px-0">
+      <div className="min-w-0 w-full">
         <KpiCards
           data={kpis}
           isLoading={isLoadingKpis}
           currency={TIKTOK_DASHBOARD_CURRENCY}
-          className="min-w-[34rem] grid-cols-4 gap-3 sm:grid-cols-4 md:grid-cols-4 xl:min-w-0 lg:grid-cols-8"
         />
       </div>
 
-      <Tabs defaultValue="campaigns" className="flex flex-col gap-4">
-        <TabsList>
-          <TabsTrigger value="campaigns">
+      <Tabs
+        defaultValue="campaigns"
+        className="flex min-w-0 w-full flex-col gap-4"
+      >
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="campaigns" className="flex-1 sm:flex-none">
             <RiMegaphoneLine />
             Campañas
           </TabsTrigger>
-          <TabsTrigger value="ads">
+          <TabsTrigger value="ads" className="flex-1 sm:flex-none">
             <RiAdvertisementLine />
             Anuncios
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="campaigns">
+        <TabsContent value="campaigns" className="min-w-0 outline-none">
           <TikTokManageProvider>
             <CampaignsTable
               data={campaigns}
@@ -137,19 +137,19 @@ export function TikTokContent() {
               adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
               fetchCampaignAdSets={getTikTokCampaignAdGroups}
               enableTikTokManage
+              columnVisibilityStorageKey={TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
+              defaultColumnVisibility={TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
             />
           </TikTokManageProvider>
         </TabsContent>
-        <TabsContent value="ads">
+        <TabsContent value="ads" className="min-w-0 outline-none">
           <AdsView
             data={adInsights}
             isLoading={isLoadingAdInsights}
             currency={TIKTOK_DASHBOARD_CURRENCY}
-            compactTabletLayout
           />
         </TabsContent>
       </Tabs>
     </div>
-    </TikTokTabletLayout>
   )
 }

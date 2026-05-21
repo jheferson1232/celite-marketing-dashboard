@@ -22,7 +22,7 @@ export function ColumnVisibilityToggle({ table }: ColumnVisibilityToggleProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="shrink-0 gap-2 self-end sm:self-auto">
           <RiSettings3Line className="h-4 w-4" />
           Columnas
         </Button>

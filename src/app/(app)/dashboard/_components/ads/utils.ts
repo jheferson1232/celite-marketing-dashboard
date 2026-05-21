@@ -288,7 +288,7 @@ export function pickAdsetNamesFromGroup(group: AdInsightRow[]): string {
   return pickAdsetNameListFromGroup(group).join("\n")
 }
 
-/** Meta: sin URL en la card → título = nombre de campaña. TikTok: siempre campaña. */
+/** TikTok: título = campaña. Meta sin URL: campaña; con URL: nombre del anuncio. */
 export function getCreativeCardDisplayTitle(
   row: AdInsightRow,
   currency: CurrencyCode = META_DASHBOARD_CURRENCY
@@ -296,7 +296,7 @@ export function getCreativeCardDisplayTitle(
   if (currency === TIKTOK_DASHBOARD_CURRENCY) {
     return row.campaign_name?.trim() || row.ad_name?.trim() || "Sin nombre"
   }
-  if (currency === META_DASHBOARD_CURRENCY && !row.url?.trim()) {
+  if (!row.url?.trim()) {
     return row.campaign_name?.trim() || row.ad_name?.trim() || "Sin nombre"
   }
   return row.ad_name?.trim() || "Sin nombre"

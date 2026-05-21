@@ -20,7 +20,6 @@ import type {
   TikTokAdImage,
   TikTokAdVideo,
   TikTokApiResponse,
-  TikTokCampaign,
 } from "./types"
 
 const AD_INSIGHTS_TTL_MS = 2 * 60 * 1000
@@ -118,7 +117,7 @@ export async function getTikTokAdInsights(
 async function fetchTikTokAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
-  const [reportRows, ads, adGroups, campaigns] = await Promise.all([
+  const [reportRows, ads, adGroups] = await Promise.all([
     fetchIntegratedReport(
       "AUCTION_AD",
       ["ad_id"],
@@ -128,17 +127,10 @@ async function fetchTikTokAdInsights(
     ),
     fetchAllPages<TikTokAd>("/ad/get/"),
     fetchAllPages<TikTokAdGroup>("/adgroup/get/"),
-    fetchAllPages<TikTokCampaign>("campaign/get/"),
   ])
   const adsById = new Map(ads.map((ad) => [ad.ad_id, ad]))
   const adGroupById = new Map(
     adGroups.map((ag) => [ag.adgroup_id, ag] as const)
-  )
-  const campaignNameById = new Map(
-    campaigns.map(
-      (campaign) =>
-        [campaign.campaign_id, campaign.campaign_name?.trim() || ""] as const
-    )
   )
 
   const purchasesByAdId = new Map<string, number>()
@@ -193,10 +185,7 @@ async function fetchTikTokAdInsights(
         ad_id: adId,
         ad_name: ad?.ad_name || `Anuncio ${adId}`,
         campaign_id: ad?.campaign_id,
-        campaign_name:
-          ad?.campaign_name?.trim() ||
-          campaignNameById.get(ad?.campaign_id ?? "") ||
-          undefined,
+        campaign_name: ad?.campaign_name?.trim() || undefined,
         adset_id: ad?.adgroup_id,
         adset_name: adGroup?.adgroup_name?.trim() || undefined,
         spend: String(spend),
