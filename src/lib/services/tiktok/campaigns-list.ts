@@ -79,14 +79,7 @@ async function fetchTikTokCampaignsList(
       return {
         id: campaign.campaign_id,
         name: campaign.campaign_name || "Sin nombre",
-        status:
-          campaignAdGroups.length === 0
-            ? normalizeStatus(campaign.operation_status)
-            : campaignAdGroups.some(
-                (group) => group.operation_status === "ENABLE"
-              )
-              ? "ACTIVE"
-              : "PAUSED",
+        status: normalizeStatus(campaign.operation_status),
         operationStatus,
         dailyBudget: isTikTokEditableDailyBudget(campaign.budget_mode)
           ? (campaign.budget ?? 0)

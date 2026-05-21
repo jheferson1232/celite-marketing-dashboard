@@ -11,4 +11,7 @@ export type CampaignPerformanceStatus =
   | "CRITICO"
   | "APAGADO"
 
-export type CampaignPerformanceFilter = "ALL" | CampaignPerformanceStatus
+export type CampaignPerformanceFilter =
+  | "ALL"
+  | "ACTIVOS"
+  | CampaignPerformanceStatus

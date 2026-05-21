@@ -22,7 +22,6 @@ import type { CurrencyCode } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { SortableHeader } from "@/app/(app)/dashboard/_components/campaigns/sortable-header"
 import {
-  getAdSetSubtableColumnMeta,
   isTikTokAdSetManageColumnId,
   renderAdSetSubtableCell,
   type AdSetSubtableColumnId,
@@ -30,14 +29,19 @@ import {
 } from "@/app/(app)/dashboard/_components/campaigns/ad-set-subtable-columns"
 import { TikTokBudgetCell } from "./tiktok-budget-cell"
 import { TikTokStatusSwitch } from "./tiktok-status-switch"
-
-type DisplayColumnId = AdSetSubtableColumnId | TikTokAdSetManageColumnId
+import {
+  getTikTokAdSetColumnMeta,
+  isTikTokAdSetMetricColumnId,
+  renderTikTokAdSetMetricCell,
+  type TikTokAdSetDisplayColumnId,
+  type TikTokAdSetMetricColumnId,
+} from "./tiktok-ad-set-columns"
 
 function getSubtableHeadClassName(
-  columnId: DisplayColumnId,
+  columnId: TikTokAdSetDisplayColumnId,
   currency: CurrencyCode
 ) {
-  const meta = getAdSetSubtableColumnMeta(columnId, currency)
+  const meta = getTikTokAdSetColumnMeta(columnId, currency)
 
   return cn(
     columnId === "name" && "w-[300px] pl-5",
@@ -48,10 +52,10 @@ function getSubtableHeadClassName(
 }
 
 function getSubtableCellClassName(
-  columnId: DisplayColumnId,
+  columnId: TikTokAdSetDisplayColumnId,
   currency: CurrencyCode
 ) {
-  const meta = getAdSetSubtableColumnMeta(columnId, currency)
+  const meta = getTikTokAdSetColumnMeta(columnId, currency)
 
   return cn(
     columnId === "name" && "pl-5",
@@ -61,7 +65,10 @@ function getSubtableCellClassName(
   )
 }
 
-function renderManageCell(columnId: TikTokAdSetManageColumnId, adSet: CampaignAdSetRow) {
+function renderManageCell(
+  columnId: TikTokAdSetManageColumnId,
+  adSet: CampaignAdSetRow
+) {
   const entity = {
     type: "adgroup" as const,
     id: adSet.id,
@@ -79,11 +86,27 @@ function renderManageCell(columnId: TikTokAdSetManageColumnId, adSet: CampaignAd
   return <TikTokBudgetCell entity={entity} />
 }
 
+function metricAccessor(
+  columnId: TikTokAdSetMetricColumnId,
+  row: CampaignAdSetRow
+): number {
+  switch (columnId) {
+    case "purchases7d":
+      return row.purchases7d ?? 0
+    case "cpa7d":
+      return row.cpa7d ?? 0
+    case "totalPurchases":
+      return row.totalPurchases ?? 0
+    case "totalCpa":
+      return row.totalCpa ?? 0
+  }
+}
+
 function buildColumnDef(
-  columnId: DisplayColumnId,
+  columnId: TikTokAdSetDisplayColumnId,
   currency: CurrencyCode
 ): ColumnDef<CampaignAdSetRow> {
-  const meta = getAdSetSubtableColumnMeta(columnId, currency)
+  const meta = getTikTokAdSetColumnMeta(columnId, currency)
   const align = meta.align === "left" ? "left" : "right"
 
   if (isTikTokAdSetManageColumnId(columnId)) {
@@ -108,11 +131,23 @@ function buildColumnDef(
     }
   }
 
+  if (isTikTokAdSetMetricColumnId(columnId)) {
+    return {
+      id: columnId,
+      accessorFn: (row) => metricAccessor(columnId, row),
+      header: (context) => (
+        <SortableHeader context={context} label={meta.label} align={align} />
+      ),
+      cell: ({ row }) =>
+        renderTikTokAdSetMetricCell(columnId, row.original, currency),
+    }
+  }
+
+  const subtableId = columnId as AdSetSubtableColumnId
+
   return {
     id: columnId,
-    ...(columnId === "roas"
-      ? { accessorFn: (row: CampaignAdSetRow) => row.addToCart ?? 0 }
-      : { accessorKey: columnId }),
+    accessorKey: columnId,
     header: (context) => (
       <SortableHeader
         context={context}
@@ -121,13 +156,14 @@ function buildColumnDef(
         className={columnId === "name" ? "pl-2" : undefined}
       />
     ),
-    cell: ({ row }) => renderAdSetSubtableCell(columnId, row.original, currency),
+    cell: ({ row }) =>
+      renderAdSetSubtableCell(subtableId, row.original, currency),
   }
 }
 
 interface TikTokAdSetsSubtableProps {
   data: CampaignAdSetRow[]
-  displayColumns: DisplayColumnId[]
+  displayColumns: TikTokAdSetDisplayColumnId[]
   currency: CurrencyCode
 }
 
@@ -161,7 +197,7 @@ export function TikTokAdSetsSubtable({
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
               {headerGroup.headers.map((header) => {
-                const columnId = header.column.id as DisplayColumnId
+                const columnId = header.column.id as TikTokAdSetDisplayColumnId
                 return (
                   <TableHead
                     key={header.id}
@@ -183,7 +219,7 @@ export function TikTokAdSetsSubtable({
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id}>
               {row.getVisibleCells().map((cell) => {
-                const columnId = cell.column.id as DisplayColumnId
+                const columnId = cell.column.id as TikTokAdSetDisplayColumnId
                 return (
                   <TableCell
                     key={cell.id}

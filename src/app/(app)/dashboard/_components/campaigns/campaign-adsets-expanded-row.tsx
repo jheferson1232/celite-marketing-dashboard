@@ -33,6 +33,11 @@ import {
   type AdSetSubtableColumnId,
   type TikTokAdSetManageColumnId,
 } from "./ad-set-subtable-columns"
+import {
+  getTikTokAdSetColumnMeta,
+  getTikTokAdSetDisplayColumns,
+  type TikTokAdSetDisplayColumnId,
+} from "@/app/(app)/tiktok/_components/tiktok-ad-set-columns"
 import { TikTokAdSetsSubtable } from "@/app/(app)/tiktok/_components/tiktok-ad-sets-subtable"
 
 type FetchCampaignAdSetsAction = typeof getCampaignAdSets
@@ -52,8 +57,11 @@ interface CampaignAdSetsExpandedRowProps {
 
 const SKELETON_ROWS = 3
 
-function getSubtableHeadClassName(columnId: DisplayColumnId) {
-  const meta = getAdSetSubtableColumnMeta(columnId)
+function getSubtableHeadClassName(
+  columnId: DisplayColumnId,
+  currency: CurrencyCode
+) {
+  const meta = getAdSetSubtableColumnMeta(columnId, currency)
 
   return cn(
     columnId === "name" && "w-[300px] pl-5",
@@ -63,8 +71,11 @@ function getSubtableHeadClassName(columnId: DisplayColumnId) {
   )
 }
 
-function getSubtableCellClassName(columnId: DisplayColumnId) {
-  const meta = getAdSetSubtableColumnMeta(columnId)
+function getSubtableCellClassName(
+  columnId: DisplayColumnId,
+  currency: CurrencyCode
+) {
+  const meta = getAdSetSubtableColumnMeta(columnId, currency)
 
   return cn(
     columnId === "name" && "pl-5",
@@ -97,10 +108,12 @@ export function CampaignAdSetsExpandedRow({
     visibleColumnOrder,
     columnVisibility
   )
-  const displayColumns = getAdSetSubtableColumnsWithTikTokManage(
-    visibleSubtableColumns,
-    enableTikTokManage
-  )
+  const tiktokDisplayColumns = enableTikTokManage
+    ? getTikTokAdSetDisplayColumns(visibleSubtableColumns)
+    : null
+  const displayColumns: (DisplayColumnId | TikTokAdSetDisplayColumnId)[] =
+    tiktokDisplayColumns ??
+    getAdSetSubtableColumnsWithTikTokManage(visibleSubtableColumns, false)
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: [queryKeyPrefix, campaignId, dateRange, campaignObjective],
@@ -119,6 +132,31 @@ export function CampaignAdSetsExpandedRow({
     )
   }
 
+  const columnMetaFor = (columnId: DisplayColumnId | TikTokAdSetDisplayColumnId) =>
+    enableTikTokManage
+      ? getTikTokAdSetColumnMeta(columnId as TikTokAdSetDisplayColumnId, currency)
+      : getAdSetSubtableColumnMeta(columnId as DisplayColumnId, currency)
+
+  const headClassFor = (columnId: DisplayColumnId | TikTokAdSetDisplayColumnId) =>
+    enableTikTokManage
+      ? cn(
+          columnId === "name" && "w-[300px] pl-5",
+          columnId === "active" && "w-[52px]",
+          columnId !== "name" && columnId !== "active" && "text-right",
+          columnMetaFor(columnId).align === "left" && "text-left"
+        )
+      : getSubtableHeadClassName(columnId as DisplayColumnId, currency)
+
+  const cellClassFor = (columnId: DisplayColumnId | TikTokAdSetDisplayColumnId) =>
+    enableTikTokManage
+      ? cn(
+          columnId === "name" && "pl-5",
+          columnId === "active" && "text-center",
+          columnId !== "name" && columnId !== "active" && "text-right",
+          columnMetaFor(columnId).align === "left" && "text-left"
+        )
+      : getSubtableCellClassName(columnId as DisplayColumnId, currency)
+
   if (isLoading) {
     return (
       <div className="py-1">
@@ -128,9 +166,9 @@ export function CampaignAdSetsExpandedRow({
               {displayColumns.map((columnId) => (
                 <TableHead
                   key={columnId}
-                  className={getSubtableHeadClassName(columnId)}
+                  className={headClassFor(columnId)}
                 >
-                  {getAdSetSubtableColumnMeta(columnId).label}
+                  {columnMetaFor(columnId).label}
                 </TableHead>
               ))}
             </TableRow>
@@ -141,7 +179,7 @@ export function CampaignAdSetsExpandedRow({
                 {displayColumns.map((columnId) => (
                   <TableCell
                     key={`${rowIndex}-${columnId}`}
-                    className={getSubtableCellClassName(columnId)}
+                    className={cellClassFor(columnId)}
                   >
                     <Skeleton
                       className={cn(
@@ -190,11 +228,11 @@ export function CampaignAdSetsExpandedRow({
     )
   }
 
-  if (enableTikTokManage) {
+  if (enableTikTokManage && tiktokDisplayColumns) {
     return (
       <TikTokAdSetsSubtable
         data={data}
-        displayColumns={displayColumns}
+        displayColumns={tiktokDisplayColumns}
         currency={currency}
       />
     )
@@ -208,9 +246,9 @@ export function CampaignAdSetsExpandedRow({
             {displayColumns.map((columnId) => (
               <TableHead
                 key={columnId}
-                className={getSubtableHeadClassName(columnId)}
+                className={headClassFor(columnId)}
               >
-                {getAdSetSubtableColumnMeta(columnId).label}
+                {columnMetaFor(columnId).label}
               </TableHead>
             ))}
           </TableRow>
@@ -221,7 +259,7 @@ export function CampaignAdSetsExpandedRow({
               {displayColumns.map((columnId) => (
                 <TableCell
                   key={`${adSet.id}-${columnId}`}
-                  className={getSubtableCellClassName(columnId)}
+                  className={cellClassFor(columnId)}
                 >
                   {renderDisplayCell(
                     columnId as AdSetSubtableColumnId,

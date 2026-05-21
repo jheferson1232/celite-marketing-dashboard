@@ -32,6 +32,54 @@ function getPerformanceThresholds(currency: CurrencyCode) {
   }
 }
 
+/** Campaña TikTok con interruptor en ON (nivel campaña, no conjuntos). */
+export function isTikTokCampaignActiveToday(row: CampaignRow): boolean {
+  if (row.operationStatus === "ENABLE" || row.operationStatus === "DISABLE") {
+    return row.operationStatus === "ENABLE"
+  }
+  return row.status === "ACTIVE"
+}
+
+export function hasTikTokCampaignActivityInPeriod(row: CampaignRow): boolean {
+  return row.spend > 0 || row.impressions > 0
+}
+
+/**
+ * Rendimiento TikTok (excelente / en curso / crítico).
+ * Sin clasificar "apagado" por gasto cero: eso va al chip operativo (interruptor OFF).
+ */
+export function getTikTokCampaignPerformanceStatus(
+  row: CampaignRow,
+  currency: CurrencyCode = TIKTOK_DASHBOARD_CURRENCY
+): CampaignPerformanceStatus | null {
+  if (!hasTikTokCampaignActivityInPeriod(row)) return null
+
+  const { spend, costPerResult, results } = row
+  const {
+    criticoMinSpend,
+    criticoMinCpa,
+    excelenteMinSpend,
+    excelenteMaxCpa,
+  } = getPerformanceThresholds(currency)
+
+  if (
+    (spend >= criticoMinSpend && costPerResult >= criticoMinCpa) ||
+    (spend >= criticoMinSpend && results === 0)
+  ) {
+    return "CRITICO"
+  }
+
+  if (
+    spend >= excelenteMinSpend &&
+    costPerResult > 0 &&
+    costPerResult < excelenteMaxCpa
+  ) {
+    return "EXCELENTE"
+  }
+
+  return "EN_CURSO"
+}
+
 export function getCampaignPerformanceStatus(
   row: CampaignRow,
   currency: CurrencyCode = "COP"

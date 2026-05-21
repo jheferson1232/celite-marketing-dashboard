@@ -36,7 +36,11 @@ import type {
   CampaignPerformanceStatus,
 } from "./types"
 import { usePersistedColumnVisibility } from "./use-persisted-column-visibility"
-import { getCampaignPerformanceStatus } from "./utils"
+import {
+  getCampaignPerformanceStatus,
+  getTikTokCampaignPerformanceStatus,
+  isTikTokCampaignActiveToday,
+} from "./utils"
 
 type FetchCampaignAdSetsAction = typeof getCampaignAdSets
 
@@ -98,32 +102,72 @@ export function CampaignsTable({
     setIsDetailsOpen(true)
   }, [])
 
-  const { statusCounts, filteredTableData } = React.useMemo(() => {
+  const { statusCounts, activeCampaignCount, totalCampaignCount, filteredTableData } =
+    React.useMemo(() => {
     const counts: Record<CampaignPerformanceStatus, number> = {
       ...EMPTY_STATUS_COUNTS,
     }
 
-    const rowsWithStatus = tableData.map((row) => ({
-      row,
-      status: getCampaignPerformanceStatus(row, currency),
-    }))
+    const rowsWithStatus = tableData.map((row) => {
+      const isActiveToday = enableTikTokManage
+        ? isTikTokCampaignActiveToday(row)
+        : false
+      const performanceStatus = enableTikTokManage
+        ? getTikTokCampaignPerformanceStatus(row, currency)
+        : getCampaignPerformanceStatus(row, currency)
 
-    for (const { status } of rowsWithStatus) {
-      counts[status] += 1
+      return {
+        row,
+        isActiveToday,
+        performanceStatus,
+      }
+    })
+
+    if (enableTikTokManage) {
+      for (const { isActiveToday, performanceStatus } of rowsWithStatus) {
+        if (!isActiveToday) {
+          counts.APAGADO += 1
+        } else if (performanceStatus) {
+          counts[performanceStatus] += 1
+        }
+      }
+    } else {
+      for (const { performanceStatus } of rowsWithStatus) {
+        if (performanceStatus) {
+          counts[performanceStatus] += 1
+        }
+      }
     }
+
+    const activeCount = enableTikTokManage
+      ? rowsWithStatus.filter(({ isActiveToday }) => isActiveToday).length
+      : 0
 
     const filteredRows =
       selectedPerformanceFilter === "ALL"
         ? tableData
-        : rowsWithStatus
-            .filter(({ status }) => status === selectedPerformanceFilter)
-            .map(({ row }) => row)
+        : selectedPerformanceFilter === "ACTIVOS"
+          ? rowsWithStatus
+              .filter(({ isActiveToday }) => isActiveToday)
+              .map(({ row }) => row)
+          : selectedPerformanceFilter === "APAGADO" && enableTikTokManage
+            ? rowsWithStatus
+                .filter(({ isActiveToday }) => !isActiveToday)
+                .map(({ row }) => row)
+            : rowsWithStatus
+                .filter(
+                  ({ performanceStatus }) =>
+                    performanceStatus === selectedPerformanceFilter
+                )
+                .map(({ row }) => row)
 
     return {
       statusCounts: counts,
+      activeCampaignCount: activeCount,
+      totalCampaignCount: tableData.length,
       filteredTableData: filteredRows,
     }
-  }, [currency, selectedPerformanceFilter, tableData])
+  }, [currency, enableTikTokManage, selectedPerformanceFilter, tableData])
 
   const visibleCampaignIds = React.useMemo(
     () => new Set(filteredTableData.map((row) => row.id)),
@@ -187,6 +231,10 @@ export function CampaignsTable({
           selectedFilter={selectedPerformanceFilter}
           onFilterChange={setSelectedPerformanceFilter}
           showAllFilter={enableTikTokManage}
+          showActiveFilter={enableTikTokManage}
+          activeCampaignCount={activeCampaignCount}
+          totalCampaignCount={totalCampaignCount}
+          apagadoMeansSwitchOff={enableTikTokManage}
         />
         <ColumnVisibilityToggle table={table} />
       </div>

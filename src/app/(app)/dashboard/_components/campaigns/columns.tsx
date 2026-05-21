@@ -43,8 +43,7 @@ export function getCampaignColumns({
   enableTikTokManage = false,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
-  const showAddToCart =
-    enableTikTokManage || currency === META_DASHBOARD_CURRENCY
+  const showAddToCart = !enableTikTokManage && currency === META_DASHBOARD_CURRENCY
 
   const dataColumns: ColumnDef<CampaignRow>[] = [
     {
@@ -177,9 +176,12 @@ export function getCampaignColumns({
     {
       id: "results",
       accessorKey: "results",
-      meta: columnMeta("Resultados"),
+      meta: columnMeta(enableTikTokManage ? "Compras" : "Resultados"),
       header: (context) => (
-        <SortableHeader context={context} label="Resultados" />
+        <SortableHeader
+          context={context}
+          label={enableTikTokManage ? "Compras" : "Resultados"}
+        />
       ),
       cell: ({ row }) => (
         <div className="text-right">
@@ -190,9 +192,12 @@ export function getCampaignColumns({
     {
       id: "costPerResult",
       accessorKey: "costPerResult",
-      meta: columnMeta("Costo/Res"),
+      meta: columnMeta(enableTikTokManage ? "CPA" : "Costo/Res"),
       header: (context) => (
-        <SortableHeader context={context} label="Costo/Res" />
+        <SortableHeader
+          context={context}
+          label={enableTikTokManage ? "CPA" : "Costo/Res"}
+        />
       ),
       cell: ({ row }) => {
         const { costPerResult } = row.original
@@ -285,5 +290,9 @@ export function getCampaignColumns({
     },
   ]
 
-  return [...manageColumns, ...dataColumns]
+  const columns = [...manageColumns, ...dataColumns]
+  if (enableTikTokManage) {
+    return columns.filter((column) => column.id !== "roas")
+  }
+  return columns
 }

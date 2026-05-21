@@ -106,6 +106,18 @@ export function getPurchases(metrics: Record<string, string>): number {
   return 0
 }
 
+export function getPurchaseSpendAndCpa(
+  metrics: Record<string, string>
+): { spend: number; purchases: number; cpa: number } {
+  const spend = getMetricNumber(metrics, "spend")
+  const purchases = getPurchases(metrics)
+  return {
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : 0,
+  }
+}
+
 export function getPurchaseValue(metrics: Record<string, string>): number {
   return getMetricNumber(metrics, "total_purchase_value")
 }

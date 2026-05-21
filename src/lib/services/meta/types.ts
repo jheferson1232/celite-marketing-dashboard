@@ -78,6 +78,12 @@ export interface CampaignAdSetRow {
   roas: number
   /** Agregados al carrito (Meta actions / TikTok web_event_add_to_cart). */
   addToCart?: number
+  /** TikTok: compras en los últimos 7 días (calendario dashboard). */
+  purchases7d?: number
+  cpa7d?: number
+  /** TikTok: compras acumuladas en ventana larga (~365 días). */
+  totalPurchases?: number
+  totalCpa?: number
   /** Presupuesto diario en PEN (TikTok ad groups con BUDGET_MODE_DAY). */
   dailyBudget?: number | null
   budgetMode?: string | null
