@@ -44,6 +44,8 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const isTikTokRoute =
+    pathname === "/tiktok" || pathname.startsWith("/tiktok/")
 
   return (
     <Sidebar collapsible="icon">
@@ -98,7 +100,14 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarRail />
+      <SidebarRail
+        className={
+          isTikTokRoute
+            ? "z-30 flex w-5 -right-5 after:w-1 sm:flex md:flex"
+            : undefined
+        }
+        title={isTikTokRoute ? "Toca para expandir u ocultar el menú" : undefined}
+      />
     </Sidebar>
   )
 }

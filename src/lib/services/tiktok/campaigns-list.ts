@@ -11,10 +11,11 @@ import {
   getTikTokLifetimeDateRange,
 } from "./report"
 import { getLastSevenDaysRange } from "./campaign-daily-insights"
+import { collectUniqueLandingUrlsByCampaign } from "./campaign-landing-urls"
 import { fetchAllPages } from "./fetch-all-pages"
 import { withTikTokCache } from "./tiktok-cache"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
-import type { TikTokAdGroup, TikTokCampaign } from "./types"
+import type { TikTokAd, TikTokAdGroup, TikTokCampaign } from "./types"
 
 const CAMPAIGNS_TTL_MS = 2 * 60 * 1000
 
@@ -40,7 +41,7 @@ async function fetchTikTokCampaignsList(
   const lifetimeRange = getTikTokLifetimeDateRange()
   const range7d = getLastSevenDaysRange()
 
-  const [campaigns, reportRows, metrics7d, lifetimeMetrics, adGroups] =
+  const [campaigns, reportRows, metrics7d, lifetimeMetrics, adGroups, ads] =
     await Promise.all([
     fetchAllPages<TikTokCampaign>("campaign/get/"),
     fetchIntegratedReport(
@@ -53,7 +54,10 @@ async function fetchTikTokCampaignsList(
     fetchCachedCampaignMetricsByDateRange(range7d),
     fetchCachedCampaignMetricsByDateRange(lifetimeRange),
     fetchAllPages<TikTokAdGroup>("adgroup/get/"),
+    fetchAllPages<TikTokAd>("/ad/get/"),
   ])
+
+  const landingUrlsByCampaign = collectUniqueLandingUrlsByCampaign(ads)
 
   const metricsByCampaign = new Map(
     reportRows.map((row) => [
@@ -122,6 +126,8 @@ async function fetchTikTokCampaignsList(
         totalSpend: lifetime.spend,
         totalCpa: lifetime.cpa,
         objective: campaign.objective_type || "PURCHASE",
+        landingUrls:
+          landingUrlsByCampaign.get(campaign.campaign_id) ?? [],
       } satisfies CampaignRow
     })
     .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name))

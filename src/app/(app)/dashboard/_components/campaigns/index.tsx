@@ -239,8 +239,14 @@ export function CampaignsTable({
         <ColumnVisibilityToggle table={table} />
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
+      <div
+        className={
+          enableTikTokManage
+            ? "overflow-x-auto overscroll-x-contain rounded-lg border [-webkit-overflow-scrolling:touch]"
+            : "rounded-lg border"
+        }
+      >
+        <Table className={enableTikTokManage ? "min-w-[72rem] w-max" : undefined}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">

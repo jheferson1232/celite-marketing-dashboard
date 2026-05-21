@@ -17,6 +17,8 @@ import { AdsView } from "@/app/(app)/dashboard/_components/ads"
 import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-picker"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { TikTokManageProvider } from "./tiktok-manage-provider"
+import { TikTokTabletLayout } from "./tiktok-tablet-layout"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   RiAdvertisementLine,
   RiMegaphoneLine,
@@ -73,10 +75,19 @@ export function TikTokContent() {
   })
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 p-6 lg:gap-8 lg:p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard TikTok</h1>
-        <div className="flex items-center gap-2">
+    <TikTokTabletLayout>
+    <div className="flex w-full min-w-0 flex-col gap-4 p-3 sm:gap-6 sm:p-4 lg:gap-8 lg:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <SidebarTrigger
+            className="shrink-0 xl:hidden"
+            title="Mostrar u ocultar menú"
+          />
+          <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
+            Dashboard TikTok
+          </h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
@@ -97,11 +108,14 @@ export function TikTokContent() {
         </div>
       </div>
 
-      <KpiCards
-        data={kpis}
-        isLoading={isLoadingKpis}
-        currency={TIKTOK_DASHBOARD_CURRENCY}
-      />
+      <div className="-mx-3 overflow-x-auto overscroll-x-contain px-3 sm:-mx-4 sm:px-4 xl:mx-0 xl:overflow-visible xl:px-0">
+        <KpiCards
+          data={kpis}
+          isLoading={isLoadingKpis}
+          currency={TIKTOK_DASHBOARD_CURRENCY}
+          className="min-w-[34rem] grid-cols-4 gap-3 sm:grid-cols-4 md:grid-cols-4 xl:min-w-0 lg:grid-cols-8"
+        />
+      </div>
 
       <Tabs defaultValue="campaigns" className="flex flex-col gap-4">
         <TabsList>
@@ -131,9 +145,11 @@ export function TikTokContent() {
             data={adInsights}
             isLoading={isLoadingAdInsights}
             currency={TIKTOK_DASHBOARD_CURRENCY}
+            compactTabletLayout
           />
         </TabsContent>
       </Tabs>
     </div>
+    </TikTokTabletLayout>
   )
 }

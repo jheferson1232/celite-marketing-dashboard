@@ -154,6 +154,8 @@ export interface CampaignRow {
   totalSpend?: number
   /** TikTok: CPA sobre totales acumulados. */
   totalCpa?: number
+  /** TikTok: URLs de destino únicas configuradas en anuncios de la campaña. */
+  landingUrls?: string[]
 }
 
 export interface MetaAdCreativeObjectStorySpec {

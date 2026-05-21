@@ -19,6 +19,7 @@ import {
 } from "./utils"
 import { getTikTokCampaignManageColumns } from "@/app/(app)/tiktok/_components/tiktok-campaign-manage-columns"
 import { TikTokCampaignBudgetCell } from "@/app/(app)/tiktok/_components/tiktok-campaign-budget-cell"
+import { TikTokCampaignLandingUrlsButton } from "@/app/(app)/tiktok/_components/tiktok-campaign-landing-urls-button"
 
 function columnMeta(
   label: string,
@@ -380,6 +381,12 @@ export function getCampaignColumns({
             >
               <RiStackLine data-icon="inline-start" />
             </Button>
+            {enableTikTokManage ? (
+              <TikTokCampaignLandingUrlsButton
+                urls={row.original.landingUrls ?? []}
+                campaignName={row.original.name}
+              />
+            ) : null}
             <Button
               variant="outline"
               size="icon-sm"

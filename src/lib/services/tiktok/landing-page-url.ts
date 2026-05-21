@@ -56,3 +56,22 @@ export function getTikTokLandingPageUrl(ad?: {
   const fromList = ad?.landing_page_urls?.find(Boolean)
   return ad?.landing_page_url?.trim() || fromList?.trim() || ""
 }
+
+/** Clave estable para deduplicar URLs (host + path, sin UTM ni barra final). */
+export function normalizeLandingPageUrlKey(url: string): string {
+  const raw = url.trim()
+  if (!raw) return ""
+
+  try {
+    const parsed = new URL(raw.startsWith("http") ? raw : `https://${raw}`)
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase()
+    let path = parsed.pathname || "/"
+    if (path.length > 1 && path.endsWith("/")) {
+      path = path.slice(0, -1)
+    }
+    return `${host}${path}`
+  } catch {
+    const withoutQuery = raw.split("?")[0] ?? raw
+    return withoutQuery.toLowerCase().replace(/\/$/, "")
+  }
+}

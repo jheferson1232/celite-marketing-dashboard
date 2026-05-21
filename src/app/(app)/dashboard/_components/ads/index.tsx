@@ -18,6 +18,8 @@ interface AdsViewProps {
   data?: AdInsightRow[]
   isLoading: boolean
   currency?: CurrencyCode
+  /** TikTok tablet: fila horizontal deslizable de creativos. */
+  compactTabletLayout?: boolean
 }
 
 function AdsEmptyState({ currency }: { currency: CurrencyCode }) {
@@ -36,6 +38,7 @@ export function AdsView({
   data,
   isLoading,
   currency = META_DASHBOARD_CURRENCY,
+  compactTabletLayout = false,
 }: AdsViewProps) {
   if (isLoading) {
     return <AdsGridSkeleton />
@@ -62,7 +65,11 @@ export function AdsView({
       </div>
 
       <TabsContent value="grid" className="mt-0 border-none p-0 shadow-none">
-        <TopCreativesPanel rows={data} currency={currency} />
+        <TopCreativesPanel
+          rows={data}
+          currency={currency}
+          compactTabletLayout={compactTabletLayout}
+        />
       </TabsContent>
 
       <TabsContent value="table" className="mt-0 border-none p-0 shadow-none">
