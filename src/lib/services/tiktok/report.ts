@@ -1,9 +1,17 @@
 import type { DateRange } from "@/lib/services/meta/types"
+import { addDaysToDateString, getDashboardToday } from "@/lib/date"
 import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
 import { withTikTokCache } from "./tiktok-cache"
 import type { TikTokApiResponse, TikTokReportData, TikTokReportRow } from "./types"
 
-const ADGROUP_REPORT_TTL_MS = 2 * 60 * 1000
+const REPORT_TTL_MS = 2 * 60 * 1000
+
+/** Ventana larga para totales acumulados (~365 días, límite habitual TikTok). */
+export function getTikTokLifetimeDateRange(): DateRange {
+  const to = getDashboardToday()
+  const from = addDaysToDateString(to, -364)
+  return { from, to }
+}
 
 export type TikTokDataLevel =
   | "AUCTION_ADVERTISER"
@@ -206,11 +214,30 @@ export async function fetchIntegratedReport(
 }
 
 /** TikTok does not support campaign filters on AUCTION_ADGROUP reports; cache full report per range. */
+export async function fetchCachedCampaignMetricsByDateRange(
+  dateRange: DateRange
+): Promise<Map<string, Record<string, string>>> {
+  const cacheKey = `tiktok-campaign-report:${dateRange.from}:${dateRange.to}`
+  return withTikTokCache(cacheKey, REPORT_TTL_MS, async () => {
+    const rows = await fetchIntegratedReport(
+      "AUCTION_CAMPAIGN",
+      ["campaign_id"],
+      [...CAMPAIGN_METRICS],
+      dateRange.from,
+      dateRange.to
+    )
+
+    return new Map(
+      rows.map((row) => [row.dimensions.campaign_id, row.metrics] as const)
+    )
+  })
+}
+
 export async function fetchCachedAdGroupMetricsByDateRange(
   dateRange: DateRange
 ): Promise<Map<string, Record<string, string>>> {
   const cacheKey = `tiktok-adgroup-report:${dateRange.from}:${dateRange.to}`
-  return withTikTokCache(cacheKey, ADGROUP_REPORT_TTL_MS, async () => {
+  return withTikTokCache(cacheKey, REPORT_TTL_MS, async () => {
     const rows = await fetchIntegratedReport(
       "AUCTION_ADGROUP",
       ["adgroup_id"],

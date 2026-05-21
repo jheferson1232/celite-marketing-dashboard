@@ -145,6 +145,15 @@ export interface CampaignRow {
   budgetMode?: string | null
   /** Suma de presupuesto diario de conjuntos (TikTok ABO). */
   adGroupDailyBudgetSum?: number | null
+  /** TikTok: compras en los últimos 7 días. */
+  purchases7d?: number
+  cpa7d?: number
+  /** TikTok: compras acumuladas en ventana larga (~365 días). */
+  totalPurchases?: number
+  /** TikTok: gasto acumulado en ventana larga (~365 días). */
+  totalSpend?: number
+  /** TikTok: CPA sobre totales acumulados. */
+  totalCpa?: number
 }
 
 export interface MetaAdCreativeObjectStorySpec {

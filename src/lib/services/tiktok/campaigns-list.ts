@@ -1,12 +1,16 @@
 import type { CampaignRow, DateRange } from "@/lib/services/meta/types"
 import {
   CAMPAIGN_METRICS,
+  fetchCachedCampaignMetricsByDateRange,
   fetchIntegratedReport,
   getAddToCart,
   getMetricNumber,
+  getPurchaseSpendAndCpa,
   getPurchases,
   getPurchaseValue,
+  getTikTokLifetimeDateRange,
 } from "./report"
+import { getLastSevenDaysRange } from "./campaign-daily-insights"
 import { fetchAllPages } from "./fetch-all-pages"
 import { withTikTokCache } from "./tiktok-cache"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
@@ -33,7 +37,11 @@ export async function getTikTokCampaignsList(
 async function fetchTikTokCampaignsList(
   dateRange: DateRange
 ): Promise<CampaignRow[]> {
-  const [campaigns, reportRows, adGroups] = await Promise.all([
+  const lifetimeRange = getTikTokLifetimeDateRange()
+  const range7d = getLastSevenDaysRange()
+
+  const [campaigns, reportRows, metrics7d, lifetimeMetrics, adGroups] =
+    await Promise.all([
     fetchAllPages<TikTokCampaign>("campaign/get/"),
     fetchIntegratedReport(
       "AUCTION_CAMPAIGN",
@@ -42,6 +50,8 @@ async function fetchTikTokCampaignsList(
       dateRange.from,
       dateRange.to
     ),
+    fetchCachedCampaignMetricsByDateRange(range7d),
+    fetchCachedCampaignMetricsByDateRange(lifetimeRange),
     fetchAllPages<TikTokAdGroup>("adgroup/get/"),
   ])
 
@@ -67,6 +77,12 @@ async function fetchTikTokCampaignsList(
     )
     .map((campaign) => {
       const metrics = metricsByCampaign.get(campaign.campaign_id) ?? {}
+      const last7d = getPurchaseSpendAndCpa(
+        metrics7d.get(campaign.campaign_id) ?? {}
+      )
+      const lifetime = getPurchaseSpendAndCpa(
+        lifetimeMetrics.get(campaign.campaign_id) ?? {}
+      )
       const spend = getMetricNumber(metrics, "spend")
       const purchases = getPurchases(metrics)
       const purchaseValue = getPurchaseValue(metrics)
@@ -100,6 +116,11 @@ async function fetchTikTokCampaignsList(
         costPerResult: purchases > 0 ? spend / purchases : 0,
         roas: spend > 0 ? purchaseValue / spend : 0,
         addToCart: getAddToCart(metrics),
+        purchases7d: last7d.purchases,
+        cpa7d: last7d.cpa,
+        totalPurchases: lifetime.purchases,
+        totalSpend: lifetime.spend,
+        totalCpa: lifetime.cpa,
         objective: campaign.objective_type || "PURCHASE",
       } satisfies CampaignRow
     })

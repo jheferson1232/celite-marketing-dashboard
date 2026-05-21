@@ -4,7 +4,6 @@ import type {
   DateRange,
 } from "@/lib/services/meta/types"
 import { fetchAllPages } from "./fetch-all-pages"
-import { addDaysToDateString, getDashboardToday } from "@/lib/date"
 import { getLastSevenDaysRange } from "./campaign-daily-insights"
 import {
   fetchCachedAdGroupMetricsByDateRange,
@@ -12,16 +11,10 @@ import {
   getPurchaseSpendAndCpa,
   getPurchases,
   getPurchaseValue,
+  getTikTokLifetimeDateRange,
 } from "./report"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
 import type { TikTokAdGroup } from "./types"
-
-/** Ventana larga para totales por conjunto (máximo habitual en reportes TikTok). */
-function getTikTokAdGroupTotalRange(): DateRange {
-  const to = getDashboardToday()
-  const from = addDaysToDateString(to, -364)
-  return { from, to }
-}
 
 function normalizeStatus(status?: string): CampaignEntityStatus {
   if (status === "ENABLE" || status === "ACTIVE") return "ACTIVE"
@@ -35,7 +28,7 @@ export async function getTikTokCampaignAdGroupsByCampaignId(
   dateRange: DateRange
 ): Promise<CampaignAdSetRow[]> {
   const range7d = getLastSevenDaysRange()
-  const rangeTotal = getTikTokAdGroupTotalRange()
+  const rangeTotal = getTikTokLifetimeDateRange()
 
   const [adGroups, metricsByAdGroup, metrics7d, metricsTotal] = await Promise.all([
     fetchAllPages<TikTokAdGroup>("/adgroup/get/", {

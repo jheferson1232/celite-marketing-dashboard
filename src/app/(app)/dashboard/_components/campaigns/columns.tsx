@@ -215,6 +215,111 @@ export function getCampaignColumns({
         )
       },
     },
+    ...(enableTikTokManage
+      ? [
+          {
+            id: "purchases7d",
+            accessorKey: "purchases7d",
+            meta: columnMeta("Ventas 7d"),
+            header: (context) => (
+              <span title="Compras en los últimos 7 días">
+                <SortableHeader context={context} label="Ventas 7d" />
+              </span>
+            ),
+            cell: ({ row }) => (
+              <div className="text-right">
+                {(row.original.purchases7d ?? 0) > 0
+                  ? formatNumber(row.original.purchases7d ?? 0)
+                  : "-"}
+              </div>
+            ),
+          } satisfies ColumnDef<CampaignRow>,
+          {
+            id: "cpa7d",
+            accessorKey: "cpa7d",
+            meta: columnMeta("CPA 7d"),
+            header: (context) => (
+              <span title="CPA en los últimos 7 días (sin columna de gasto)">
+                <SortableHeader context={context} label="CPA 7d" />
+              </span>
+            ),
+            cell: ({ row }) => {
+              const cpa7d = row.original.cpa7d ?? 0
+              const highlight = getCostPerResultCellClassName(cpa7d, currency)
+              return (
+                <div className={cn("-m-2 p-2 text-right", highlight)}>
+                  {cpa7d > 0 ? formatCurrency(cpa7d, currency) : "-"}
+                </div>
+              )
+            },
+          } satisfies ColumnDef<CampaignRow>,
+          {
+            id: "totalPurchases",
+            accessorKey: "totalPurchases",
+            meta: {
+              ...columnMeta("Total ventas"),
+              description: "Compras acumuladas (~365 días)",
+            },
+            header: (context) => (
+              <span title="Compras acumuladas en los últimos ~365 días">
+                <SortableHeader context={context} label="Total ventas" />
+              </span>
+            ),
+            cell: ({ row }) => (
+              <div className="text-right font-medium">
+                {(row.original.totalPurchases ?? 0) > 0
+                  ? formatNumber(row.original.totalPurchases ?? 0)
+                  : "-"}
+              </div>
+            ),
+          } satisfies ColumnDef<CampaignRow>,
+          {
+            id: "totalSpend",
+            accessorKey: "totalSpend",
+            meta: {
+              ...columnMeta("Gasto total"),
+              description: "Gasto acumulado (~365 días)",
+            },
+            header: (context) => (
+              <span title="Gasto acumulado en los últimos ~365 días">
+                <SortableHeader context={context} label="Gasto total" />
+              </span>
+            ),
+            cell: ({ row }) => (
+              <div className="text-right">
+                {(row.original.totalSpend ?? 0) > 0
+                  ? formatCurrency(row.original.totalSpend ?? 0, currency)
+                  : "-"}
+              </div>
+            ),
+          } satisfies ColumnDef<CampaignRow>,
+          {
+            id: "totalCpa",
+            accessorKey: "totalCpa",
+            meta: {
+              ...columnMeta("CPA total"),
+              description: "CPA sobre totales (~365 días)",
+            },
+            header: (context) => (
+              <span title="Gasto total ÷ total ventas (~365 días)">
+                <SortableHeader context={context} label="CPA total" />
+              </span>
+            ),
+            cell: ({ row }) => {
+              const totalCpa = row.original.totalCpa ?? 0
+              const highlight = getCostPerResultCellClassName(
+                totalCpa,
+                currency
+              )
+              return (
+                <div className={cn("-m-2 p-2 text-right", highlight)}>
+                  {totalCpa > 0 ? formatCurrency(totalCpa, currency) : "-"}
+                </div>
+              )
+            },
+          } satisfies ColumnDef<CampaignRow>,
+        ]
+      : []),
     {
       id: "roas",
       accessorFn: (row) => (row.addToCart ?? 0),
