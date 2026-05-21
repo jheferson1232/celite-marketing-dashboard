@@ -1,4 +1,5 @@
 import { generateId, type UIMessage } from "ai"
+import { toChatDbServerError } from "@/lib/chat/db-error"
 import prisma from "@/lib/prisma"
 
 async function withChatDb<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -12,13 +13,18 @@ async function withChatDb<T>(label: string, fn: () => Promise<T>, fallback: T): 
 
 export async function createChat(title?: string): Promise<string> {
   const id = generateId()
-  await prisma.chat.create({
-    data: {
-      id,
-      title: title ?? "Nueva conversación",
-    },
-  })
-  return id
+  try {
+    await prisma.chat.create({
+      data: {
+        id,
+        title: title ?? "Nueva conversación",
+      },
+    })
+    return id
+  } catch (error) {
+    console.error("[chat-store] createChat failed", error)
+    throw toChatDbServerError(error)
+  }
 }
 
 export async function loadChats() {
@@ -70,6 +76,15 @@ function dedupeMessagesById(messages: UIMessage[]): UIMessage[] {
 export async function saveChat(chatId: string, messages: UIMessage[]) {
   const uniqueMessages = dedupeMessagesById(messages)
 
+  try {
+    await saveChatInDb(chatId, uniqueMessages)
+  } catch (error) {
+    console.error("[chat-store] saveChat failed", error)
+    throw toChatDbServerError(error)
+  }
+}
+
+async function saveChatInDb(chatId: string, uniqueMessages: UIMessage[]) {
   await prisma.chat.upsert({
     where: { id: chatId },
     update: {
@@ -102,6 +117,16 @@ export async function saveChat(chatId: string, messages: UIMessage[]) {
       })
     )
   )
+}
+
+/** Comprueba conexión (p. ej. al abrir el asistente en Vercel). */
+export async function pingChatDatabase(): Promise<void> {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+  } catch (error) {
+    console.error("[chat-store] pingChatDatabase failed", error)
+    throw toChatDbServerError(error)
+  }
 }
 
 export async function deleteChat(chatId: string) {

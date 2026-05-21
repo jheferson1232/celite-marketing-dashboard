@@ -6,7 +6,6 @@ export const REPLY_SHORTCUT = {
   GASTO_AYER: "📅 Gasto total ayer",
   FB_ACTIVAS: "📘 FB campañas activas",
   TT_ACTIVAS: "🎵 TT campañas activas",
-  TT_CONJUNTOS: "🎯 TT conjuntos activos",
 } as const
 
 export type ReplyShortcutText =
@@ -29,7 +28,6 @@ export function getTelegramReplyKeyboard(): ReplyKeyboardMarkup {
         { text: REPLY_SHORTCUT.FB_ACTIVAS },
         { text: REPLY_SHORTCUT.TT_ACTIVAS },
       ],
-      [{ text: REPLY_SHORTCUT.TT_CONJUNTOS }],
     ],
     resize_keyboard: true,
     is_persistent: true,

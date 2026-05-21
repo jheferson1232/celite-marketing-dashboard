@@ -30,7 +30,6 @@ import {
   buildAdGroupBudgetPickerKeyboard,
   buildAdGroupPausePickerKeyboard,
   buildCampaignPickerKeyboard,
-  formatTikTokActiveAdSetsMessage,
   formatTikTokActiveCampaignsMessage,
   formatTikTokCampaignsMessage,
   parseDateRangeArg,
@@ -84,7 +83,6 @@ const HELP_TEXT = `**Comandos**
 **Teclado**
 📊 Gasto total hoy · 📅 Gasto total ayer
 📘 FB campañas activas · 🎵 TT campañas activas
-🎯 TT conjuntos activos
 
 También puedes escribir en español y el asistente responderá.`
 
@@ -155,12 +153,6 @@ async function handleShortcut(
     case REPLY_SHORTCUT.TT_ACTIVAS: {
       const range = parseDateRangeArg("hoy")
       const text = await formatTikTokActiveCampaignsMessage(range, "hoy")
-      await sendWithReplyKeyboard(chatId, text, { html: true })
-      return
-    }
-    case REPLY_SHORTCUT.TT_CONJUNTOS: {
-      const range = parseDateRangeArg("hoy")
-      const text = await formatTikTokActiveAdSetsMessage(range, "hoy")
       await sendWithReplyKeyboard(chatId, text, { html: true })
       return
     }

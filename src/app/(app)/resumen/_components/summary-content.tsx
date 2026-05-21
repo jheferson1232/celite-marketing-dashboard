@@ -22,6 +22,7 @@ import {
   formatSummaryOrders,
   formatSummarySpendCop,
 } from "./summary-pin-card"
+import { SummaryMobileThemeToggle } from "./summary-mobile-theme-toggle"
 
 function SummarySection({
   title,
@@ -95,18 +96,21 @@ export function SummaryContent() {
             onRangeChange={(range) => setDateRange(range)}
             className="w-full sm:w-auto"
           />
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 w-full gap-2 px-3 sm:w-auto"
-            onClick={handleReload}
-            disabled={isReloading}
-          >
+          <div className="flex w-full gap-2 sm:w-auto">
+            <SummaryMobileThemeToggle />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
+              onClick={handleReload}
+              disabled={isReloading}
+            >
             <RiRefreshLine
               className={isReloading ? "size-4 animate-spin" : "size-4"}
             />
             Reload
-          </Button>
+            </Button>
+          </div>
         </div>
       </div>
 

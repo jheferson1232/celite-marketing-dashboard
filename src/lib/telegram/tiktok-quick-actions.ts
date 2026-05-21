@@ -568,7 +568,7 @@ export async function pauseAdGroupByNameQuery(
 
   if (matches.length === 0) {
     return {
-      text: `No encontré "${nameQuery}" entre los conjuntos activos con gasto hoy. Revisa **🎯 TT conjuntos activos**.`,
+      text: `No encontré "${nameQuery}" entre los conjuntos activos con gasto hoy. Usa /pausarconjunto para ver la lista.`,
     }
   }
   if (matches.length === 1) {

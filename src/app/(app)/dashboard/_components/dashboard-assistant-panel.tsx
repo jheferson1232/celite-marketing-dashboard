@@ -46,7 +46,7 @@ function getPlatformFromPath(path: string): ChatPlatform {
 type ChatSummary = {
   id: string
   title: string | null
-  updatedAt: Date
+  updatedAt: Date | string
   _count: { messages: number }
 }
 
@@ -56,6 +56,8 @@ interface DashboardAssistantPanelProps {
   initialMessages: UIMessage[]
   returnPath: string
   isLoading?: boolean
+  openError?: string | null
+  onRetryOpen?: () => void
   onCollapse: () => void
   onClose: () => void
 }
@@ -66,6 +68,8 @@ export function DashboardAssistantPanel({
   initialMessages,
   returnPath,
   isLoading = false,
+  openError = null,
+  onRetryOpen,
   onCollapse,
   onClose,
 }: DashboardAssistantPanelProps) {
@@ -113,7 +117,7 @@ export function DashboardAssistantPanel({
                         {chat.title ?? "Sin título"}
                       </p>
                       <p className="text-muted-foreground mt-0.5 text-xs">
-                        {formatDistanceToNow(chat.updatedAt, {
+                        {formatDistanceToNow(new Date(chat.updatedAt), {
                           addSuffix: true,
                           locale: es,
                         })}
@@ -167,7 +171,22 @@ export function DashboardAssistantPanel({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {isLoading || !activeChatId ? (
+        {openError ? (
+          <div className="flex flex-1 flex-col justify-center gap-4 p-6">
+            <p className="text-sm text-destructive">{openError}</p>
+            <p className="text-muted-foreground text-sm">
+              En Vercel, conecta{" "}
+              <strong>Storage → Neon</strong> o pega una{" "}
+              <code className="text-xs">DATABASE_URL</code> de Postgres en la nube
+              y ejecuta <code className="text-xs">npm run db:push</code>.
+            </p>
+            {onRetryOpen ? (
+              <Button type="button" variant="outline" onClick={onRetryOpen}>
+                Reintentar
+              </Button>
+            ) : null}
+          </div>
+        ) : isLoading || !activeChatId ? (
           <div className="flex flex-1 flex-col gap-3 p-4">
             <Skeleton className="h-16 w-3/4" />
             <Skeleton className="h-24 w-full" />

@@ -18,7 +18,7 @@ import { useAssistantPanel } from "../_lib/use-assistant-panel"
 type ChatSummary = {
   id: string
   title: string | null
-  updatedAt: Date
+  updatedAt: Date | string
   _count: { messages: number }
 }
 
@@ -53,6 +53,7 @@ export function DashboardShell({
   const [{ assistant, chat: chatFromUrl }, setPanel] = useAssistantPanel()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isOpening, startOpening] = useTransition()
+  const [openError, setOpenError] = useState<string | null>(null)
   const isLargeScreen = useLargeScreen()
   const isOpen = assistant !== false && !isCollapsed
 
@@ -61,11 +62,27 @@ export function DashboardShell({
     chatFromUrl && chatFromUrl === serverChatId ? serverMessages : []
 
   function openAssistant() {
+    setOpenError(null)
     startOpening(async () => {
-      const result = await runServerAction(createAssistantChatAction())
-      if (!result?.id) return
-      setIsCollapsed(false)
-      setPanel({ assistant: true, chat: result.id })
+      try {
+        const result = await runServerAction(createAssistantChatAction())
+        if (!result?.id) {
+          setOpenError("No se pudo crear la conversación.")
+          setPanel({ assistant: true, chat: null })
+          setIsCollapsed(false)
+          return
+        }
+        setIsCollapsed(false)
+        setPanel({ assistant: true, chat: result.id })
+      } catch (error) {
+        setOpenError(
+          error instanceof Error
+            ? error.message
+            : "No se pudo abrir el asistente. Intenta de nuevo."
+        )
+        setIsCollapsed(false)
+        setPanel({ assistant: true, chat: null })
+      }
     })
   }
 
@@ -76,20 +93,25 @@ export function DashboardShell({
   }, [assistant])
 
   useEffect(() => {
-    if (assistant !== false && !activeChatId && !isOpening) {
+    if (assistant !== false && !activeChatId && !isOpening && !openError) {
       openAssistant()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir sin chat en URL
-  }, [assistant, activeChatId, isOpening])
+  }, [assistant, activeChatId, isOpening, openError])
 
   const panelProps = {
     chats,
     activeChatId,
     initialMessages,
     returnPath: pathname,
-    isLoading: isOpening || !activeChatId,
+    isLoading: isOpening || (!activeChatId && !openError),
+    openError,
+    onRetryOpen: openAssistant,
     onCollapse: () => setIsCollapsed(true),
-    onClose: () => setPanel({ assistant: false, chat: null }),
+    onClose: () => {
+      setOpenError(null)
+      setPanel({ assistant: false, chat: null })
+    },
   }
 
   return (

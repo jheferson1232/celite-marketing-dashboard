@@ -21,6 +21,7 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
+    "db:check": "tsx scripts/check-db.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
   },
