@@ -8,6 +8,9 @@ export const REPLY_SHORTCUT = {
   TT_ACTIVAS: "🎵 TT campañas activas",
 } as const
 
+/** Teclado antiguo; Telegram puede seguir mostrándolo hasta refrescar. */
+export const LEGACY_REPLY_TT_CONJUNTOS = "🎯 TT conjuntos activos"
+
 export type ReplyShortcutText =
   (typeof REPLY_SHORTCUT)[keyof typeof REPLY_SHORTCUT]
 
@@ -30,7 +33,7 @@ export function getTelegramReplyKeyboard(): ReplyKeyboardMarkup {
       ],
     ],
     resize_keyboard: true,
-    is_persistent: true,
+    is_persistent: false,
   }
 }
 

@@ -23,6 +23,7 @@ import {
 import {
   getTelegramReplyKeyboard,
   isReplyShortcutText,
+  LEGACY_REPLY_TT_CONJUNTOS,
   REPLY_SHORTCUT,
   type ReplyShortcutText,
 } from "./keyboards"
@@ -110,10 +111,16 @@ async function sendTikTokActionResult(
 async function sendWithReplyKeyboard(
   chatId: number,
   text: string,
-  options?: { html?: boolean }
+  options?: { html?: boolean; refreshKeyboard?: boolean }
 ): Promise<void> {
   const keyboard = getTelegramReplyKeyboard()
   const parts = splitTelegramMessage(text)
+
+  if (options?.refreshKeyboard) {
+    await sendTelegramMessage(chatId, "\u200b", {
+      replyMarkup: { remove_keyboard: true },
+    })
+  }
 
   for (let i = 0; i < parts.length; i++) {
     await sendTelegramMessage(chatId, parts[i]!, {
@@ -172,7 +179,7 @@ async function handleCommand(
       await sendWithReplyKeyboard(
         chatId,
         `Hola. Soy tu asistente de marketing (Meta + TikTok).\n\n${HELP_TEXT}`,
-        { html: true }
+        { html: true, refreshKeyboard: true }
       )
       return
 
@@ -461,6 +468,15 @@ export async function processTelegramUpdate(
     await sendTelegramMessage(
       telegramChatId,
       "No tienes permiso para usar este bot."
+    )
+    return
+  }
+
+  if (text === LEGACY_REPLY_TT_CONJUNTOS) {
+    await sendWithReplyKeyboard(
+      telegramChatId,
+      "Ese botón ya no está disponible. Usa **🎵 TT campañas activas**.",
+      { html: true, refreshKeyboard: true }
     )
     return
   }
