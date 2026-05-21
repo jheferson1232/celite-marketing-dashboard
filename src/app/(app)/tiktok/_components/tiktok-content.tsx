@@ -15,6 +15,7 @@ import { KpiCards } from "@/app/(app)/dashboard/_components/kpi-cards"
 import { CampaignsTable } from "@/app/(app)/dashboard/_components/campaigns"
 import { AdsView } from "@/app/(app)/dashboard/_components/ads"
 import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-picker"
+import { ThemeToggleButton } from "@/app/(app)/dashboard/_components/theme-toggle-button"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { TikTokManageProvider } from "./tiktok-manage-provider"
 import {
@@ -91,18 +92,21 @@ export function TikTokContent() {
             onRangeChange={(range) => setDateRange(range)}
             className="w-full sm:w-auto"
           />
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
-            onClick={handleReload}
-            disabled={isReloading}
-          >
-            <RiRefreshLine
-              className={isReloading ? "size-4 animate-spin" : "size-4"}
-            />
-            Reload
-          </Button>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <ThemeToggleButton />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
+              onClick={handleReload}
+              disabled={isReloading}
+            >
+              <RiRefreshLine
+                className={isReloading ? "size-4 animate-spin" : "size-4"}
+              />
+              Reload
+            </Button>
+          </div>
         </div>
       </div>
 
