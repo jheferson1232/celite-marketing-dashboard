@@ -3,6 +3,7 @@ import {
   editTelegramMessageReplyMarkup,
   sendTelegramMessage,
 } from "./bot"
+import { getTelegramReplyKeyboard } from "./keyboards"
 import { decodeCallback, type CallbackAction } from "./callback-data"
 import {
   executeConfirmActivate,
@@ -43,7 +44,9 @@ export async function handleTelegramCallback(
   if (!action || action.type === "cancel") {
     await answerTelegramCallbackQuery(callbackQueryId, { text: "Cancelado" })
     await editTelegramMessageReplyMarkup(chatId, messageId)
-    await sendTelegramMessage(chatId, "Acción cancelada.")
+    await sendTelegramMessage(chatId, "Acción cancelada.", {
+      replyMarkup: getTelegramReplyKeyboard(),
+    })
     return
   }
 
@@ -54,21 +57,30 @@ export async function handleTelegramCallback(
       case "select_pause": {
         await answerTelegramCallbackQuery(callbackQueryId, { text: "Pausando…" })
         const result = await executeConfirmPause(action.campaignId)
-        await sendTelegramMessage(chatId, result, { html: true })
+        await sendTelegramMessage(chatId, result, {
+          html: true,
+          replyMarkup: getTelegramReplyKeyboard(),
+        })
         return
       }
 
       case "select_activate": {
         await answerTelegramCallbackQuery(callbackQueryId, { text: "Activando…" })
         const result = await executeConfirmActivate(action.campaignId)
-        await sendTelegramMessage(chatId, result, { html: true })
+        await sendTelegramMessage(chatId, result, {
+          html: true,
+          replyMarkup: getTelegramReplyKeyboard(),
+        })
         return
       }
 
       case "select_pause_adgroup": {
         await answerTelegramCallbackQuery(callbackQueryId, { text: "Pausando…" })
         const result = await executeConfirmPauseAdGroup(action.adgroupId)
-        await sendTelegramMessage(chatId, result, { html: true })
+        await sendTelegramMessage(chatId, result, {
+          html: true,
+          replyMarkup: getTelegramReplyKeyboard(),
+        })
         return
       }
 
@@ -92,7 +104,10 @@ export async function handleTelegramCallback(
         })
         await editTelegramMessageReplyMarkup(chatId, messageId)
         const result = await runConfirmAction(action)
-        await sendTelegramMessage(chatId, result, { html: true })
+        await sendTelegramMessage(chatId, result, {
+          html: true,
+          replyMarkup: getTelegramReplyKeyboard(),
+        })
         return
       }
     }
@@ -103,6 +118,8 @@ export async function handleTelegramCallback(
       text: message.slice(0, 180),
       showAlert: true,
     })
-    await sendTelegramMessage(chatId, `❌ ${message}`)
+    await sendTelegramMessage(chatId, `❌ ${message}`, {
+      replyMarkup: getTelegramReplyKeyboard(),
+    })
   }
 }

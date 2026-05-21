@@ -1,4 +1,8 @@
-import type { InlineKeyboardButton, ReplyKeyboardMarkup } from "./bot"
+import type {
+  InlineKeyboardButton,
+  ReplyKeyboardMarkup,
+  ReplyKeyboardRemove,
+} from "./bot"
 
 /** Textos que envía el teclado fijo (deben coincidir al comparar). */
 export const REPLY_SHORTCUT = {
@@ -35,6 +39,10 @@ export function getTelegramReplyKeyboard(): ReplyKeyboardMarkup {
     resize_keyboard: true,
     is_persistent: false,
   }
+}
+
+export function getTelegramReplyKeyboardRemove(): ReplyKeyboardRemove {
+  return { remove_keyboard: true }
 }
 
 export function getCancelInlineKeyboard(): InlineKeyboardButton[][] {

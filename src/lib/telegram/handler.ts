@@ -22,6 +22,7 @@ import {
 } from "./meta-quick-actions"
 import {
   getTelegramReplyKeyboard,
+  getTelegramReplyKeyboardRemove,
   isReplyShortcutText,
   LEGACY_REPLY_TT_CONJUNTOS,
   REPLY_SHORTCUT,
@@ -68,6 +69,7 @@ export type TelegramUpdate = {
 
 const HELP_TEXT = `**Comandos**
 /start — Inicio + teclado
+/teclado — Quitar botón viejo y actualizar teclado
 /ayuda — Esta ayuda
 /nuevo — Nueva conversación
 /gasto — Gasto Facebook + TikTok (hoy)
@@ -108,6 +110,13 @@ async function sendTikTokActionResult(
   })
 }
 
+/** Telegram rechaza text vacío; hace falta texto visible para remove_keyboard. */
+async function removeTelegramReplyKeyboard(chatId: number): Promise<void> {
+  await sendTelegramMessage(chatId, "🔄", {
+    replyMarkup: getTelegramReplyKeyboardRemove(),
+  })
+}
+
 async function sendWithReplyKeyboard(
   chatId: number,
   text: string,
@@ -117,9 +126,7 @@ async function sendWithReplyKeyboard(
   const parts = splitTelegramMessage(text)
 
   if (options?.refreshKeyboard) {
-    await sendTelegramMessage(chatId, "\u200b", {
-      replyMarkup: { remove_keyboard: true },
-    })
+    await removeTelegramReplyKeyboard(chatId)
   }
 
   for (let i = 0; i < parts.length; i++) {
@@ -183,9 +190,20 @@ async function handleCommand(
       )
       return
 
+    case "teclado":
+    case "keyboard":
+      await removeTelegramReplyKeyboard(chatId)
+      await sendTelegramMessage(chatId, "Teclado actualizado (4 botones).", {
+        replyMarkup: getTelegramReplyKeyboard(),
+      })
+      return
+
     case "ayuda":
     case "help":
-      await sendWithReplyKeyboard(chatId, HELP_TEXT, { html: true })
+      await sendWithReplyKeyboard(chatId, HELP_TEXT, {
+        html: true,
+        refreshKeyboard: true,
+      })
       return
 
     case "nuevo":
@@ -194,7 +212,7 @@ async function handleCommand(
       await sendWithReplyKeyboard(
         chatId,
         `Conversación nueva. Plataforma: ${session.platform === "tiktok" ? "TikTok" : "Meta"}.\n\n${HELP_TEXT}`,
-        { html: true }
+        { html: true, refreshKeyboard: true }
       )
       return
     }
@@ -406,7 +424,11 @@ async function handleQuestion(
       platform,
       channel: "telegram",
     })
-    await sendTelegramAssistantReply(telegramChatId, reply)
+    await sendTelegramAssistantReply(
+      telegramChatId,
+      reply,
+      getTelegramReplyKeyboard()
+    )
   } catch (error) {
     console.error("Telegram assistant error:", error)
     await sendTelegramMessage(

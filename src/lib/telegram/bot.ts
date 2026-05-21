@@ -139,7 +139,11 @@ export async function sendTelegramLongMessage(
 /** Respuesta del asistente IA: HTML + solo métricas permitidas. */
 export async function sendTelegramAssistantReply(
   chatId: number | string,
-  text: string
+  text: string,
+  replyMarkup?: TelegramReplyMarkup
 ): Promise<void> {
-  await sendTelegramLongMessage(chatId, text, { html: true })
+  await sendTelegramLongMessage(chatId, text, {
+    html: true,
+    replyMarkup,
+  })
 }
