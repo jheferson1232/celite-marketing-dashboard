@@ -7,7 +7,7 @@ import {
 } from "@/lib/format"
 
 /** Gasto mínimo (PEN) para mostrar un creativo en el dashboard TikTok. */
-export const TIKTOK_MIN_CREATIVE_SPEND_PEN = 5
+export const TIKTOK_MIN_CREATIVE_SPEND_PEN = 2
 
 export function passesTikTokCreativeSpendFilter(
   spend: number | string,
@@ -271,6 +271,21 @@ export function pickCampaignNameFromGroup(group: AdInsightRow[]): string {
     if (name) return name
   }
   return ""
+}
+
+/** Nombres únicos de conjuntos (ad groups) en el grupo, uno por línea en UI. */
+export function pickAdsetNameListFromGroup(group: AdInsightRow[]): string[] {
+  const names = new Set<string>()
+  for (const row of group) {
+    const name = row.adset_name?.trim()
+    if (name) names.add(name)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b, "es"))
+}
+
+/** Texto plano (p. ej. atributo title); no usar para mostrar varios conjuntos en una línea. */
+export function pickAdsetNamesFromGroup(group: AdInsightRow[]): string {
+  return pickAdsetNameListFromGroup(group).join("\n")
 }
 
 /** Meta: sin URL en la card → título = nombre de campaña. */

@@ -14,7 +14,13 @@ import {
 import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
 import { withTikTokCache } from "./tiktok-cache"
 import { fetchTikTokPurchaseGenderByAdId } from "./purchase-gender"
-import type { TikTokAd, TikTokAdImage, TikTokAdVideo, TikTokApiResponse } from "./types"
+import type {
+  TikTokAd,
+  TikTokAdGroup,
+  TikTokAdImage,
+  TikTokAdVideo,
+  TikTokApiResponse,
+} from "./types"
 
 const AD_INSIGHTS_TTL_MS = 2 * 60 * 1000
 
@@ -111,7 +117,7 @@ export async function getTikTokAdInsights(
 async function fetchTikTokAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
-  const [reportRows, ads] = await Promise.all([
+  const [reportRows, ads, adGroups] = await Promise.all([
     fetchIntegratedReport(
       "AUCTION_AD",
       ["ad_id"],
@@ -120,8 +126,12 @@ async function fetchTikTokAdInsights(
       dateRange.to
     ),
     fetchAllPages<TikTokAd>("/ad/get/"),
+    fetchAllPages<TikTokAdGroup>("/adgroup/get/"),
   ])
   const adsById = new Map(ads.map((ad) => [ad.ad_id, ad]))
+  const adGroupById = new Map(
+    adGroups.map((ag) => [ag.adgroup_id, ag] as const)
+  )
 
   const purchasesByAdId = new Map<string, number>()
   for (const row of reportRows) {
@@ -156,6 +166,9 @@ async function fetchTikTokAdInsights(
     .map((row) => {
       const adId = row.dimensions.ad_id
       const ad = adsById.get(adId)
+      const adGroup = ad?.adgroup_id
+        ? adGroupById.get(ad.adgroup_id)
+        : undefined
       const metrics = row.metrics
       const spend = getMetricNumber(metrics, "spend")
       const impressions = getMetricNumber(metrics, "impressions")
@@ -172,7 +185,9 @@ async function fetchTikTokAdInsights(
         ad_id: adId,
         ad_name: ad?.ad_name || `Anuncio ${adId}`,
         campaign_id: ad?.campaign_id,
+        campaign_name: ad?.campaign_name?.trim() || undefined,
         adset_id: ad?.adgroup_id,
+        adset_name: adGroup?.adgroup_name?.trim() || undefined,
         spend: String(spend),
         impressions: String(impressions),
         reach: String(getMetricNumber(metrics, "reach")),

@@ -25,7 +25,7 @@ function AdsEmptyState({ currency }: { currency: CurrencyCode }) {
     <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed">
       <p className="text-sm text-muted-foreground">
         {currency === TIKTOK_DASHBOARD_CURRENCY
-          ? "No hay creativos con gasto de S/ 5 o más en el periodo seleccionado."
+          ? "No hay creativos con gasto de S/ 2 o más en el periodo seleccionado."
           : "No se encontraron anuncios con gasto en el periodo seleccionado."}
       </p>
     </div>

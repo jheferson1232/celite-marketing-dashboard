@@ -19,6 +19,7 @@ import {
 import {
   formatLandingPagePath,
   META_DASHBOARD_CURRENCY,
+  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
@@ -31,6 +32,8 @@ import {
   getCreativeKey,
   mergeEarliestCreatedTime,
   getCreativeCardDisplayTitle,
+  pickAdsetNameListFromGroup,
+  pickAdsetNamesFromGroup,
   pickCampaignNameFromGroup,
   pickHighestSpendRow,
   pickUrlFromGroup,
@@ -120,6 +123,7 @@ function mergeRows(group: AdInsightRow[]): AdInsightRow {
   base.video_id = best.video_id
   base.url = pickUrlFromGroup(group)
   base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
+  base.adset_name = pickAdsetNamesFromGroup(group) || best.adset_name
   base.created_time = mergeEarliestCreatedTime(group) ?? best.created_time
 
   return base
@@ -132,6 +136,7 @@ function CreativeCard({
   metricOptions,
   currency,
   adsCount,
+  adsetNames,
 }: {
   creativeKey: string
   row: AdInsightRow
@@ -139,6 +144,7 @@ function CreativeCard({
   metricOptions: { key: MetricKey; label: string }[]
   currency: CurrencyCode
   adsCount: number
+  adsetNames: string[]
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
   const hasVideo = !!row.video_id
@@ -247,6 +253,36 @@ function CreativeCard({
               </div>
             ))}
           </dl>
+
+          {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+            <dl className="space-y-2 border-t pt-3">
+              <div className="flex items-start justify-between gap-3 text-sm">
+                <dt className="shrink-0 text-muted-foreground">Campaña</dt>
+                <dd
+                  className="min-w-0 text-right font-medium leading-snug"
+                  title={row.campaign_name || undefined}
+                >
+                  {row.campaign_name?.trim() || "—"}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-3 text-sm">
+                <dt className="shrink-0 pt-0.5 text-muted-foreground">Conjuntos</dt>
+                <dd className="min-w-0 flex-1 text-right font-medium leading-snug">
+                  {adsetNames.length > 0 ? (
+                    <ul className="space-y-1">
+                      {adsetNames.map((name) => (
+                        <li key={name} className="break-words">
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -285,6 +321,7 @@ export function TopCreativesPanel({
     return Array.from(map.entries()).map(([key, group]) => ({
       key,
       merged: mergeRows(group),
+      adsetNames: pickAdsetNameListFromGroup(group),
       count: group.length,
     }))
   }, [rows])
@@ -385,7 +422,7 @@ export function TopCreativesPanel({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-        {sortedRows.map(({ key, merged, count }) => (
+        {sortedRows.map(({ key, merged, adsetNames, count }) => (
           <CreativeCard
             key={key}
             creativeKey={key}
@@ -394,6 +431,7 @@ export function TopCreativesPanel({
             metricOptions={metricOptions}
             currency={currency}
             adsCount={count}
+            adsetNames={adsetNames}
           />
         ))}
       </div>
