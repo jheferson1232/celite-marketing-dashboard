@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   RiBarChartGroupedLine,
+  RiBrainLine,
   RiMegaphoneLine,
   RiMetaLine,
   RiTiktokLine,
@@ -33,6 +34,12 @@ const navItems = [
     title: "Meta",
     href: "/dashboard",
     icon: RiMetaLine,
+  },
+  {
+    id: "informe-ia",
+    title: "Informe IA",
+    href: "/informe-ia",
+    icon: RiBrainLine,
   },
   {
     id: "tiktok",
@@ -79,11 +86,14 @@ export function AppSidebar() {
                       item.id === "resumen"
                         ? pathname === "/resumen" ||
                           pathname.startsWith("/resumen/")
-                        : item.id === "tiktok"
-                          ? pathname === "/tiktok" ||
-                            pathname.startsWith("/tiktok/")
-                          : pathname === "/dashboard" ||
-                            pathname.startsWith("/dashboard/")
+                        : item.id === "informe-ia"
+                          ? pathname === "/informe-ia" ||
+                            pathname.startsWith("/informe-ia/")
+                          : item.id === "tiktok"
+                            ? pathname === "/tiktok" ||
+                              pathname.startsWith("/tiktok/")
+                            : pathname === "/dashboard" ||
+                              pathname.startsWith("/dashboard/")
                     }
                     tooltip={item.title}
                   >

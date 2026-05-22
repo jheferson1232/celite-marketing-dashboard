@@ -32,3 +32,35 @@ model Message {
   parts     Json
   createdAt DateTime @default(now())
 }
+
+/** Campaña o conjunto Meta para Informe IA y cron de activación. */
+model MetaTrackEntity {
+  id             String   @id @default(cuid())
+  metaId         String
+  type           String
+  name           String
+  campaignMetaId String?
+  objective      String?
+  updatedAt      DateTime @updatedAt
+  operativeDays  MetaOperativeDay[]
+
+  @@unique([metaId, type])
+  @@index([type, campaignMetaId])
+}
+
+/** Checklist diario: activé (manual), estado Meta, ventas del día. */
+model MetaOperativeDay {
+  id            String          @id @default(cuid())
+  date          String
+  entityId      String
+  entity        MetaTrackEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  intentActive  Boolean         @default(false)
+  metaWasActive Boolean         @default(false)
+  sold          Boolean         @default(false)
+  purchases     Int             @default(0)
+  spend         Float           @default(0)
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([date, entityId])
+  @@index([date])
+}

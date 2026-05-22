@@ -16,3 +16,33 @@ export function addDaysToDateString(dateStr: string, days: number): string {
 export function getDashboardYesterday(): string {
   return addDaysToDateString(getDashboardToday(), -1)
 }
+
+/** Hora 0–23 en America/Lima. */
+export function getDashboardHour(): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: DASHBOARD_TIMEZONE,
+    hour: "numeric",
+    hour12: false,
+  }).format(new Date())
+  return parseInt(hour, 10)
+}
+
+export function getTodayDateRange(): { from: string; to: string } {
+  const today = getDashboardToday()
+  return { from: today, to: today }
+}
+
+export function getLastNDaysRange(days: number): { from: string; to: string } {
+  const to = getDashboardToday()
+  return { from: addDaysToDateString(to, -(days - 1)), to }
+}
+
+export function buildDateKeys(from: string, to: string): string[] {
+  const keys: string[] = []
+  let cursor = from
+  while (cursor <= to) {
+    keys.push(cursor)
+    cursor = addDaysToDateString(cursor, 1)
+  }
+  return keys
+}
