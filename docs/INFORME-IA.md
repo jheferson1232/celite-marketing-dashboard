@@ -96,13 +96,9 @@ curl -s -H "Authorization: Bearer $CRON_SECRET" \
 - Columna **Puntos** — Suma ayer+hoy con tope **−1** por fila.
 ## Estados en tabla (columna Estado)
 
-Evaluación del día (prioridad de arriba a abajo):
+**Campañas:** veredicto corto generado con OpenAI (o regla fija si no hay `OPENAI_API_KEY`), leyendo Meta 7 / 15 / 30 días y total + datos del informe (hoy/ayer). Sin columnas extra de métricas. Textos: **Seguir activando**, **No seguir**, **Revisar** (CPA referencia ≤ 20k COP).
 
-- **Gasto alto ayer** — Ayer gastó ≥ 10k COP.
-- **—** — Hoy sin gasto.
-- **Sin ventas** — Hoy con gasto y 0 compras (rojo si gasto ≥ 10k o entre 5k–10k).
-- **CPA alto** — Hoy con ventas y CPA &gt; 15k COP.
-- **OK** — Hoy con ventas y CPA aceptable (+1 si CPA &lt; 10k).
+**Conjuntos:** reglas operativas del día (Gasto alto ayer, Sin ventas, CPA alto, OK, —).
 
 ## Sugerencias de apagar (Telegram)
 
@@ -116,7 +112,9 @@ Solo entidades **activas en Meta (ON)**; si ya están apagadas no se repiten en 
 | Archivo | Rol |
 |---------|-----|
 | `src/lib/services/meta/meta-operative-service.ts` | Payload tabla + sync |
-| `src/lib/services/meta/meta-informe-scoring.ts` | Umbrales y puntos |
+| `src/lib/services/meta/meta-informe-scoring.ts` | Umbrales y puntos (conjuntos) |
+| `src/lib/services/meta/campaign-multi-window-metrics.ts` | Meta 7/15/30/total por campaña |
+| `src/lib/services/meta/meta-campaign-ai-estado.ts` | Veredicto IA campañas |
 | `src/lib/services/meta/meta-informe-alerts.ts` | Listas apagar / resumen campañas |
 | `src/lib/services/meta/meta-hourly-report.ts` | Mensaje horario + envío |
 | `src/lib/services/meta/meta-telegram-cron.ts` | Orquestación cron |

@@ -39,6 +39,10 @@ import type {
 } from "@/lib/services/meta/meta-operative-service"
 import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
+  INFORME_CPA_PENALTY_COP,
+  INFORME_SPEND_PENALTY_COP,
+} from "@/lib/services/meta/meta-informe-scoring"
+import {
   getMetaInformeAction,
   previewMetaInformeHourlyAction,
   sendMetaInformeHourlyToTelegramAction,
@@ -55,6 +59,59 @@ function formatInformeDate(date: string): string {
   const [y, m, d] = date.split("-")
   if (!y || !m || !d) return date
   return `${d}/${m}/${y}`
+}
+
+function formatInformeRowLabel(
+  row: InformeEntityRow,
+  groups: InformeCampaignGroup[]
+): string {
+  if (row.type === "campaign") return row.name
+  const group = groups.find((g) =>
+    g.adsets.some((a) => a.entityId === row.entityId)
+  )
+  return group ? `${row.name} (${group.campaign.name})` : row.name
+}
+
+/** Avisos de reglas de hoy (no ocultar): lista nombres + qué revisar. */
+function RulePerformanceBanner({
+  title,
+  explanation,
+  rows,
+  groups,
+}: {
+  title: string
+  explanation: string
+  rows: InformeEntityRow[]
+  groups: InformeCampaignGroup[]
+}) {
+  if (rows.length === 0) return null
+
+  return (
+    <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
+      <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-red-800 dark:text-red-300">{title}</p>
+        <p className="text-muted-foreground mt-1 text-xs">{explanation}</p>
+        <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
+          {rows.slice(0, 6).map((row) => (
+            <li key={row.entityId} className="truncate">
+              {formatInformeRowLabel(row, groups)}
+              {" · "}
+              {formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)}
+              {row.purchasesToday > 0
+                ? ` · ${formatNumber(row.purchasesToday)} compras · CPA ${formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)}`
+                : " · 0 compras"}
+            </li>
+          ))}
+          {rows.length > 6 ? (
+            <li className="text-muted-foreground/80">
+              +{rows.length - 6} más en la tabla (columna Estado en conjuntos)
+            </li>
+          ) : null}
+        </ul>
+      </div>
+    </div>
+  )
 }
 
 function PauseAlertsBanner({
@@ -299,7 +356,28 @@ function AdsetCountCells({
   )
 }
 
+function estadoLabelClassName(row: InformeEntityRow): string {
+  if (row.type !== "campaign") {
+    return cn(
+      row.rowHighlight === "red" &&
+        "font-medium text-red-600 dark:text-red-400"
+    )
+  }
+  if (row.estadoLabel === "Seguir activando") {
+    return "font-medium text-green-600 dark:text-green-400"
+  }
+  if (row.estadoLabel === "No seguir") {
+    return "font-medium text-red-600 dark:text-red-400"
+  }
+  return "text-muted-foreground"
+}
+
 function StatusCells({ row }: { row: InformeEntityRow }) {
+  const estadoTitle =
+    row.type === "campaign"
+      ? "Veredicto IA (Meta 7/15/30 días y total; CPA máx. 20k COP)"
+      : undefined
+
   return (
     <>
       <TableCell className="w-[72px] text-center">
@@ -315,11 +393,8 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
         </span>
       </TableCell>
       <TableCell
-        className={cn(
-          "min-w-[140px] text-center text-xs",
-          row.rowHighlight === "red" &&
-            "font-medium text-red-600 dark:text-red-400"
-        )}
+        className={cn("min-w-[140px] text-center text-xs", estadoLabelClassName(row))}
+        title={estadoTitle}
       >
         {row.estadoLabel}
       </TableCell>
@@ -669,11 +744,10 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada hora a Telegram (GitHub Actions).{" "}
-            <strong className="text-foreground font-medium">Vista previa</strong>{" "}
-            muestra el mensaje aquí abajo (no envía).{" "}
-            <strong className="text-foreground font-medium">Enviar a Telegram</strong>{" "}
-            usa el mismo informe y lo manda al bot.
+            Cron cada hora a Telegram (GitHub Actions). En{" "}
+            <strong className="text-foreground font-medium">Estado</strong>, las
+            campañas muestran un veredicto IA (7/15/30 días y total en Meta; sin
+            columnas extra). Los conjuntos usan reglas del día.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -714,6 +788,13 @@ export function InformeIaContent() {
         </div>
       </div>
 
+      {pending ? (
+        <p className="text-muted-foreground text-xs">
+          Sincronizando Meta y analizando campañas con IA… Puede tardar 1–2
+          minutos.
+        </p>
+      ) : null}
+
       {hourlyLoadingLabel ? (
         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm dark:border-blue-500/30 dark:bg-blue-500/10">
           <RiRefreshLine className="size-4 shrink-0 animate-spin text-blue-600" />
@@ -747,26 +828,25 @@ export function InformeIaContent() {
         </div>
       ) : null}
 
-      {data && data.sinVentasAlerts.length > 0 ? (
-        <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
-          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
-          <div>
-            <p className="font-medium text-red-800 dark:text-red-300">
-              {data.sinVentasAlerts.length} con gasto alto sin ventas (−1)
-            </p>
-          </div>
-        </div>
+      {data ? (
+        <RulePerformanceBanner
+          title={`${data.sinVentasAlerts.filter((r) => r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0).length} con gasto alto hoy y sin ventas`}
+          explanation={`Hoy gastaron ≥ ${formatCurrency(INFORME_SPEND_PENALTY_COP, META_DASHBOARD_CURRENCY)} y no cerraron compras. Conviene revisar o pausar en Meta.`}
+          rows={data.sinVentasAlerts.filter(
+            (r) =>
+              r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0
+          )}
+          groups={data.groups}
+        />
       ) : null}
 
-      {data && data.cpaAltoAlerts.length > 0 ? (
-        <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
-          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
-          <div>
-            <p className="font-medium text-red-800 dark:text-red-300">
-              {data.cpaAltoAlerts.length} con CPA &gt; 15k (−1)
-            </p>
-          </div>
-        </div>
+      {data ? (
+        <RulePerformanceBanner
+          title={`${data.cpaAltoAlerts.length} con CPA alto hoy`}
+          explanation={`Costo por compra hoy mayor a ${formatCurrency(INFORME_CPA_PENALTY_COP, META_DASHBOARD_CURRENCY)}. Revisa rentabilidad antes de seguir gastando.`}
+          rows={data.cpaAltoAlerts}
+          groups={data.groups}
+        />
       ) : null}
 
       {data ? (
