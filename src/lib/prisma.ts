@@ -7,12 +7,22 @@ const adapter = new PrismaPg({
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
-const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    adapter,
-  })
+function createPrismaClient() {
+  return new PrismaClient({ adapter })
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+function hasInformeModels(client: PrismaClient) {
+  return Boolean(client.metaTrackEntity && client.metaOperativeDay)
+}
+
+let prisma = globalForPrisma.prisma ?? createPrismaClient()
+
+if (!hasInformeModels(prisma)) {
+  prisma = createPrismaClient()
+}
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma
+}
 
 export default prisma

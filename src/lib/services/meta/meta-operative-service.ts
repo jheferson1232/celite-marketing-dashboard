@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { getInformePrisma } from "@/lib/informe-db"
 import { getDashboardToday, getTodayDateRange } from "@/lib/date"
 import {
   getMetaInformeDateKeys,
@@ -111,11 +112,14 @@ function collectSpendingToday(
 async function upsertTrackEntitiesBatch(
   inputs: TrackEntityInput[]
 ): Promise<void> {
+  if (inputs.length === 0) return
+  const { metaTrackEntity } = getInformePrisma()
+
   for (let i = 0; i < inputs.length; i += UPSERT_CHUNK) {
     const chunk = inputs.slice(i, i + UPSERT_CHUNK)
     await prisma.$transaction(
       chunk.map((input) =>
-        prisma.metaTrackEntity.upsert({
+        metaTrackEntity.upsert({
           where: { metaId_type: { metaId: input.metaId, type: input.type } },
           create: {
             metaId: input.metaId,
@@ -144,7 +148,8 @@ async function upsertOperativeDay(
     spend?: number
   }
 ) {
-  await prisma.metaOperativeDay.upsert({
+  const { metaOperativeDay } = getInformePrisma()
+  await metaOperativeDay.upsert({
     where: { date_entityId: { date, entityId } },
     create: {
       date,
@@ -166,7 +171,8 @@ export async function syncMetaOperativeStateForDate(
 ): Promise<void> {
   if (date < getMetaInformeStartDate() || metaIds.length === 0) return
 
-  const entities = await prisma.metaTrackEntity.findMany({
+  const { metaTrackEntity } = getInformePrisma()
+  const entities = await metaTrackEntity.findMany({
     where: { metaId: { in: metaIds } },
   })
   if (entities.length === 0) return
@@ -210,7 +216,8 @@ export async function setMetaIntentActive(
 ): Promise<void> {
   if (date < getMetaInformeStartDate()) return
 
-  await prisma.metaOperativeDay.upsert({
+  const { metaOperativeDay } = getInformePrisma()
+  await metaOperativeDay.upsert({
     where: { date_entityId: { date, entityId } },
     create: {
       date,
@@ -261,8 +268,13 @@ function toInformeRow(
 }
 
 async function pruneOperativeDaysBeforeInformeStart(): Promise<void> {
-  const start = getMetaInformeStartDate()
-  await prisma.metaOperativeDay.deleteMany({ where: { date: { lt: start } } })
+  try {
+    const start = getMetaInformeStartDate()
+    const { metaOperativeDay } = getInformePrisma()
+    await metaOperativeDay.deleteMany({ where: { date: { lt: start } } })
+  } catch {
+    // Tablas aún no creadas en Neon o cliente desactualizado
+  }
 }
 
 /** Quita entidades del catálogo completo antiguo; conserva gasto hoy o check «Activé». */
@@ -270,16 +282,23 @@ async function pruneStaleTrackEntities(
   keepMetaIds: string[],
   today: string
 ): Promise<void> {
-  await prisma.metaTrackEntity.deleteMany({
-    where: {
-      metaId: { notIn: keepMetaIds },
-      NOT: {
-        operativeDays: {
-          some: { date: today, intentActive: true },
+  if (keepMetaIds.length === 0) return
+
+  try {
+    const { metaTrackEntity } = getInformePrisma()
+    await metaTrackEntity.deleteMany({
+      where: {
+        metaId: { notIn: keepMetaIds },
+        NOT: {
+          operativeDays: {
+            some: { date: today, intentActive: true },
+          },
         },
       },
-    },
-  })
+    })
+  } catch {
+    // Sin tablas o sin filas previas
+  }
 }
 
 function dayCellsForEntity(
@@ -341,12 +360,13 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     }
   }
 
+  const { metaTrackEntity, metaOperativeDay } = getInformePrisma()
   const [entities, operativeRows] = await Promise.all([
-    prisma.metaTrackEntity.findMany({
+    metaTrackEntity.findMany({
       where: { metaId: { in: [...metaIdSet] } },
       orderBy: { name: "asc" },
     }),
-    prisma.metaOperativeDay.findMany({
+    metaOperativeDay.findMany({
       where: { date: { gte: dateRange.from, lte: dateRange.to } },
     }),
   ])
