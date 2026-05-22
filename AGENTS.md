@@ -23,3 +23,11 @@ Toda obtención de datos del servidor sigue este flujo:
 - Llamar APIs externas directamente desde componentes.
 - Usar `fetch()` en vez de axios para servicios externos.
 - Poner lógica de negocio dentro de server actions.
+
+## Informe IA vs dashboard Meta (`/dashboard`)
+
+- **No modificar** `src/app/(app)/dashboard/` ni servicios de listado/KPIs del dashboard al trabajar en Informe IA.
+- Informe IA vive en `src/app/(app)/informe-ia/` y `meta-operative-service.ts` (+ `meta-account-daily-insights.ts`, `informe-entity-status.ts`).
+- Persistencia propia: tablas Prisma `MetaTrackEntity` / `MetaOperativeDay` (el dashboard no las usa).
+- Caché Meta del informe con prefijo `meta-informe:`; no invalidar `clearMetaCache()` del dashboard.
+- El informe **no** llama a `campaigns-list`, `campaign-adsets` ni al catálogo completo `meta:adsets:catalog` / `meta:campaigns:catalog` del dashboard.

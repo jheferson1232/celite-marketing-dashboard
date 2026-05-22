@@ -6,18 +6,12 @@ import {
   getMetaInformeStartDate,
 } from "@/lib/meta-informe"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
-import { getCachedMetaCampaignCatalog } from "./campaign-catalog"
-import { getCachedMetaAdsetsCatalog, normalizeAdSetFromApi } from "./adsets-catalog"
-import { isMetaCampaignActiveForCount } from "./meta-campaign-status"
-import { isMetaAdSetActiveForCount } from "./meta-adset-status"
 import {
   getMetaAccountDailyInsights,
   type MetaDailyEntityRow,
 } from "./meta-account-daily-insights"
+import { getInformeEntitiesActiveMap } from "./informe-entity-status"
 import { getAccountKpis } from "./account-kpis"
-import { getMetaClient } from "./meta"
-import { normalizeMetaId } from "./meta-ids"
-import type { MetaAdSet, MetaCampaign } from "./types"
 
 export type InformeEntityRow = {
   entityId: string
@@ -140,17 +134,6 @@ async function upsertTrackEntitiesBatch(
   }
 }
 
-function isCampaignActive(campaign: MetaCampaign): boolean {
-  return isMetaCampaignActiveForCount(campaign)
-}
-
-function isAdsetActive(adset: MetaAdSet): boolean {
-  return isMetaAdSetActiveForCount({
-    status: adset.status,
-    effective_status: adset.effective_status,
-  })
-}
-
 async function upsertOperativeDay(
   entityId: string,
   date: string,
@@ -188,22 +171,7 @@ export async function syncMetaOperativeStateForDate(
   })
   if (entities.length === 0) return
 
-  const api = getMetaClient()
-  const [campaigns, adsetsRaw] = await Promise.all([
-    getCachedMetaCampaignCatalog(api),
-    getCachedMetaAdsetsCatalog(api),
-  ])
-
-  const campaignById = new Map(
-    campaigns.map((c) => [normalizeMetaId(c.id), c])
-  )
-  const adsetById = new Map<string, MetaAdSet>()
-  for (const raw of adsetsRaw) {
-    const adset = normalizeAdSetFromApi(
-      raw as MetaAdSet & { campaign_id?: string | { id?: string } }
-    )
-    if (adset?.id) adsetById.set(adset.id, adset)
-  }
+  const activeByKey = await getInformeEntitiesActiveMap(entities)
 
   const range =
     date === getDashboardToday() ? getTodayDateRange() : { from: date, to: date }
@@ -223,14 +191,8 @@ export async function syncMetaOperativeStateForDate(
         : adsetDay.get(entity.metaId)
     const cell = dayMap?.get(date)
 
-    let metaWasActive = false
-    if (entity.type === "campaign") {
-      const c = campaignById.get(entity.metaId)
-      metaWasActive = c ? isCampaignActive(c) : false
-    } else {
-      const a = adsetById.get(entity.metaId)
-      metaWasActive = a ? isAdsetActive(a) : false
-    }
+    const metaWasActive =
+      activeByKey.get(`${entity.type}:${entity.metaId}`) ?? false
 
     await upsertOperativeDay(entity.id, date, {
       metaWasActive,
