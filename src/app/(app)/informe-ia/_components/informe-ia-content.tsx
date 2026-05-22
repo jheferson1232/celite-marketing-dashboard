@@ -34,10 +34,12 @@ import {
 import type {
   InformeCampaignGroup,
   InformeEntityRow,
+  MetaInformePayload,
   InformeTableTotals,
 } from "@/lib/services/meta/meta-operative-service"
 import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
+  getAdsetEstadoTodayDisplay,
   INFORME_CPA_PENALTY_COP,
   INFORME_SPEND_PENALTY_COP,
 } from "@/lib/services/meta/meta-informe-scoring"
@@ -71,91 +73,208 @@ function formatInformeRowLabel(
   return group ? `${row.name} (${group.campaign.name})` : row.name
 }
 
-/** Avisos de reglas de hoy (no ocultar): lista nombres + qué revisar. */
-function RulePerformanceBanner({
-  title,
-  explanation,
-  rows,
-  groups,
-}: {
-  title: string
-  explanation: string
-  rows: InformeEntityRow[]
+type InformeAlertVariant = "red" | "amber"
+
+const INFORME_ALERT_STYLES: Record<
+  InformeAlertVariant,
+  { border: string; title: string; icon: string }
+> = {
+  red: {
+    border:
+      "border-red-200 bg-red-50/80 dark:border-red-500/30 dark:bg-red-500/10",
+    title: "text-red-800 dark:text-red-300",
+    icon: "text-red-600",
+  },
+  amber: {
+    border:
+      "border-amber-200 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10",
+    title: "text-amber-800 dark:text-amber-300",
+    icon: "text-amber-600",
+  },
+}
+
+const INFORME_ALERT_MAX_ITEMS = 8
+
+function formatInformeRowMetrics(
+  row: InformeEntityRow,
   groups: InformeCampaignGroup[]
+): string {
+  const metrics =
+    row.purchasesToday > 0
+      ? `${formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)} · ${formatNumber(row.purchasesToday)} compras · CPA ${formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)}`
+      : `${formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)} · 0 compras`
+  return `${formatInformeRowLabel(row, groups)} · ${metrics}`
+}
+
+function formatPauseItemMetrics(item: InformePauseItem): string {
+  const name =
+    item.type === "adset" && item.campaignName
+      ? `${item.name} (${item.campaignName})`
+      : item.name
+  return `${name} · ${formatCurrency(item.spend, META_DASHBOARD_CURRENCY)} · ${item.purchases} compras`
+}
+
+function joinAlertItems(items: string[], extra?: number): string {
+  if (items.length === 0) return ""
+  const visible = items.slice(0, INFORME_ALERT_MAX_ITEMS).join(" | ")
+  if (extra && extra > 0) {
+    return `${visible} | +${extra} más`
+  }
+  return visible
+}
+
+/** Una fila compacta: etiqueta corta + ítems en línea. */
+function InformeAlertLine({
+  variant,
+  label,
+  itemsText,
+}: {
+  variant: InformeAlertVariant
+  label: string
+  itemsText: string
 }) {
-  if (rows.length === 0) return null
+  if (!itemsText) return null
+  const styles = INFORME_ALERT_STYLES[variant]
 
   return (
-    <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
-      <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-red-800 dark:text-red-300">{title}</p>
-        <p className="text-muted-foreground mt-1 text-xs">{explanation}</p>
-        <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
-          {rows.slice(0, 6).map((row) => (
-            <li key={row.entityId} className="truncate">
-              {formatInformeRowLabel(row, groups)}
-              {" · "}
-              {formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)}
-              {row.purchasesToday > 0
-                ? ` · ${formatNumber(row.purchasesToday)} compras · CPA ${formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)}`
-                : " · 0 compras"}
-            </li>
-          ))}
-          {rows.length > 6 ? (
-            <li className="text-muted-foreground/80">
-              +{rows.length - 6} más en la tabla (columna Estado en conjuntos)
-            </li>
-          ) : null}
-        </ul>
-      </div>
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px] leading-snug sm:text-xs">
+      <span className={cn("shrink-0 font-medium", styles.title)}>{label}</span>
+      <span className="text-muted-foreground min-w-0">{itemsText}</span>
     </div>
   )
 }
 
-function PauseAlertsBanner({
-  title,
-  items,
+/** Bloque único por nivel (campañas rojo / conjuntos amarillo), filas horizontales. */
+function InformeAlertSection({
   variant,
+  heading,
+  lines,
 }: {
-  title: string
-  items: InformePauseItem[]
-  variant: "amber" | "red"
+  variant: InformeAlertVariant
+  heading: string
+  lines: { label: string; itemsText: string }[]
 }) {
-  if (items.length === 0) return null
-  const border =
-    variant === "amber"
-      ? "border-amber-200 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10"
-      : "border-red-200 bg-red-50/80 dark:border-red-500/30 dark:bg-red-500/10"
-  const titleColor =
-    variant === "amber"
-      ? "text-amber-800 dark:text-amber-300"
-      : "text-red-800 dark:text-red-300"
-  const iconColor = variant === "amber" ? "text-amber-600" : "text-red-600"
+  const visible = lines.filter((l) => l.itemsText)
+  if (visible.length === 0) return null
+  const styles = INFORME_ALERT_STYLES[variant]
 
   return (
-    <div className={cn("flex gap-2 rounded-lg border px-4 py-3 text-sm", border)}>
-      <RiAlertLine className={cn("mt-0.5 size-4 shrink-0", iconColor)} />
-      <div className="min-w-0 flex-1">
-        <p className={cn("font-medium", titleColor)}>{title}</p>
-        <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
-          {items.slice(0, 6).map((item) => (
-            <li key={`${item.type}-${item.name}`} className="truncate">
-              {item.type === "adset" && item.campaignName
-                ? `${item.name} (${item.campaignName})`
-                : item.name}
-              {" · "}
-              {formatCurrency(item.spend, META_DASHBOARD_CURRENCY)} ·{" "}
-              {item.purchases} compras
-            </li>
-          ))}
-          {items.length > 6 ? (
-            <li className="text-muted-foreground/80">
-              +{items.length - 6} más en el informe de Telegram
-            </li>
-          ) : null}
-        </ul>
+    <section
+      className={cn("rounded-md border px-2 py-1.5 sm:px-2.5", styles.border)}
+    >
+      <div
+        className={cn(
+          "mb-0.5 flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase sm:text-[11px]",
+          styles.title
+        )}
+      >
+        <RiAlertLine className={cn("size-3 shrink-0", styles.icon)} />
+        {heading}
       </div>
+      <div className="flex flex-col gap-0.5">
+        {visible.map((line) => (
+          <InformeAlertLine
+            key={line.label}
+            variant={variant}
+            label={line.label}
+            itemsText={line.itemsText}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function InformeAlertsPanel({ data }: { data: MetaInformePayload }) {
+  const highSpendNoSales = (rows: InformeEntityRow[]) =>
+    rows.filter(
+      (r) =>
+        r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0
+    )
+
+  const campaignSinVentas = highSpendNoSales(
+    data.sinVentasAlerts.filter((r) => r.type === "campaign")
+  )
+  const adsetSinVentas = highSpendNoSales(
+    data.sinVentasAlerts.filter((r) => r.type === "adset")
+  )
+  const campaignCpaAlto = data.cpaAltoAlerts.filter((r) => r.type === "campaign")
+  const adsetCpaAlto = data.cpaAltoAlerts.filter((r) => r.type === "adset")
+
+  const campaignLines = [
+    {
+      label: "Sin ventas ≥10k",
+      itemsText: joinAlertItems(
+        campaignSinVentas.map((r) => formatInformeRowMetrics(r, data.groups)),
+        Math.max(0, campaignSinVentas.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+    {
+      label: "CPA >15k",
+      itemsText: joinAlertItems(
+        campaignCpaAlto.map((r) => formatInformeRowMetrics(r, data.groups)),
+        Math.max(0, campaignCpaAlto.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+    {
+      label: "Apagar ≥30k",
+      itemsText: joinAlertItems(
+        data.campaignsToPause.map(formatPauseItemMetrics),
+        Math.max(0, data.campaignsToPause.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+  ]
+
+  const adsetLines = [
+    {
+      label: "Sin ventas ≥10k",
+      itemsText: joinAlertItems(
+        adsetSinVentas.map((r) => formatInformeRowMetrics(r, data.groups)),
+        Math.max(0, adsetSinVentas.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+    {
+      label: "CPA >15k",
+      itemsText: joinAlertItems(
+        adsetCpaAlto.map((r) => formatInformeRowMetrics(r, data.groups)),
+        Math.max(0, adsetCpaAlto.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+    {
+      label: "Apagar ≥10k",
+      itemsText: joinAlertItems(
+        data.adsetsToPause.map(formatPauseItemMetrics),
+        Math.max(0, data.adsetsToPause.length - INFORME_ALERT_MAX_ITEMS)
+      ),
+    },
+  ]
+
+  const hasCampaign = campaignLines.some((l) => l.itemsText)
+  const hasAdset = adsetLines.some((l) => l.itemsText)
+
+  if (!hasCampaign && !hasAdset) return null
+
+  return (
+    <div
+      className={cn(
+        "grid gap-1.5",
+        hasCampaign && hasAdset ? "sm:grid-cols-2" : "grid-cols-1"
+      )}
+    >
+      {hasCampaign ? (
+        <InformeAlertSection
+          variant="red"
+          heading="Campañas"
+          lines={campaignLines}
+        />
+      ) : null}
+      {hasAdset ? (
+        <InformeAlertSection
+          variant="amber"
+          heading="Conjuntos"
+          lines={adsetLines}
+        />
+      ) : null}
     </div>
   )
 }
@@ -238,6 +357,57 @@ function PeriodMetricsCells({
       >
         {metrics.cpa > 0
           ? formatCurrency(metrics.cpa, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+    </>
+  )
+}
+
+/** Gasto y CPA total: campaña (desde inicio informe) · conjunto (ayer + hoy). */
+function InformeTotalCells({
+  row,
+  informeStartDate,
+  yesterday,
+  today,
+}: {
+  row: InformeEntityRow
+  informeStartDate: string
+  yesterday: string
+  today: string
+}) {
+  const cpaClass = getCostPerResultCellClassName(
+    row.cpaInformeTotal,
+    META_DASHBOARD_CURRENCY
+  )
+  const spendTitle =
+    row.type === "campaign"
+      ? `Gasto desde ${formatInformeDate(informeStartDate)} (todas las fechas del informe)`
+      : `Gasto ayer (${formatInformeDate(yesterday)}) + hoy (${formatInformeDate(today)})`
+  const cpaTitle =
+    row.type === "campaign"
+      ? row.purchasesInformeTotal > 0
+        ? `CPA total informe · ${formatNumber(row.purchasesInformeTotal)} compras`
+        : "CPA total del informe"
+      : row.purchasesInformeTotal > 0
+        ? `CPA ayer+hoy · ${formatNumber(row.purchasesInformeTotal)} compras`
+        : "CPA ayer+hoy (sin compras en el periodo)"
+
+  return (
+    <>
+      <TableCell
+        className="text-right tabular-nums font-medium"
+        title={spendTitle}
+      >
+        {row.spendInformeTotal > 0
+          ? formatCurrency(row.spendInformeTotal, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+      <TableCell
+        className={cn("text-right tabular-nums font-medium", cpaClass)}
+        title={cpaTitle}
+      >
+        {row.cpaInformeTotal > 0
+          ? formatCurrency(row.cpaInformeTotal, META_DASHBOARD_CURRENCY)
           : "—"}
       </TableCell>
     </>
@@ -355,13 +525,17 @@ function AdsetCountCells({
   )
 }
 
-function estadoLabelClassName(row: InformeEntityRow): string {
-  if (row.type !== "campaign") {
-    return cn(
-      row.rowHighlight === "red" &&
-        "font-medium text-red-600 dark:text-red-400"
-    )
-  }
+const ADSET_ESTADO_TONE_CLASS: Record<
+  ReturnType<typeof getAdsetEstadoTodayDisplay>["tone"],
+  string
+> = {
+  green: "font-medium text-green-600 dark:text-green-400",
+  orange: "font-medium text-orange-600 dark:text-orange-400",
+  red: "font-medium text-red-600 dark:text-red-400",
+  muted: "text-muted-foreground",
+}
+
+function campaignEstadoLabelClassName(row: InformeEntityRow): string {
   if (row.estadoLabel === "Seguir activando") {
     return "font-medium text-green-600 dark:text-green-400"
   }
@@ -372,10 +546,20 @@ function estadoLabelClassName(row: InformeEntityRow): string {
 }
 
 function StatusCells({ row }: { row: InformeEntityRow }) {
+  const adsetEstado =
+    row.type === "adset"
+      ? getAdsetEstadoTodayDisplay({
+          spendToday: row.spendToday,
+          purchasesToday: row.purchasesToday,
+          cpaToday: row.cpaToday,
+          estadoKind: row.estadoKind,
+        })
+      : null
+
   const estadoTitle =
     row.type === "campaign"
       ? "Veredicto IA (Meta 7/15/30 días y total; CPA máx. 20k COP)"
-      : undefined
+      : adsetEstado?.title
 
   return (
     <>
@@ -392,10 +576,30 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
         </span>
       </TableCell>
       <TableCell
-        className={cn("min-w-[140px] text-center text-xs", estadoLabelClassName(row))}
+        className={cn(
+          "min-w-[120px] text-center text-xs",
+          row.type === "campaign"
+            ? campaignEstadoLabelClassName(row)
+            : adsetEstado
+              ? ADSET_ESTADO_TONE_CLASS[adsetEstado.tone]
+              : undefined
+        )}
         title={estadoTitle}
       >
-        {row.estadoLabel}
+        {row.type === "campaign" ? (
+          row.estadoLabel
+        ) : adsetEstado ? (
+          <span className="flex flex-col items-center gap-0.5 leading-tight">
+            <span>{adsetEstado.label}</span>
+            {adsetEstado.hint ? (
+              <span className="text-[10px] font-normal opacity-90">
+                {adsetEstado.hint}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          row.estadoLabel
+        )}
       </TableCell>
     </>
   )
@@ -405,6 +609,7 @@ function EntityRow({
   row,
   yesterday,
   today,
+  informeStartDate,
   indent,
   campaignActions,
   adSetsCount,
@@ -413,6 +618,7 @@ function EntityRow({
   row: InformeEntityRow
   yesterday: string
   today: string
+  informeStartDate: string
   indent?: boolean
   /** Solo filas de campaña: conjuntos + links (como dashboard Meta). */
   campaignActions?: React.ReactNode
@@ -439,6 +645,12 @@ function EntityRow({
         adSetsCount={adSetsCount}
         activeAdSetsCount={activeAdSetsCount}
       />
+      <InformeTotalCells
+        row={row}
+        informeStartDate={informeStartDate}
+        yesterday={yesterday}
+        today={today}
+      />
       <MetricsCells row={row} yesterday={yesterday} today={today} />
     </TableRow>
   )
@@ -450,12 +662,14 @@ function CampaignGroupRows({
   onToggleExpand,
   yesterday,
   today,
+  informeStartDate,
 }: {
   group: InformeCampaignGroup
   isExpanded: boolean
   onToggleExpand: () => void
   yesterday: string
   today: string
+  informeStartDate: string
 }) {
   const adsetCount = group.adsets.length
 
@@ -465,6 +679,7 @@ function CampaignGroupRows({
         row={group.campaign}
         yesterday={yesterday}
         today={today}
+        informeStartDate={informeStartDate}
         adSetsCount={group.adSetsCount}
         activeAdSetsCount={group.activeAdSetsCount}
         campaignActions={
@@ -506,6 +721,7 @@ function CampaignGroupRows({
               row={adset}
               yesterday={yesterday}
               today={today}
+              informeStartDate={informeStartDate}
               indent
             />
           ))
@@ -515,10 +731,12 @@ function CampaignGroupRows({
 }
 
 function InformeTotalsRow({
+  groups,
   totals,
   yesterday,
   today,
 }: {
+  groups: InformeCampaignGroup[]
   totals: InformeTableTotals
   yesterday: string
   today: string
@@ -526,10 +744,37 @@ function InformeTotalsRow({
   const ayer = getDayTotalsMetrics(totals, yesterday)
   const hoy = getTodayMetricsFromTotals(totals)
 
+  let adsetSpendTotal = 0
+  let adsetPurchasesTotal = 0
+  for (const group of groups) {
+    for (const adset of group.adsets) {
+      adsetSpendTotal += adset.spendInformeTotal
+      adsetPurchasesTotal += adset.purchasesInformeTotal
+    }
+  }
+  const adsetCpaTotal =
+    adsetPurchasesTotal > 0 ? adsetSpendTotal / adsetPurchasesTotal : 0
+
   return (
     <TableRow className="bg-muted/60 border-t-2 font-semibold">
       <TableCell colSpan={5} className="text-left">
         Total (conjuntos)
+      </TableCell>
+      <TableCell
+        className="text-right tabular-nums"
+        title="Suma gasto conjuntos (ayer + hoy)"
+      >
+        {adsetSpendTotal > 0
+          ? formatCurrency(adsetSpendTotal, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+      <TableCell
+        className="text-right tabular-nums"
+        title="CPA total conjuntos (ayer + hoy)"
+      >
+        {adsetCpaTotal > 0
+          ? formatCurrency(adsetCpaTotal, META_DASHBOARD_CURRENCY)
+          : "—"}
       </TableCell>
       <PeriodMetricsCells
         metrics={ayer}
@@ -550,11 +795,13 @@ function InformeTable({
   yesterday,
   today,
   totals,
+  informeStartDate,
 }: {
   groups: InformeCampaignGroup[]
   yesterday: string
   today: string
   totals: InformeTableTotals
+  informeStartDate: string
 }) {
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
     () => new Set()
@@ -592,6 +839,18 @@ function InformeTable({
             Conj. activos
           </TableHead>
           <TableHead
+            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            rowSpan={2}
+          >
+            Gasto total
+          </TableHead>
+          <TableHead
+            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            rowSpan={2}
+          >
+            CPA total
+          </TableHead>
+          <TableHead
             colSpan={3}
             className="border-border bg-muted/40 text-center text-xs font-semibold tabular-nums"
           >
@@ -626,11 +885,13 @@ function InformeTable({
             onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
             yesterday={yesterday}
             today={today}
+            informeStartDate={informeStartDate}
           />
         ))}
       </TableBody>
       <TableFooter>
         <InformeTotalsRow
+          groups={groups}
           totals={totals}
           yesterday={yesterday}
           today={today}
@@ -744,10 +1005,16 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada hora a Telegram (GitHub Actions). En{" "}
-            <strong className="text-foreground font-medium">Estado</strong>, las
-            campañas muestran un veredicto IA (7/15/30 días y total en Meta; sin
-            columnas extra). Los conjuntos usan reglas del día.
+            Cron cada hora a Telegram (GitHub Actions). Avisos:{" "}
+            <span className="font-medium text-red-700 dark:text-red-300">
+              rojo = campañas
+            </span>
+            ,{" "}
+            <span className="font-medium text-amber-700 dark:text-amber-300">
+              amarillo = conjuntos
+            </span>
+            . En <strong className="text-foreground font-medium">Estado</strong>
+            , campañas con veredicto IA; conjuntos con estado de hoy (verde / naranja / rojo).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -828,42 +1095,7 @@ export function InformeIaContent() {
         </div>
       ) : null}
 
-      {data ? (
-        <RulePerformanceBanner
-          title={`${data.sinVentasAlerts.filter((r) => r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0).length} con gasto alto hoy y sin ventas`}
-          explanation={`Hoy gastaron ≥ ${formatCurrency(INFORME_SPEND_PENALTY_COP, META_DASHBOARD_CURRENCY)} y no cerraron compras. Conviene revisar o pausar en Meta.`}
-          rows={data.sinVentasAlerts.filter(
-            (r) =>
-              r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0
-          )}
-          groups={data.groups}
-        />
-      ) : null}
-
-      {data ? (
-        <RulePerformanceBanner
-          title={`${data.cpaAltoAlerts.length} con CPA alto hoy`}
-          explanation={`Costo por compra hoy mayor a ${formatCurrency(INFORME_CPA_PENALTY_COP, META_DASHBOARD_CURRENCY)}. Revisa rentabilidad antes de seguir gastando.`}
-          rows={data.cpaAltoAlerts}
-          groups={data.groups}
-        />
-      ) : null}
-
-      {data ? (
-        <PauseAlertsBanner
-          variant="amber"
-          title={`${data.adsetsToPause.length} conjunto${data.adsetsToPause.length === 1 ? "" : "s"} ≥10k COP hoy sin ventas — considera apagar`}
-          items={data.adsetsToPause}
-        />
-      ) : null}
-
-      {data ? (
-        <PauseAlertsBanner
-          variant="red"
-          title={`${data.campaignsToPause.length} campaña${data.campaignsToPause.length === 1 ? "" : "s"} ≥30k COP hoy sin ventas — considera apagar`}
-          items={data.campaignsToPause}
-        />
-      ) : null}
+      {data ? <InformeAlertsPanel data={data} /> : null}
 
       {informeQuery.isLoading ? (
         <Skeleton className="h-96 w-full rounded-lg" />
@@ -911,6 +1143,7 @@ export function InformeIaContent() {
               yesterday={data.yesterday}
               today={data.date}
               totals={data.totals}
+              informeStartDate={data.informeStartDate}
             />
           </div>
         </>

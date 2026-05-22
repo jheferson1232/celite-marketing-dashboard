@@ -52,6 +52,13 @@ export type InformeEntityRow = {
   estadoLabel: string
   notifyOlvido: boolean
   rowHighlight: "none" | "red"
+  /**
+   * Campaña: suma desde inicio del informe (todas las fechas del rango).
+   * Conjunto: suma ayer + hoy.
+   */
+  spendInformeTotal: number
+  purchasesInformeTotal: number
+  cpaInformeTotal: number
   dayCells: {
     date: string
     spend: number
@@ -59,6 +66,33 @@ export type InformeEntityRow = {
     points: number | null
     saleStatus: "green" | "red" | "neutral"
   }[]
+}
+
+export function sumInformePeriodFromDayCells(
+  dayCells: InformeEntityRow["dayCells"],
+  onlyDates?: string[]
+): {
+  spendInformeTotal: number
+  purchasesInformeTotal: number
+  cpaInformeTotal: number
+} {
+  const allowed =
+    onlyDates && onlyDates.length > 0 ? new Set(onlyDates) : null
+  let spendInformeTotal = 0
+  let purchasesInformeTotal = 0
+  for (const cell of dayCells) {
+    if (allowed && !allowed.has(cell.date)) continue
+    spendInformeTotal += cell.spend
+    purchasesInformeTotal += cell.purchases
+  }
+  return {
+    spendInformeTotal,
+    purchasesInformeTotal,
+    cpaInformeTotal:
+      purchasesInformeTotal > 0
+        ? spendInformeTotal / purchasesInformeTotal
+        : 0,
+  }
 }
 
 export type InformeTableTotals = {
@@ -424,6 +458,7 @@ function buildInformeRow(
     campaignMetaId: string | null
   },
   dateKeys: string[],
+  yesterday: string,
   today: string,
   storedByEntityDate: Map<string, StoredOperativeDay>,
   campaignDaily: Map<string, MetaDailyMetricCell[]>,
@@ -466,6 +501,10 @@ function buildInformeRow(
   }
 
   pointsTotal = finalizePointsTotal(dayCells, pointsTotal)
+  const informePeriod =
+    type === "campaign"
+      ? sumInformePeriodFromDayCells(dayCells)
+      : sumInformePeriodFromDayCells(dayCells, [yesterday, today])
 
   const todayDay =
     storedByEntityDate.get(`${entity.id}:${today}`) ??
@@ -496,6 +535,7 @@ function buildInformeRow(
     estadoLabel: todayDay.estadoLabel,
     notifyOlvido: false,
     rowHighlight: todayDay.rowHighlight,
+    ...informePeriod,
     dayCells,
   }
 }
@@ -669,6 +709,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     const campaignRow = buildInformeRow(
       campaign,
       dateKeys,
+      yesterday,
       today,
       storedByEntityDate,
       campaignDaily,
@@ -684,6 +725,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
         return buildInformeRow(
           adset,
           dateKeys,
+          yesterday,
           today,
           storedByEntityDate,
           campaignDaily,
