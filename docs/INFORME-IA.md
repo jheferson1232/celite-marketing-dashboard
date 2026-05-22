@@ -45,7 +45,18 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 
 ## Cron en Vercel
 
-`vercel.json` define el schedule. En el proyecto de Vercel:
+`vercel.json` define el schedule (compatible con plan **Hobby**: máximo una ejecución por día por entrada):
+
+| Horario (UTC) | Uso aproximado (Lima UTC−5) |
+|---------------|-----------------------------|
+| `0 14 * * *` | ~09:00 — informe operativo a Telegram |
+| `0 4 * * *` | ~23:00 — cierre diario (si la hora del servidor coincide con 23 en Lima) |
+
+En plan **Pro** puedes cambiar a `0 * * * *` para informe **cada hora**.
+
+**Informe cada hora en Hobby:** usa un cron externo (p. ej. [cron-job.org](https://cron-job.org)) que haga `GET` a `/api/cron/meta-telegram-reports` con `Authorization: Bearer <CRON_SECRET>` cada hora.
+
+En el proyecto de Vercel:
 
 - `CRON_SECRET` — mismo valor que usarás al probar el endpoint.
 - Resto de variables de la tabla anterior.
