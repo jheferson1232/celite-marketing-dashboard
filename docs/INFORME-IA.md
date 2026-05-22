@@ -6,7 +6,7 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 
 1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
-3. **Cron** — Cada 2 horas (GitHub Actions → `/api/cron/meta-telegram-reports`): resumen + sugerencias de apagar conjuntos/campañas sin ventas.
+3. **Cron** — Cada hora (GitHub Actions → `/api/cron/meta-telegram-reports`): resumen + sugerencias de apagar conjuntos/campañas sin ventas.
 4. **Cierre 23:00** (America/Lima) — Informe nocturno adicional con olvidos, sin ventas y CPA alto.
 
 OpenAI (`gpt-4o-mini`) solo redacta el texto de Telegram si existe `OPENAI_API_KEY`; los puntos y umbrales son reglas fijas en código.
@@ -43,9 +43,9 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 2. Obtén tu ID con @userinfobot → `TELEGRAM_ALLOWED_USER_IDS`.
 3. En la app: **Vista previa** (no envía) o **Enviar a Telegram** (mismo mensaje que el cron).
 
-## Cron cada 2 horas (GitHub Actions — recomendado en Hobby)
+## Cron horario (GitHub Actions — recomendado en Hobby)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada 2 horas** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`0 */2 * * *` UTC, 12 veces al día).
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`0 * * * *` UTC).
 
 ### Configuración (una vez)
 
@@ -57,7 +57,7 @@ El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe
 
 Probar sin esperar la hora:
 
-- GitHub → **Actions** → **Meta Telegram cada 2 h** → **Run workflow**.
+- GitHub → **Actions** → **Meta Telegram hourly** → **Run workflow**.
 
 El endpoint ejecuta el informe operativo en cada llamada y el **cierre nocturno** solo cuando la hora en **America/Lima** es 23.
 
@@ -70,11 +70,11 @@ Si prefieres no usar GitHub Actions:
 | URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
 | Método | GET |
 | Cabecera | `Authorization: Bearer <CRON_SECRET>` |
-| Intervalo | Cada 2 horas |
+| Intervalo | Cada 1 hora |
 
 ### Plan Vercel Pro
 
-Puedes volver a poner en `vercel.json` un cron (`0 */2 * * *` o `0 * * * *` en Pro) y desactivar el workflow de GitHub si quieres todo en Vercel.
+Puedes volver a poner en `vercel.json` un cron `0 * * * *` (Pro) y desactivar el workflow de GitHub si quieres todo en Vercel.
 
 ### Variables en Vercel
 

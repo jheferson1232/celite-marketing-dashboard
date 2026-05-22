@@ -578,7 +578,7 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada 2 h a Telegram: resumen de campañas, conjuntos ≥10k sin
+            Cron cada hora a Telegram: resumen de campañas, conjuntos ≥10k sin
             ventas (apagar) y campañas ≥30k sin ventas. El botón envía el mismo
             informe manualmente.
           </p>
