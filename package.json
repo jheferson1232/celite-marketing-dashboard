@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && next build",
+    "build": "node scripts/vercel-build.mjs",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",

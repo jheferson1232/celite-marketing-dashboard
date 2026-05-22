@@ -10,6 +10,7 @@ El asistente en Meta/TikTok y el historial de chats usan **PostgreSQL** vía Pri
    - Si solo tienes `DATABASE_URL` con `-pooler` en el host, se deriva la URL directa automáticamente.
    - En **Settings → Environment Variables**, activa las variables para **Production**, **Preview** y **Build** (no solo Runtime).
    - Opcional: `DIRECT_URL` o `POSTGRES_PRISMA_URL` si usas plantillas antiguas de Vercel Postgres.
+   - Si el build falla con **P1002**: añade manualmente `DATABASE_URL_UNPOOLED` con la connection string **Direct** de Neon (sin `pooler` en el host).
 4. En tu máquina, con la URL de producción copiada:
 
    ```bash
