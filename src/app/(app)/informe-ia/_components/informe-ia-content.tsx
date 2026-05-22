@@ -4,12 +4,11 @@ import { useCallback, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
-  RiArrowDownSLine,
-  RiArrowRightSLine,
   RiBrainLine,
   RiRefreshLine,
   RiStackLine,
 } from "@remixicon/react"
+import { MetaCampaignLandingUrlsButton } from "@/app/(app)/dashboard/_components/campaigns/meta-campaign-landing-urls-button"
 import { MetaConfigErrorHint } from "@/components/meta-config-error-hint"
 import { MetaApiStatusIndicator } from "@/components/meta-api-status-indicator"
 import { Button } from "@/components/ui/button"
@@ -407,7 +406,7 @@ function EntityRow({
   yesterday,
   today,
   indent,
-  leadingCell,
+  campaignActions,
   adSetsCount,
   activeAdSetsCount,
 }: {
@@ -415,21 +414,24 @@ function EntityRow({
   yesterday: string
   today: string
   indent?: boolean
-  leadingCell?: React.ReactNode
+  /** Solo filas de campaña: conjuntos + links (como dashboard Meta). */
+  campaignActions?: React.ReactNode
   adSetsCount?: number
   activeAdSetsCount?: number
 }) {
   return (
     <TableRow className={cn(indent && "bg-muted/20")}>
-      <TableCell className={cn("max-w-[260px]", indent && "pl-10")}>
+      <TableCell className={cn("max-w-[280px]", indent && "pl-10")}>
         <div className="flex items-center gap-2">
-          {leadingCell}
-          <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate font-medium leading-tight">{row.name}</span>
             <span className="text-muted-foreground text-xs">
               {row.type === "campaign" ? "Campaña" : "Conjunto"}
             </span>
           </div>
+          {campaignActions ? (
+            <div className="flex shrink-0 items-center gap-1">{campaignActions}</div>
+          ) : null}
         </div>
       </TableCell>
       <StatusCells row={row} />
@@ -465,13 +467,12 @@ function CampaignGroupRows({
         today={today}
         adSetsCount={group.adSetsCount}
         activeAdSetsCount={group.activeAdSetsCount}
-        leadingCell={
-          <div className="flex shrink-0 items-center gap-1">
+        campaignActions={
+          <>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="icon-sm"
-              className="size-7 shrink-0"
               onClick={onToggleExpand}
               disabled={adsetCount === 0}
               aria-expanded={isExpanded}
@@ -482,21 +483,20 @@ function CampaignGroupRows({
               }
               title={
                 adsetCount === 0
-                  ? "Sin conjuntos con gasto hoy"
+                  ? "Sin conjuntos con gasto en el informe"
                   : isExpanded
                     ? "Ocultar conjuntos"
                     : `Ver ${adsetCount} conjunto${adsetCount === 1 ? "" : "s"}`
               }
             >
-              {adsetCount === 0 ? (
-                <RiStackLine className="size-4 opacity-40" />
-              ) : isExpanded ? (
-                <RiArrowDownSLine className="size-4" />
-              ) : (
-                <RiArrowRightSLine className="size-4" />
-              )}
+              <RiStackLine data-icon="inline-start" />
             </Button>
-          </div>
+            <MetaCampaignLandingUrlsButton
+              campaignId={group.campaign.metaId}
+              campaignName={group.campaign.name}
+              urls={[]}
+            />
+          </>
         }
       />
       {isExpanded
@@ -737,7 +737,7 @@ export function InformeIaContent() {
   )
 
   return (
-    <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
+    <div className="flex w-full flex-col gap-6 p-6 pb-12 lg:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">

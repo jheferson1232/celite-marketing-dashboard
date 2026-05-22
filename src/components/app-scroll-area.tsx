@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 
 type AppScrollAreaProps = {
   children: ReactNode
@@ -11,8 +12,9 @@ type AppScrollAreaProps = {
 
 export function AppScrollArea({ children, className }: AppScrollAreaProps) {
   return (
-    <ScrollArea className={className ?? "h-dvh w-full"} type="scroll">
-      {children}
+    <ScrollArea
+      className={cn("h-dvh w-full overflow-hidden", className)}
+    >{children}
     </ScrollArea>
   )
 }
