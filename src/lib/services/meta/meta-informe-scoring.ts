@@ -129,70 +129,96 @@ export type AdsetEstadoTodayDisplay = {
 
 const META_CPA_RED_COP = 20_000
 
-/** Estado visible en tabla (conjuntos): basado en hoy, alineado a colores CPA Meta. */
-export function getAdsetEstadoTodayDisplay(input: {
+function getMetaCpaTodayTone(
+  cpa: number
+): "green" | "orange" | "red" | null {
+  if (cpa <= 0) return null
+  if (cpa > META_CPA_RED_COP) return "red"
+  if (cpa >= INFORME_CPA_GOOD_COP) return "orange"
+  return "green"
+}
+
+function getInformeEstadoTodayDisplay(input: {
   spendToday: number
   purchasesToday: number
   cpaToday: number
-  estadoKind: InformeEstadoKind
+  sinComprasCriticoCOP: number
 }): AdsetEstadoTodayDisplay {
-  const { spendToday, purchasesToday, cpaToday, estadoKind } = input
+  const { spendToday, purchasesToday, cpaToday, sinComprasCriticoCOP } = input
 
-  const ayerAltoHint =
-    estadoKind === "gasto_alto_ayer"
-      ? "Ayer gastó ≥10k; vigilar."
-      : undefined
-
-  if (spendToday <= 0 && purchasesToday <= 0) {
+  if (purchasesToday > 0 && cpaToday > 0) {
+    const tone = getMetaCpaTodayTone(cpaToday)!
+    const label =
+      tone === "green"
+        ? "Excelente"
+        : tone === "orange"
+          ? "En curso"
+          : "Crítico"
     return {
-      label: "—",
-      tone: "muted",
-      title: ayerAltoHint ?? "Sin gasto hoy",
+      label,
+      tone,
+      title:
+        tone === "green"
+          ? `CPA hoy < ${INFORME_CPA_GOOD_COP.toLocaleString("es-CO")} COP`
+          : tone === "orange"
+            ? `CPA hoy ${INFORME_CPA_GOOD_COP.toLocaleString("es-CO")}–${META_CPA_RED_COP.toLocaleString("es-CO")} COP`
+            : `CPA hoy > ${META_CPA_RED_COP.toLocaleString("es-CO")} COP`,
     }
   }
 
-  if (purchasesToday > 0) {
-    if (cpaToday > META_CPA_RED_COP) {
-      return {
-        label: "Por apagar",
-        tone: "red",
-        title: `CPA hoy > ${META_CPA_RED_COP.toLocaleString("es-CO")} COP.${ayerAltoHint ? ` ${ayerAltoHint}` : ""}`,
-      }
-    }
-    if (cpaToday >= INFORME_CPA_GOOD_COP) {
-      return {
-        label: "En curso",
-        tone: "orange",
-        title: `CPA hoy ${INFORME_CPA_GOOD_COP.toLocaleString("es-CO")}–${META_CPA_RED_COP.toLocaleString("es-CO")} COP.${ayerAltoHint ? ` ${ayerAltoHint}` : ""}`,
-      }
-    }
+  if (purchasesToday === 0 && spendToday >= sinComprasCriticoCOP) {
     return {
-      label: "Hoy vamos bien",
-      tone: "green",
-      title: `CPA hoy < ${INFORME_CPA_GOOD_COP.toLocaleString("es-CO")} COP.${ayerAltoHint ? ` ${ayerAltoHint}` : ""}`,
-    }
-  }
-
-  if (spendToday >= INFORME_ADSET_APAGAR_SPEND_COP) {
-    return {
-      label: "Por apagar",
+      label: "Crítico",
       tone: "red",
-      title: `≥${INFORME_ADSET_APAGAR_SPEND_COP.toLocaleString("es-CO")} COP hoy sin compras.${ayerAltoHint ? ` ${ayerAltoHint}` : ""}`,
+      title: `≥${sinComprasCriticoCOP.toLocaleString("es-CO")} COP hoy sin compras`,
     }
   }
 
-  if (spendToday >= INFORME_SPEND_LOW_COP) {
+  if (purchasesToday === 0 && spendToday >= INFORME_SPEND_PENALTY_COP) {
     return {
       label: "En curso",
       hint: "Sin compras aún",
       tone: "orange",
-      title: `Gasto hoy sin compras.${ayerAltoHint ? ` ${ayerAltoHint}` : ""}`,
+      title: "Gasto hoy sin compras",
+    }
+  }
+
+  if (spendToday > 0 && purchasesToday === 0) {
+    return {
+      label: "En curso",
+      hint: "Sin compras aún",
+      tone: "orange",
+      title: "Poco gasto hoy sin compras",
     }
   }
 
   return {
     label: "—",
     tone: "muted",
-    title: ayerAltoHint ?? "Poco o ningún gasto hoy.",
+    title: "Sin gasto hoy",
   }
+}
+
+/** Estado visible en tabla (campañas): basado en hoy, alineado a colores CPA Meta. */
+export function getCampaignEstadoTodayDisplay(input: {
+  spendToday: number
+  purchasesToday: number
+  cpaToday: number
+}): AdsetEstadoTodayDisplay {
+  return getInformeEstadoTodayDisplay({
+    ...input,
+    sinComprasCriticoCOP: INFORME_CAMPAIGN_APAGAR_SPEND_COP,
+  })
+}
+
+/** Estado visible en tabla (conjuntos): misma escala que campañas; crítico sin compras ≥10k. */
+export function getAdsetEstadoTodayDisplay(input: {
+  spendToday: number
+  purchasesToday: number
+  cpaToday: number
+}): AdsetEstadoTodayDisplay {
+  return getInformeEstadoTodayDisplay({
+    ...input,
+    sinComprasCriticoCOP: INFORME_ADSET_APAGAR_SPEND_COP,
+  })
 }

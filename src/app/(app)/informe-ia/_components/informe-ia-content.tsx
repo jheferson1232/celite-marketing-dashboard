@@ -40,6 +40,7 @@ import type {
 import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
   getAdsetEstadoTodayDisplay,
+  getCampaignEstadoTodayDisplay,
   INFORME_CPA_PENALTY_COP,
   INFORME_SPEND_PENALTY_COP,
 } from "@/lib/services/meta/meta-informe-scoring"
@@ -95,56 +96,57 @@ const INFORME_ALERT_STYLES: Record<
 
 const INFORME_ALERT_MAX_ITEMS = 8
 
-function formatInformeRowMetrics(
+function formatInformeRowName(
   row: InformeEntityRow,
   groups: InformeCampaignGroup[]
 ): string {
-  const metrics =
-    row.purchasesToday > 0
-      ? `${formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)} · ${formatNumber(row.purchasesToday)} compras · CPA ${formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)}`
-      : `${formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)} · 0 compras`
-  return `${formatInformeRowLabel(row, groups)} · ${metrics}`
+  return formatInformeRowLabel(row, groups)
 }
 
-function formatPauseItemMetrics(item: InformePauseItem): string {
-  const name =
-    item.type === "adset" && item.campaignName
-      ? `${item.name} (${item.campaignName})`
-      : item.name
-  return `${name} · ${formatCurrency(item.spend, META_DASHBOARD_CURRENCY)} · ${item.purchases} compras`
-}
-
-function joinAlertItems(items: string[], extra?: number): string {
-  if (items.length === 0) return ""
-  const visible = items.slice(0, INFORME_ALERT_MAX_ITEMS).join(" | ")
-  if (extra && extra > 0) {
-    return `${visible} | +${extra} más`
+function sliceAlertItems(allNames: string[]): {
+  items: string[]
+  extra: number
+} {
+  const items = allNames.slice(0, INFORME_ALERT_MAX_ITEMS)
+  return {
+    items,
+    extra: Math.max(0, allNames.length - items.length),
   }
-  return visible
 }
 
-/** Una fila compacta: etiqueta corta + ítems en línea. */
+/** Etiqueta + lista vertical (un nombre por línea). */
 function InformeAlertLine({
   variant,
   label,
-  itemsText,
+  items,
+  extra = 0,
 }: {
   variant: InformeAlertVariant
   label: string
-  itemsText: string
+  items: string[]
+  extra?: number
 }) {
-  if (!itemsText) return null
+  if (items.length === 0) return null
   const styles = INFORME_ALERT_STYLES[variant]
 
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px] leading-snug sm:text-xs">
-      <span className={cn("shrink-0 font-medium", styles.title)}>{label}</span>
-      <span className="text-muted-foreground min-w-0">{itemsText}</span>
+    <div className="min-w-0 text-[11px] leading-snug sm:text-xs">
+      <p className={cn("font-medium", styles.title)}>{label}</p>
+      <ul className="text-muted-foreground mt-0.5 space-y-0.5">
+        {items.map((name, index) => (
+          <li key={`${label}-${index}-${name}`} className="truncate" title={name}>
+            {name}
+          </li>
+        ))}
+        {extra > 0 ? (
+          <li className="text-muted-foreground/80">+{extra} más</li>
+        ) : null}
+      </ul>
     </div>
   )
 }
 
-/** Bloque único por nivel (campañas rojo / conjuntos amarillo), filas horizontales. */
+/** Bloque por nivel (campañas rojo / conjuntos amarillo). */
 function InformeAlertSection({
   variant,
   heading,
@@ -152,9 +154,9 @@ function InformeAlertSection({
 }: {
   variant: InformeAlertVariant
   heading: string
-  lines: { label: string; itemsText: string }[]
+  lines: { label: string; items: string[]; extra?: number }[]
 }) {
-  const visible = lines.filter((l) => l.itemsText)
+  const visible = lines.filter((l) => l.items.length > 0)
   if (visible.length === 0) return null
   const styles = INFORME_ALERT_STYLES[variant]
 
@@ -171,13 +173,14 @@ function InformeAlertSection({
         <RiAlertLine className={cn("size-3 shrink-0", styles.icon)} />
         {heading}
       </div>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-2">
         {visible.map((line) => (
           <InformeAlertLine
             key={line.label}
             variant={variant}
             label={line.label}
-            itemsText={line.itemsText}
+            items={line.items}
+            extra={line.extra}
           />
         ))}
       </div>
@@ -204,23 +207,24 @@ function InformeAlertsPanel({ data }: { data: MetaInformePayload }) {
   const campaignLines = [
     {
       label: "Sin ventas ≥10k",
-      itemsText: joinAlertItems(
-        campaignSinVentas.map((r) => formatInformeRowMetrics(r, data.groups)),
-        Math.max(0, campaignSinVentas.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        campaignSinVentas.map((r) => formatInformeRowName(r, data.groups))
       ),
     },
     {
       label: "CPA >15k",
-      itemsText: joinAlertItems(
-        campaignCpaAlto.map((r) => formatInformeRowMetrics(r, data.groups)),
-        Math.max(0, campaignCpaAlto.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        campaignCpaAlto.map((r) => formatInformeRowName(r, data.groups))
       ),
     },
     {
       label: "Apagar ≥30k",
-      itemsText: joinAlertItems(
-        data.campaignsToPause.map(formatPauseItemMetrics),
-        Math.max(0, data.campaignsToPause.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        data.campaignsToPause.map((item) =>
+          item.type === "adset" && item.campaignName
+            ? `${item.name} (${item.campaignName})`
+            : item.name
+        )
       ),
     },
   ]
@@ -228,29 +232,30 @@ function InformeAlertsPanel({ data }: { data: MetaInformePayload }) {
   const adsetLines = [
     {
       label: "Sin ventas ≥10k",
-      itemsText: joinAlertItems(
-        adsetSinVentas.map((r) => formatInformeRowMetrics(r, data.groups)),
-        Math.max(0, adsetSinVentas.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        adsetSinVentas.map((r) => formatInformeRowName(r, data.groups))
       ),
     },
     {
       label: "CPA >15k",
-      itemsText: joinAlertItems(
-        adsetCpaAlto.map((r) => formatInformeRowMetrics(r, data.groups)),
-        Math.max(0, adsetCpaAlto.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        adsetCpaAlto.map((r) => formatInformeRowName(r, data.groups))
       ),
     },
     {
       label: "Apagar ≥10k",
-      itemsText: joinAlertItems(
-        data.adsetsToPause.map(formatPauseItemMetrics),
-        Math.max(0, data.adsetsToPause.length - INFORME_ALERT_MAX_ITEMS)
+      ...sliceAlertItems(
+        data.adsetsToPause.map((item) =>
+          item.campaignName
+            ? `${item.name} (${item.campaignName})`
+            : item.name
+        )
       ),
     },
   ]
 
-  const hasCampaign = campaignLines.some((l) => l.itemsText)
-  const hasAdset = adsetLines.some((l) => l.itemsText)
+  const hasCampaign = campaignLines.some((l) => l.items.length > 0)
+  const hasAdset = adsetLines.some((l) => l.items.length > 0)
 
   if (!hasCampaign && !hasAdset) return null
 
@@ -525,7 +530,7 @@ function AdsetCountCells({
   )
 }
 
-const ADSET_ESTADO_TONE_CLASS: Record<
+const INFORME_ESTADO_TONE_CLASS: Record<
   ReturnType<typeof getAdsetEstadoTodayDisplay>["tone"],
   string
 > = {
@@ -535,31 +540,19 @@ const ADSET_ESTADO_TONE_CLASS: Record<
   muted: "text-muted-foreground",
 }
 
-function campaignEstadoLabelClassName(row: InformeEntityRow): string {
-  if (row.estadoLabel === "Seguir activando") {
-    return "font-medium text-green-600 dark:text-green-400"
-  }
-  if (row.estadoLabel === "No seguir") {
-    return "font-medium text-red-600 dark:text-red-400"
-  }
-  return "text-muted-foreground"
-}
-
 function StatusCells({ row }: { row: InformeEntityRow }) {
-  const adsetEstado =
-    row.type === "adset"
-      ? getAdsetEstadoTodayDisplay({
+  const estadoDisplay =
+    row.type === "campaign"
+      ? getCampaignEstadoTodayDisplay({
           spendToday: row.spendToday,
           purchasesToday: row.purchasesToday,
           cpaToday: row.cpaToday,
-          estadoKind: row.estadoKind,
         })
-      : null
-
-  const estadoTitle =
-    row.type === "campaign"
-      ? "Veredicto IA (Meta 7/15/30 días y total; CPA máx. 20k COP)"
-      : adsetEstado?.title
+      : getAdsetEstadoTodayDisplay({
+          spendToday: row.spendToday,
+          purchasesToday: row.purchasesToday,
+          cpaToday: row.cpaToday,
+        })
 
   return (
     <>
@@ -578,28 +571,18 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
       <TableCell
         className={cn(
           "min-w-[120px] text-center text-xs",
-          row.type === "campaign"
-            ? campaignEstadoLabelClassName(row)
-            : adsetEstado
-              ? ADSET_ESTADO_TONE_CLASS[adsetEstado.tone]
-              : undefined
+          INFORME_ESTADO_TONE_CLASS[estadoDisplay.tone]
         )}
-        title={estadoTitle}
+        title={estadoDisplay.title}
       >
-        {row.type === "campaign" ? (
-          row.estadoLabel
-        ) : adsetEstado ? (
-          <span className="flex flex-col items-center gap-0.5 leading-tight">
-            <span>{adsetEstado.label}</span>
-            {adsetEstado.hint ? (
-              <span className="text-[10px] font-normal opacity-90">
-                {adsetEstado.hint}
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          row.estadoLabel
-        )}
+        <span className="flex flex-col items-center gap-0.5 leading-tight">
+          <span>{estadoDisplay.label}</span>
+          {estadoDisplay.hint ? (
+            <span className="text-[10px] font-normal opacity-90">
+              {estadoDisplay.hint}
+            </span>
+          ) : null}
+        </span>
       </TableCell>
     </>
   )
@@ -1014,7 +997,11 @@ export function InformeIaContent() {
               amarillo = conjuntos
             </span>
             . En <strong className="text-foreground font-medium">Estado</strong>
-            , campañas con veredicto IA; conjuntos con estado de hoy (verde / naranja / rojo).
+            , según CPA de hoy:{" "}
+            <span className="text-green-700 dark:text-green-400">Excelente</span> /{" "}
+            <span className="text-orange-700 dark:text-orange-400">En curso</span> /{" "}
+            <span className="text-red-700 dark:text-red-400">Crítico</span> (campañas y
+            conjuntos).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

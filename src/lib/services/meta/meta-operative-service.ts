@@ -756,15 +756,6 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
 
   const totals = computeInformeTotals(allRows, dateKeys, today)
 
-  try {
-    const { applyCampaignAiEstadoLabels } = await import(
-      "./meta-campaign-ai-estado"
-    )
-    await applyCampaignAiEstadoLabels(groups, yesterday)
-  } catch (error) {
-    console.error("Campaign AI estado labels:", error)
-  }
-
   return {
     date: today,
     informeStartDate,
