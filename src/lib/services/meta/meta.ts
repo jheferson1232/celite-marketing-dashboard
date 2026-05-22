@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios"
+import { isMetaRateLimitAxiosError } from "./meta-errors"
 
 let metaClient: AxiosInstance | null = null
 
@@ -7,23 +8,6 @@ const RETRY_DELAY_MS = 2_000
 
 interface MetaRequestConfig extends InternalAxiosRequestConfig {
   __metaRetryCount?: number
-}
-
-function isRateLimitError(error: unknown): boolean {
-  if (!axios.isAxiosError(error)) return false
-
-  const metaError = error.response?.data?.error as
-    | { code?: number; error_subcode?: number }
-    | undefined
-
-  const code = metaError?.code
-  return (
-    error.response?.status === 429 ||
-    code === 17 ||
-    code === 613 ||
-    code === 80004 ||
-    metaError?.error_subcode === 2446079
-  )
 }
 
 function sleep(ms: number) {
@@ -51,7 +35,7 @@ export function getMetaClient(): AxiosInstance {
       async (error) => {
         const config = error.config as MetaRequestConfig | undefined
 
-        if (!config || !isRateLimitError(error)) {
+        if (!config || !isMetaRateLimitAxiosError(error)) {
           console.error(
             "Error al hacer la solicitud a Meta:",
             error.response?.data

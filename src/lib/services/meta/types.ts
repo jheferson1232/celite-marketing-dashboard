@@ -49,10 +49,12 @@ export interface MetaAdSet {
   name?: string
   campaign_id: string
   status: string
+  effective_status?: string
 }
 
 export interface MetaCampaign {
   id: string
+  name?: string
   status?: string
   effective_status?: string
 }
@@ -69,6 +71,8 @@ export interface CampaignAdSetRow {
   name: string
   status: CampaignEntityStatus
   campaignId: string
+  /** Estado operativo del conjunto (interruptor), no el de campaña. */
+  adSetEffectiveStatus?: string
   spend: number
   impressions: number
   ctr: number
@@ -81,8 +85,10 @@ export interface CampaignAdSetRow {
   /** TikTok: compras en los últimos 7 días (calendario dashboard). */
   purchases7d?: number
   cpa7d?: number
-  /** TikTok: compras acumuladas en ventana larga (~365 días). */
+  /** TikTok / Meta: compras acumuladas en ventana larga (~365 días). */
   totalPurchases?: number
+  /** Gasto acumulado (~365 días). */
+  totalSpend?: number
   totalCpa?: number
   /** Presupuesto diario en PEN (TikTok ad groups con BUDGET_MODE_DAY). */
   dailyBudget?: number | null
@@ -154,7 +160,7 @@ export interface CampaignRow {
   totalSpend?: number
   /** TikTok: CPA sobre totales acumulados. */
   totalCpa?: number
-  /** TikTok: URLs de destino únicas configuradas en anuncios de la campaña. */
+  /** URLs de destino únicas configuradas en anuncios de la campaña. */
   landingUrls?: string[]
 }
 

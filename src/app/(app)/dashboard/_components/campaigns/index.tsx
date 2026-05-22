@@ -29,6 +29,7 @@ import { CampaignStatusFilters } from "./campaign-status-filters"
 import { getCampaignColumns } from "./columns"
 import { ColumnVisibilityToggle } from "./column-visibility-toggle"
 import { TableEmptyState } from "./table-empty-state"
+import { TableErrorState } from "./table-error-state"
 import { TableSkeleton } from "./table-skeleton"
 import type {
   CampaignColumnMeta,
@@ -37,12 +38,14 @@ import type {
 } from "./types"
 import {
   META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
+  META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
   usePersistedColumnVisibility,
 } from "./use-persisted-column-visibility"
 import type { VisibilityState } from "@tanstack/react-table"
 import {
   getCampaignPerformanceStatus,
   getTikTokCampaignPerformanceStatus,
+  isMetaCampaignActive,
   isTikTokCampaignActiveToday,
 } from "./utils"
 
@@ -51,10 +54,16 @@ type FetchCampaignAdSetsAction = typeof getCampaignAdSets
 interface CampaignsTableProps {
   data?: CampaignRow[]
   isLoading: boolean
+  error?: Error | null
   currency?: CurrencyCode
   adSetsQueryKeyPrefix?: string
   fetchCampaignAdSets?: FetchCampaignAdSetsAction
   enableTikTokManage?: boolean
+  enableMetaExtendedMetrics?: boolean
+  showAllCampaignsFilter?: boolean
+  /** Meta: chip «activos» (azul) y «apagadas» por interruptor de campaña. */
+  showMetaActiveCampaignFilter?: boolean
+  metaLandingUrlsLoading?: boolean
   columnVisibilityStorageKey?: string
   defaultColumnVisibility?: VisibilityState
 }
@@ -71,12 +80,19 @@ const EMPTY_STATUS_COUNTS: Record<CampaignPerformanceStatus, number> = {
 export function CampaignsTable({
   data,
   isLoading,
+  error = null,
   currency = META_DASHBOARD_CURRENCY,
   adSetsQueryKeyPrefix,
   fetchCampaignAdSets,
   enableTikTokManage = false,
+  enableMetaExtendedMetrics = false,
+  showAllCampaignsFilter = false,
+  showMetaActiveCampaignFilter = false,
+  metaLandingUrlsLoading = false,
   columnVisibilityStorageKey = META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
-  defaultColumnVisibility = {},
+  defaultColumnVisibility = enableMetaExtendedMetrics
+    ? META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
+    : {},
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -119,10 +135,15 @@ export function CampaignsTable({
       ...EMPTY_STATUS_COUNTS,
     }
 
+    const useOperationalFilters =
+      enableTikTokManage || showMetaActiveCampaignFilter
+
     const rowsWithStatus = tableData.map((row) => {
       const isActiveToday = enableTikTokManage
         ? isTikTokCampaignActiveToday(row)
-        : false
+        : showMetaActiveCampaignFilter
+          ? isMetaCampaignActive(row)
+          : false
       const performanceStatus = enableTikTokManage
         ? getTikTokCampaignPerformanceStatus(row, currency)
         : getCampaignPerformanceStatus(row, currency)
@@ -134,7 +155,7 @@ export function CampaignsTable({
       }
     })
 
-    if (enableTikTokManage) {
+    if (useOperationalFilters) {
       for (const { isActiveToday, performanceStatus } of rowsWithStatus) {
         if (!isActiveToday) {
           counts.APAGADO += 1
@@ -150,7 +171,7 @@ export function CampaignsTable({
       }
     }
 
-    const activeCount = enableTikTokManage
+    const activeCount = useOperationalFilters
       ? rowsWithStatus.filter(({ isActiveToday }) => isActiveToday).length
       : 0
 
@@ -161,7 +182,7 @@ export function CampaignsTable({
           ? rowsWithStatus
               .filter(({ isActiveToday }) => isActiveToday)
               .map(({ row }) => row)
-          : selectedPerformanceFilter === "APAGADO" && enableTikTokManage
+          : selectedPerformanceFilter === "APAGADO" && useOperationalFilters
             ? rowsWithStatus
                 .filter(({ isActiveToday }) => !isActiveToday)
                 .map(({ row }) => row)
@@ -178,7 +199,13 @@ export function CampaignsTable({
       totalCampaignCount: tableData.length,
       filteredTableData: filteredRows,
     }
-  }, [currency, enableTikTokManage, selectedPerformanceFilter, tableData])
+  }, [
+    currency,
+    enableTikTokManage,
+    showMetaActiveCampaignFilter,
+    selectedPerformanceFilter,
+    tableData,
+  ])
 
   const visibleCampaignIds = React.useMemo(
     () => new Set(filteredTableData.map((row) => row.id)),
@@ -202,10 +229,14 @@ export function CampaignsTable({
         onOpenDetails: handleOpenDetails,
         currency,
         enableTikTokManage,
+        enableMetaExtendedMetrics,
+        metaLandingUrlsLoading,
       }),
     [
       currency,
       enableTikTokManage,
+      enableMetaExtendedMetrics,
+      metaLandingUrlsLoading,
       expandedCampaignIds,
       handleToggleAdSets,
       handleOpenDetails,
@@ -241,11 +272,13 @@ export function CampaignsTable({
           counts={statusCounts}
           selectedFilter={selectedPerformanceFilter}
           onFilterChange={setSelectedPerformanceFilter}
-          showAllFilter={enableTikTokManage}
-          showActiveFilter={enableTikTokManage}
+          showAllFilter={showAllCampaignsFilter || enableTikTokManage}
+          showActiveFilter={enableTikTokManage || showMetaActiveCampaignFilter}
           activeCampaignCount={activeCampaignCount}
           totalCampaignCount={totalCampaignCount}
-          apagadoMeansSwitchOff={enableTikTokManage}
+          apagadoMeansSwitchOff={
+            enableTikTokManage || showMetaActiveCampaignFilter
+          }
         />
         <ColumnVisibilityToggle table={table} />
       </div>
@@ -273,6 +306,11 @@ export function CampaignsTable({
           <TableBody>
             {isLoading ? (
               <TableSkeleton columnsCount={visibleColumnsCount} />
+            ) : error ? (
+              <TableErrorState
+                columnsCount={visibleColumnsCount}
+                error={error}
+              />
             ) : table.getRowModel().rows.length === 0 ? (
               <TableEmptyState columnsCount={visibleColumnsCount} />
             ) : (
@@ -308,6 +346,7 @@ export function CampaignsTable({
                             fetchAdSets={fetchCampaignAdSets}
                             currency={currency}
                             enableTikTokManage={enableTikTokManage}
+                            enableMetaExtendedMetrics={enableMetaExtendedMetrics}
                           />
                         </TableCell>
                       </TableRow>

@@ -11,6 +11,7 @@ import { fetchPurchaseGenderByAdId } from "./purchase-gender"
 import { extractCreativeDestinationUrl } from "./creative-url"
 import { extractVideoIdFromCreative } from "./extract-video-id"
 import { getMetaClient } from "./meta"
+import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 import type {
   AdInsightRow,
@@ -24,7 +25,7 @@ const AD_INSIGHTS_TTL_MS = 2 * 60 * 1000
 export async function getAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
-  const cacheKey = `ad-insights:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `ad-insights:v2:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, AD_INSIGHTS_TTL_MS, () =>
     fetchAdInsights(dateRange)
   )
@@ -78,12 +79,10 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
 
   if (insights.length === 0) return []
 
-  const genderByAdId = await fetchPurchaseGenderByAdId(dateRange).catch(
-    (error) => {
-      console.error("Error fetching gender purchase breakdown:", error)
-      return new Map<string, { male: number; female: number; unknown: number }>()
-    }
-  )
+  const genderPromise = fetchPurchaseGenderByAdId(dateRange).catch((error) => {
+    console.error("Error fetching gender purchase breakdown:", error)
+    return new Map<string, { male: number; female: number; unknown: number }>()
+  })
 
   // 2. Fetch creative metadata in batches of 50
   const adIds = [...new Set(insights.map((r) => r.ad_id).filter(Boolean))]
@@ -98,23 +97,29 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
     "object_story_spec{photo_data{url,image_hash},video_data{video_id,image_url,call_to_action{value{link}}}," +
     "link_data{picture,image_url,link,call_to_action{value{link}},child_attachments{link}},template_data{link}}," +
     "asset_feed_spec{link_urls{website_url},videos{video_id}}}"
-  const BATCH_SIZE = 50
+  const BATCH_SIZE = 25
+  const BATCH_DELAY_MS = 600
 
   const token = process.env.META_ACCESS_TOKEN
 
   for (let i = 0; i < adIds.length; i += BATCH_SIZE) {
     const chunk = adIds.slice(i, i + BATCH_SIZE)
     if (i > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS))
     }
     try {
-      const { data } = await axios.get(`https://graph.facebook.com/v25.0/`, {
-        params: {
-          ids: chunk.join(","),
-          fields: CREATIVE_FIELDS,
-          access_token: token,
-        },
-      })
+      const data = token
+        ? await metaGraphGet<Record<string, unknown>>(
+            "https://graph.facebook.com/v25.0/",
+            {
+              params: {
+                ids: chunk.join(","),
+                fields: CREATIVE_FIELDS,
+                access_token: token,
+              },
+            }
+          )
+        : {}
 
       for (const [id, ad] of Object.entries(data) as [string, any][]) {
         statusMap.set(id, ad.effective_status || "")
@@ -162,6 +167,8 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
   } catch (error) {
     console.error("Error fetching creative media:", error)
   }
+
+  const genderByAdId = await genderPromise
 
   const rows = insights.map((r) => {
     const adId = r.ad_id

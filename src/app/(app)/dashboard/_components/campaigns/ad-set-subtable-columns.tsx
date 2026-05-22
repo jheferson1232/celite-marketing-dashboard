@@ -1,5 +1,6 @@
 import type { VisibilityState } from "@tanstack/react-table"
 import type { CampaignAdSetRow } from "@/lib/services/meta/types"
+import { isMetaAdSetActiveForCount } from "@/lib/services/meta/meta-adset-status"
 import {
   formatCurrency,
   META_DASHBOARD_CURRENCY,
@@ -24,6 +25,11 @@ export const AD_SET_SUBTABLE_COLUMN_IDS = [
   "results",
   "costPerResult",
   "roas",
+  "purchases7d",
+  "cpa7d",
+  "totalPurchases",
+  "totalSpend",
+  "totalCpa",
 ] as const
 
 export type AdSetSubtableColumnId = (typeof AD_SET_SUBTABLE_COLUMN_IDS)[number]
@@ -48,6 +54,11 @@ const AD_SET_SUBTABLE_COLUMN_META: Record<
   results: { label: "Resultados", align: "right" },
   costPerResult: { label: "Costo/Res", align: "right" },
   roas: { label: "ROAS", align: "right" },
+  purchases7d: { label: "Ventas 7d", align: "right" },
+  cpa7d: { label: "CPA 7d", align: "right" },
+  totalPurchases: { label: "Total ventas", align: "right" },
+  totalSpend: { label: "Gasto total", align: "right" },
+  totalCpa: { label: "CPA total", align: "right" },
 }
 
 function isSubtableColumnId(columnId: string): columnId is AdSetSubtableColumnId {
@@ -74,13 +85,20 @@ export function isTikTokAdSetManageColumnId(
 
 export function getAdSetSubtableColumnMeta(
   columnId: AdSetSubtableColumnId | TikTokAdSetManageColumnId,
-  currency: CurrencyCode = META_DASHBOARD_CURRENCY
+  currency: CurrencyCode = META_DASHBOARD_CURRENCY,
+  usePurchaseLabels = false
 ) {
   if (isTikTokAdSetManageColumnId(columnId)) {
     return TIKTOK_AD_SET_MANAGE_COLUMN_META[columnId]
   }
   if (columnId === "roas") {
     return { label: "Agreg. carrito", align: "right" as const }
+  }
+  if (columnId === "results" && usePurchaseLabels) {
+    return { label: "Compras", align: "right" as const }
+  }
+  if (columnId === "costPerResult" && usePurchaseLabels) {
+    return { label: "CPA", align: "right" as const }
   }
   return AD_SET_SUBTABLE_COLUMN_META[columnId]
 }
@@ -109,7 +127,8 @@ export function getAdSetSubtableColumnsWithTikTokManage(
 export function renderAdSetSubtableCell(
   columnId: AdSetSubtableColumnId,
   row: CampaignAdSetRow,
-  currency: CurrencyCode = META_DASHBOARD_CURRENCY
+  currency: CurrencyCode = META_DASHBOARD_CURRENCY,
+  usePurchaseLabels = false
 ) {
   switch (columnId) {
     case "name":
@@ -118,7 +137,12 @@ export function renderAdSetSubtableCell(
           <div
             className={cn(
               "h-2 w-2 rounded-full",
-              row.status === "ACTIVE" ? "bg-blue-500" : "bg-gray-400"
+              isMetaAdSetActiveForCount({
+                status: row.status,
+                effective_status: row.adSetEffectiveStatus,
+              })
+                ? "bg-blue-500"
+                : "bg-gray-400"
             )}
           />
           <span>{row.name}</span>
@@ -171,5 +195,47 @@ export function renderAdSetSubtableCell(
           {(row.addToCart ?? 0) > 0 ? formatNumber(row.addToCart ?? 0) : "-"}
         </div>
       )
+    case "purchases7d":
+      return (
+        <div className="text-right">
+          {(row.purchases7d ?? 0) > 0
+            ? formatNumber(row.purchases7d ?? 0)
+            : "-"}
+        </div>
+      )
+    case "cpa7d": {
+      const cpa7d = row.cpa7d ?? 0
+      const highlight = getCostPerResultCellClassName(cpa7d, currency)
+      return (
+        <div className={cn("-m-2 p-2 text-right", highlight)}>
+          {cpa7d > 0 ? formatCurrency(cpa7d, currency) : "-"}
+        </div>
+      )
+    }
+    case "totalPurchases":
+      return (
+        <div className="text-right font-medium">
+          {(row.totalPurchases ?? 0) > 0
+            ? formatNumber(row.totalPurchases ?? 0)
+            : "-"}
+        </div>
+      )
+    case "totalSpend":
+      return (
+        <div className="text-right">
+          {(row.totalSpend ?? 0) > 0
+            ? formatCurrency(row.totalSpend ?? 0, currency)
+            : "-"}
+        </div>
+      )
+    case "totalCpa": {
+      const totalCpa = row.totalCpa ?? 0
+      const highlight = getCostPerResultCellClassName(totalCpa, currency)
+      return (
+        <div className={cn("-m-2 p-2 text-right", highlight)}>
+          {totalCpa > 0 ? formatCurrency(totalCpa, currency) : "-"}
+        </div>
+      )
+    }
   }
 }

@@ -7,6 +7,11 @@ import { useState } from "react"
 export const META_CAMPAIGNS_COLUMN_VISIBILITY_KEY =
   "dashboard:campaigns:column-visibility"
 
+export const META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  impressions: false,
+  totalSpend: false,
+}
+
 export const TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY =
   "dashboard:tiktok:campaigns:column-visibility"
 

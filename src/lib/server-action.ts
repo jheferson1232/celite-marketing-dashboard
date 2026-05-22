@@ -28,9 +28,14 @@ export function createServerAction<R, A = void>(action: (args: A) => Promise<R>)
         .catch((error) => {
           console.error(error)
 
-          const metaUserMessage = error?.response?.data?.error?.error_user_msg as
-            | string
+          const metaError = error?.response?.data?.error as
+            | {
+                error_user_msg?: string
+                message?: string
+              }
             | undefined
+
+          const metaUserMessage = metaError?.error_user_msg || metaError?.message
 
           const message =
             metaUserMessage ||

@@ -18,18 +18,14 @@ import {
   type CurrencyCode,
 } from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
+import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
 import { cn } from "@/lib/utils"
-import type {
-  CampaignAdSetRow,
-  DateRange,
-} from "@/lib/services/meta/types"
 import { useDateRange } from "../../_lib/use-date-range"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
 import {
   getAdSetSubtableColumnMeta,
   getAdSetSubtableColumnsWithTikTokManage,
   getVisibleAdSetSubtableColumns,
-  renderAdSetSubtableCell,
   type AdSetSubtableColumnId,
   type TikTokAdSetManageColumnId,
 } from "./ad-set-subtable-columns"
@@ -38,6 +34,7 @@ import {
   getTikTokAdSetDisplayColumns,
   type TikTokAdSetDisplayColumnId,
 } from "@/app/(app)/tiktok/_components/tiktok-ad-set-columns"
+import { MetaAdSetsSubtable } from "./meta-ad-sets-subtable"
 import { TikTokAdSetsSubtable } from "@/app/(app)/tiktok/_components/tiktok-ad-sets-subtable"
 
 type FetchCampaignAdSetsAction = typeof getCampaignAdSets
@@ -53,6 +50,7 @@ interface CampaignAdSetsExpandedRowProps {
   fetchAdSets?: FetchCampaignAdSetsAction
   currency?: CurrencyCode
   enableTikTokManage?: boolean
+  enableMetaExtendedMetrics?: boolean
 }
 
 const SKELETON_ROWS = 3
@@ -85,14 +83,6 @@ function getSubtableCellClassName(
   )
 }
 
-function renderDisplayCell(
-  columnId: AdSetSubtableColumnId,
-  adSet: CampaignAdSetRow,
-  currency: CurrencyCode
-) {
-  return renderAdSetSubtableCell(columnId, adSet, currency)
-}
-
 export function CampaignAdSetsExpandedRow({
   campaignId,
   campaignObjective,
@@ -102,7 +92,9 @@ export function CampaignAdSetsExpandedRow({
   fetchAdSets = getCampaignAdSets,
   currency = META_DASHBOARD_CURRENCY,
   enableTikTokManage = false,
+  enableMetaExtendedMetrics = false,
 }: CampaignAdSetsExpandedRowProps) {
+  const usePurchaseLabels = enableTikTokManage || enableMetaExtendedMetrics
   const { dateRange } = useDateRange()
   const visibleSubtableColumns = getVisibleAdSetSubtableColumns(
     visibleColumnOrder,
@@ -115,7 +107,7 @@ export function CampaignAdSetsExpandedRow({
     tiktokDisplayColumns ??
     getAdSetSubtableColumnsWithTikTokManage(visibleSubtableColumns, false)
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: [queryKeyPrefix, campaignId, dateRange, campaignObjective],
     queryFn: () =>
       runServerAction(
@@ -135,7 +127,11 @@ export function CampaignAdSetsExpandedRow({
   const columnMetaFor = (columnId: DisplayColumnId | TikTokAdSetDisplayColumnId) =>
     enableTikTokManage
       ? getTikTokAdSetColumnMeta(columnId as TikTokAdSetDisplayColumnId, currency)
-      : getAdSetSubtableColumnMeta(columnId as DisplayColumnId, currency)
+      : getAdSetSubtableColumnMeta(
+          columnId as DisplayColumnId,
+          currency,
+          usePurchaseLabels
+        )
 
   const headClassFor = (columnId: DisplayColumnId | TikTokAdSetDisplayColumnId) =>
     enableTikTokManage
@@ -202,11 +198,19 @@ export function CampaignAdSetsExpandedRow({
   }
 
   if (isError) {
+    const rateLimit = error ? isMetaRateLimitError(error) : false
     return (
       <div className="flex items-center justify-between gap-3 px-4 py-3">
-        <p className="text-sm text-destructive">
-          No se pudieron cargar los conjuntos.
-        </p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-destructive">
+            {rateLimit
+              ? "Límite de Meta al cargar conjuntos."
+              : "No se pudieron cargar los conjuntos."}
+          </p>
+          {error?.message ? (
+            <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
+          ) : null}
+        </div>
         <Button
           variant="outline"
           size="icon-sm"
@@ -239,39 +243,10 @@ export function CampaignAdSetsExpandedRow({
   }
 
   return (
-    <div className="py-1">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            {displayColumns.map((columnId) => (
-              <TableHead
-                key={columnId}
-                className={headClassFor(columnId)}
-              >
-                {columnMetaFor(columnId).label}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((adSet) => (
-            <TableRow key={adSet.id}>
-              {displayColumns.map((columnId) => (
-                <TableCell
-                  key={`${adSet.id}-${columnId}`}
-                  className={cellClassFor(columnId)}
-                >
-                  {renderDisplayCell(
-                    columnId as AdSetSubtableColumnId,
-                    adSet,
-                    currency
-                  )}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <MetaAdSetsSubtable
+      data={data}
+      displayColumns={displayColumns as AdSetSubtableColumnId[]}
+      currency={currency}
+    />
   )
 }

@@ -173,22 +173,12 @@ function CreativeCard({
             onClick={() => setIsPreviewOpen(true)}
             className="group block w-full cursor-pointer transition-opacity hover:opacity-90"
           >
-            {row.thumbnail_url || row.image_url ? (
-              <CreativePreviewImage
-                thumbnailUrl={row.thumbnail_url}
-                imageUrl={row.image_url}
-                alt={displayTitle}
-                className="aspect-9/16 w-full"
-              />
-            ) : (
-              <div className="flex aspect-9/16 w-full items-center justify-center bg-muted">
-                {hasVideo ? (
-                  <RiPlayCircleLine className="size-10 text-muted-foreground" />
-                ) : (
-                  <RiImageLine className="size-10 text-muted-foreground" />
-                )}
-              </div>
-            )}
+            <CreativePreviewImage
+              thumbnailUrl={row.thumbnail_url}
+              imageUrl={row.image_url}
+              alt={displayTitle}
+              className="aspect-9/16 w-full"
+            />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
               <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
                 {hasVideo ? (

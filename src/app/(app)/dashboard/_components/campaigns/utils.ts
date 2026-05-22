@@ -32,6 +32,11 @@ function getPerformanceThresholds(currency: CurrencyCode) {
   }
 }
 
+/** Campaña Meta con interruptor en ON (nivel campaña). */
+export function isMetaCampaignActive(row: CampaignRow): boolean {
+  return row.status === "ACTIVE"
+}
+
 /** Campaña TikTok con interruptor en ON (nivel campaña, no conjuntos). */
 export function isTikTokCampaignActiveToday(row: CampaignRow): boolean {
   if (row.operationStatus === "ENABLE" || row.operationStatus === "DISABLE") {

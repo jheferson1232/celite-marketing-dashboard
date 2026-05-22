@@ -119,9 +119,11 @@ export function CampaignStatusFilters({
             title={
               status === "APAGADO" && apagadoMeansSwitchOff
                 ? "Campañas con interruptor Act. apagado"
-                : status === "EN_CURSO"
-                  ? "Con gasto en el periodo y CPA en rango normal"
-                  : undefined
+                : status === "APAGADO"
+                  ? "Sin gasto en el periodo (siguen en la tabla con «todas»)"
+                  : status === "EN_CURSO"
+                    ? "Con gasto en el periodo y CPA en rango normal"
+                    : undefined
             }
             className={cn(
               "cursor-pointer px-3 text-sm font-semibold",

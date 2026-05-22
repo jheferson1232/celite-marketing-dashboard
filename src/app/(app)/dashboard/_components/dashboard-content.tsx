@@ -1,12 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { runServerAction } from "@/lib/server-action"
+import type { CampaignRow } from "@/lib/services/meta/types"
 import { getAccountKpisSummary } from "../_actions/account-kpis"
 import { getCampaignsList } from "../_actions/campaigns-list"
+import { getCampaignsExtendedMetrics } from "../_actions/campaigns-extended-metrics"
 import { getAdInsightsList } from "../_actions/ad-insights"
+import { getMetaLandingUrlsMapAction } from "../_actions/landing-urls-map"
+import { warmMetaAdsetInsightsAction } from "../_actions/adset-insights"
 import { clearMetaCacheAction } from "../_actions/clear-meta-cache"
+import { getMetaApiStatus } from "../_lib/meta-api-status"
 import { useDateRange } from "../_lib/use-date-range"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -14,6 +19,7 @@ import { KpiCards } from "./kpi-cards"
 import { CampaignsTable } from "./campaigns"
 import { AdsView } from "./ads"
 import { DateRangePicker } from "./date-range-picker"
+import { MetaApiStatusIndicator } from "./meta-api-status-indicator"
 import {
   RiAdvertisementLine,
   RiMegaphoneLine,
@@ -23,6 +29,7 @@ import {
 export function DashboardContent() {
   const queryClient = useQueryClient()
   const [isReloading, setIsReloading] = useState(false)
+  const [activeTab, setActiveTab] = useState("campaigns")
   const { dateRange, setDateRange } = useDateRange()
 
   const dashboardQueryOptions = {
@@ -36,30 +43,135 @@ export function DashboardContent() {
       await runServerAction(clearMetaCacheAction())
       await queryClient.invalidateQueries({
         predicate: (query) =>
-          ["account-kpis", "campaigns", "ad-insights"].includes(
-            String(query.queryKey[0])
-          ),
+          [
+            "account-kpis",
+            "campaigns",
+            "campaigns-extended-metrics",
+            "ad-insights",
+            "meta-campaign-landing-urls",
+            "meta-landing-urls-map",
+            "meta-adset-insights-warm",
+          ].includes(String(query.queryKey[0])),
       })
     } finally {
       setIsReloading(false)
     }
   }
 
-  const { data: kpis, isLoading: isLoadingKpis } = useQuery({
+  const kpisQuery = useQuery({
     queryKey: ["account-kpis", dateRange],
     queryFn: () => runServerAction(getAccountKpisSummary(dateRange)),
     ...dashboardQueryOptions,
   })
 
-  const { data: campaigns, isLoading: isLoadingCampaigns } = useQuery({
+  const campaignsQuery = useQuery({
     queryKey: ["campaigns", dateRange],
     queryFn: () => runServerAction(getCampaignsList(dateRange)),
     ...dashboardQueryOptions,
   })
 
+  const metaApiStatus = getMetaApiStatus({
+    isReloading,
+    campaigns: campaignsQuery,
+    kpis: kpisQuery,
+  })
+
+  const { data: kpis, isLoading: isLoadingKpis } = kpisQuery
+  const {
+    data: campaigns,
+    isLoading: isLoadingCampaigns,
+    error: campaignsError,
+  } = campaignsQuery
+
+  const extendedQueryOptions = {
+    staleTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  } as const
+
+  const [extendedMetricsEnabled, setExtendedMetricsEnabled] = useState(false)
+  const [landingMapEnabled, setLandingMapEnabled] = useState(false)
+  const [adsetInsightsWarmEnabled, setAdsetInsightsWarmEnabled] = useState(false)
+
+  useEffect(() => {
+    if (!campaigns?.length) {
+      setExtendedMetricsEnabled(false)
+      setLandingMapEnabled(false)
+      setAdsetInsightsWarmEnabled(false)
+      return
+    }
+    const adsetTimer = window.setTimeout(() => setAdsetInsightsWarmEnabled(true), 1_500)
+    const landingTimer = window.setTimeout(() => setLandingMapEnabled(true), 4_000)
+    const extendedTimer = window.setTimeout(
+      () => setExtendedMetricsEnabled(true),
+      10_000
+    )
+    return () => {
+      window.clearTimeout(adsetTimer)
+      window.clearTimeout(landingTimer)
+      window.clearTimeout(extendedTimer)
+    }
+  }, [campaigns?.length, dateRange.from, dateRange.to])
+
+  useQuery({
+    queryKey: ["meta-adset-insights-warm", dateRange],
+    queryFn: () => runServerAction(warmMetaAdsetInsightsAction(dateRange)),
+    enabled: adsetInsightsWarmEnabled,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const {
+    data: landingUrlsMap,
+    isFetching: isLandingUrlsMapFetching,
+    isPending: isLandingUrlsMapPending,
+  } = useQuery({
+    queryKey: ["meta-landing-urls-map"],
+    queryFn: () => runServerAction(getMetaLandingUrlsMapAction()),
+    enabled: landingMapEnabled,
+    staleTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const metaLandingUrlsLoading =
+    landingMapEnabled && (isLandingUrlsMapPending || isLandingUrlsMapFetching)
+
+  const { data: extendedMetrics } = useQuery({
+    queryKey: ["campaigns-extended-metrics"],
+    queryFn: () => runServerAction(getCampaignsExtendedMetrics()),
+    enabled: extendedMetricsEnabled,
+    ...extendedQueryOptions,
+  })
+
+  const campaignsEnriched = useMemo((): CampaignRow[] | undefined => {
+    if (!campaigns) return undefined
+
+    return campaigns.map((campaign) => {
+      const urls = landingUrlsMap?.[campaign.id]
+      const withUrls =
+        urls && urls.length > 0
+          ? { ...campaign, landingUrls: urls }
+          : campaign
+
+      if (!extendedMetrics) return withUrls
+
+      const extended = extendedMetrics[campaign.id]
+      if (!extended) return withUrls
+
+      return {
+        ...withUrls,
+        purchases7d: extended.purchases7d,
+        cpa7d: extended.cpa7d,
+        totalPurchases: extended.totalPurchases,
+        totalSpend: extended.totalSpend,
+        totalCpa: extended.totalCpa,
+      }
+    })
+  }, [campaigns, extendedMetrics, landingUrlsMap])
+
   const { data: adInsights, isLoading: isLoadingAdInsights } = useQuery({
     queryKey: ["ad-insights", dateRange],
     queryFn: () => runServerAction(getAdInsightsList(dateRange)),
+    enabled: activeTab === "ads",
     ...dashboardQueryOptions,
   })
 
@@ -70,6 +182,7 @@ export function DashboardContent() {
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Meta</h1>
         </div>
         <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <MetaApiStatusIndicator status={metaApiStatus} />
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
@@ -98,7 +211,8 @@ export function DashboardContent() {
       />
 
       <Tabs
-        defaultValue="campaigns"
+        value={activeTab}
+        onValueChange={setActiveTab}
         className="flex min-w-0 w-full flex-col gap-4"
       >
         <TabsList className="w-full sm:w-fit">
@@ -112,7 +226,15 @@ export function DashboardContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
-          <CampaignsTable data={campaigns} isLoading={isLoadingCampaigns} />
+          <CampaignsTable
+            data={campaignsEnriched}
+            isLoading={isLoadingCampaigns}
+            error={campaignsError}
+            enableMetaExtendedMetrics
+            showAllCampaignsFilter
+            showMetaActiveCampaignFilter
+            metaLandingUrlsLoading={metaLandingUrlsLoading}
+          />
         </TabsContent>
         <TabsContent value="ads" className="min-w-0 outline-none">
           <AdsView data={adInsights} isLoading={isLoadingAdInsights} />

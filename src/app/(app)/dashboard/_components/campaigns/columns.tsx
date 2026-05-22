@@ -19,6 +19,7 @@ import {
 } from "./utils"
 import { getTikTokCampaignManageColumns } from "@/app/(app)/tiktok/_components/tiktok-campaign-manage-columns"
 import { TikTokCampaignBudgetCell } from "@/app/(app)/tiktok/_components/tiktok-campaign-budget-cell"
+import { MetaCampaignLandingUrlsButton } from "./meta-campaign-landing-urls-button"
 import { TikTokCampaignLandingUrlsButton } from "@/app/(app)/tiktok/_components/tiktok-campaign-landing-urls-button"
 
 function columnMeta(
@@ -34,6 +35,8 @@ interface GetCampaignColumnsOptions {
   onOpenDetails: (campaign: CampaignRow) => void
   currency?: CurrencyCode
   enableTikTokManage?: boolean
+  enableMetaExtendedMetrics?: boolean
+  metaLandingUrlsLoading?: boolean
 }
 
 export function getCampaignColumns({
@@ -42,9 +45,15 @@ export function getCampaignColumns({
   onOpenDetails,
   currency = META_DASHBOARD_CURRENCY,
   enableTikTokManage = false,
+  enableMetaExtendedMetrics = false,
+  metaLandingUrlsLoading = false,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
-  const showAddToCart = !enableTikTokManage && currency === META_DASHBOARD_CURRENCY
+  const showLifetimeMetrics = enableTikTokManage || enableMetaExtendedMetrics
+  const showLandingUrls = enableTikTokManage || enableMetaExtendedMetrics
+  const usePurchaseLabels = enableTikTokManage || enableMetaExtendedMetrics
+  const showAddToCart =
+    !enableTikTokManage && !enableMetaExtendedMetrics && currency === META_DASHBOARD_CURRENCY
 
   const dataColumns: ColumnDef<CampaignRow>[] = [
     {
@@ -185,11 +194,11 @@ export function getCampaignColumns({
     {
       id: "results",
       accessorKey: "results",
-      meta: columnMeta(enableTikTokManage ? "Compras" : "Resultados"),
+      meta: columnMeta(usePurchaseLabels ? "Compras" : "Resultados"),
       header: (context) => (
         <SortableHeader
           context={context}
-          label={enableTikTokManage ? "Compras" : "Resultados"}
+          label={usePurchaseLabels ? "Compras" : "Resultados"}
         />
       ),
       cell: ({ row }) => (
@@ -201,11 +210,11 @@ export function getCampaignColumns({
     {
       id: "costPerResult",
       accessorKey: "costPerResult",
-      meta: columnMeta(enableTikTokManage ? "CPA" : "Costo/Res"),
+      meta: columnMeta(usePurchaseLabels ? "CPA" : "Costo/Res"),
       header: (context) => (
         <SortableHeader
           context={context}
-          label={enableTikTokManage ? "CPA" : "Costo/Res"}
+          label={usePurchaseLabels ? "CPA" : "Costo/Res"}
         />
       ),
       cell: ({ row }) => {
@@ -224,7 +233,7 @@ export function getCampaignColumns({
         )
       },
     },
-    ...(enableTikTokManage
+    ...(showLifetimeMetrics
       ? [
           {
             id: "purchases7d",
@@ -389,7 +398,15 @@ export function getCampaignColumns({
             >
               <RiStackLine data-icon="inline-start" />
             </Button>
-            {enableTikTokManage ? (
+            {showLandingUrls && enableMetaExtendedMetrics && row.original.id ? (
+              <MetaCampaignLandingUrlsButton
+                urls={row.original.landingUrls ?? []}
+                campaignId={row.original.id}
+                campaignName={row.original.name}
+                globalUrlsLoading={metaLandingUrlsLoading}
+              />
+            ) : null}
+            {showLandingUrls && enableTikTokManage ? (
               <TikTokCampaignLandingUrlsButton
                 urls={row.original.landingUrls ?? []}
                 campaignName={row.original.name}
@@ -411,7 +428,7 @@ export function getCampaignColumns({
   ]
 
   const columns = [...manageColumns, ...dataColumns]
-  if (enableTikTokManage) {
+  if (enableTikTokManage || enableMetaExtendedMetrics) {
     return columns.filter((column) => column.id !== "roas")
   }
   return columns
