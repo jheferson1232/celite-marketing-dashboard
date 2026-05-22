@@ -29,6 +29,6 @@ Toda obtención de datos del servidor sigue este flujo:
 - **No modificar** `src/app/(app)/dashboard/` ni servicios de listado/KPIs del dashboard al trabajar en Informe IA.
 - Informe IA vive en `src/app/(app)/informe-ia/` y `meta-operative-service.ts` (+ `meta-account-daily-insights.ts`, `informe-entity-status.ts`). Setup: `docs/INFORME-IA.md`.
 - Persistencia propia: `MetaTrackEntity` (catálogo), `MetaOperativeDay` (gasto/ventas/puntos/estado por entidad y día), `MetaInformeAccountDay` (totales cuenta por día). Al sincronizar se guarda cada día en orden cronológico.
-- Cron horario (`meta-hourly-report.ts`): resumen campañas + Telegram si conjunto ≥10k COP sin compras o campaña ≥30k sin compras. Botón «Enviar a Telegram» = mismo informe manual.
+- Cron cada 2 h (GitHub Actions → `meta-hourly-report.ts`): resumen campañas + Telegram si conjunto ≥10k COP sin compras o campaña ≥30k sin compras. Botón «Enviar a Telegram» = mismo informe manual.
 - Caché Meta del informe con prefijo `meta-informe:`; no invalidar `clearMetaCache()` del dashboard.
 - El informe **no** llama a `campaigns-list`, `campaign-adsets` ni al catálogo completo `meta:adsets:catalog` / `meta:campaigns:catalog` del dashboard.

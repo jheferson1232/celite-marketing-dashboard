@@ -1,13 +1,13 @@
-# Informe Meta → Telegram cada hora (plan Vercel Hobby no permite cron horario en vercel.json).
+# Informe Meta → Telegram cada 2 horas (plan Vercel Hobby no permite cron frecuente en vercel.json).
 # Requiere secrets: CRON_SECRET (mismo valor que en Vercel).
 # Opcional: META_CRON_APP_URL (default: producción en Vercel).
 
-name: Meta Telegram hourly
+name: Meta Telegram cada 2 h
 
 on:
   schedule:
-    # Cada hora en UTC (la app usa America/Lima para el texto y el cierre 23:00)
-    - cron: "0 * * * *"
+    # Minuto 0, cada 2 h UTC (la app usa America/Lima para el texto y el cierre 23:00)
+    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 concurrency:
