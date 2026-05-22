@@ -10,7 +10,8 @@ import { getAccountKpis } from "./account-kpis"
 import {
   formatCop,
   getMetaInformePayload,
-  getOlvidoNotifications,
+  mapOlvidoNotificationsFromInforme,
+  type MetaInformePayload,
   type OlvidoNotificationItem,
 } from "./meta-operative-service"
 import { generateHourlyOperativeCommentary } from "./meta-cron-commentary"
@@ -30,11 +31,13 @@ export type MetaHourlyReportPayload = {
   olvido: OlvidoNotificationItem[]
 }
 
-export async function buildMetaHourlyReportPayload(): Promise<MetaHourlyReportPayload> {
-  const [informe, kpis, olvido] = await Promise.all([
-    getMetaInformePayload(),
+/** Una sola sync de informe; opcionalmente reutiliza payload ya cargado. */
+export async function buildMetaHourlyReportPayload(
+  cachedInforme?: MetaInformePayload
+): Promise<MetaHourlyReportPayload> {
+  const [informe, kpis] = await Promise.all([
+    cachedInforme ?? getMetaInformePayload(),
     getAccountKpis(getTodayDateRange()),
-    getOlvidoNotifications(),
   ])
 
   return {
@@ -45,7 +48,7 @@ export async function buildMetaHourlyReportPayload(): Promise<MetaHourlyReportPa
     campaigns: buildInformeCampaignSummaries(informe.groups),
     adsetsToPause: collectAdsetsToPause(informe.groups),
     campaignsToPause: collectCampaignsToPause(informe.groups),
-    olvido,
+    olvido: mapOlvidoNotificationsFromInforme(informe),
   }
 }
 

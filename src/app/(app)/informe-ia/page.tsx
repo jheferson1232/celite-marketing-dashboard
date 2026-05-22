@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { InformeIaContent } from "./_components/informe-ia-content"
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 export const metadata = {
   title: "Informe IA · Meta | Marketing",

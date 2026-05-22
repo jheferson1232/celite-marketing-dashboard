@@ -750,11 +750,9 @@ export type OlvidoNotificationItem = {
 /** @deprecated Usar getOlvidoNotifications */
 export type ForgottenActivationItem = OlvidoNotificationItem
 
-export async function getOlvidoNotifications(
-  date = getDashboardToday()
-): Promise<OlvidoNotificationItem[]> {
-  void date
-  const informe = await getMetaInformePayload()
+export function mapOlvidoNotificationsFromInforme(
+  informe: MetaInformePayload
+): OlvidoNotificationItem[] {
   return informe.olvidoAlerts.map((row) => {
     if (row.type === "campaign") {
       return {
@@ -773,6 +771,14 @@ export async function getOlvidoNotifications(
       estadoLabel: row.estadoLabel,
     }
   })
+}
+
+export async function getOlvidoNotifications(
+  date = getDashboardToday()
+): Promise<OlvidoNotificationItem[]> {
+  void date
+  const informe = await getMetaInformePayload()
+  return mapOlvidoNotificationsFromInforme(informe)
 }
 
 export async function getForgottenActivations(

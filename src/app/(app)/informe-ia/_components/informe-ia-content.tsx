@@ -523,10 +523,18 @@ function InformeTable({
   )
 }
 
+function getHourlyMutationError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return "No se pudo generar el informe. Revisa Meta, la base de datos y las variables en Vercel."
+}
+
 export function InformeIaContent() {
   const queryClient = useQueryClient()
   const [aiText, setAiText] = useState<string | null>(null)
   const [telegramSent, setTelegramSent] = useState<number | null>(null)
+  const [hourlyError, setHourlyError] = useState<string | null>(null)
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
@@ -543,23 +551,42 @@ export function InformeIaContent() {
 
   const previewMutation = useMutation({
     mutationFn: () => runServerAction(previewMetaInformeHourlyAction()),
+    onMutate: () => {
+      setHourlyError(null)
+    },
     onSuccess: (result) => {
       if (!result) return
       setAiText(result.text)
+      setTelegramSent(null)
+    },
+    onError: (error) => {
+      setHourlyError(getHourlyMutationError(error))
+      setAiText(null)
       setTelegramSent(null)
     },
   })
 
   const sendMutation = useMutation({
     mutationFn: () => runServerAction(sendMetaInformeHourlyToTelegramAction()),
+    onMutate: () => {
+      setHourlyError(null)
+    },
     onSuccess: (result) => {
       if (!result) return
       setAiText(result.text)
       setTelegramSent(result.sent)
     },
+    onError: (error) => {
+      setHourlyError(getHourlyMutationError(error))
+    },
   })
 
   const hourlyPending = previewMutation.isPending || sendMutation.isPending
+  const hourlyLoadingLabel = previewMutation.isPending
+    ? "Generando vista previa…"
+    : sendMutation.isPending
+      ? "Generando y enviando a Telegram…"
+      : null
 
   const data = informeQuery.data
   const dayHeaders = data?.groups[0]?.campaign.dayCells.map((d) => d.date) ?? []
@@ -578,9 +605,11 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada hora a Telegram: resumen de campañas, conjuntos ≥10k sin
-            ventas (apagar) y campañas ≥30k sin ventas. El botón envía el mismo
-            informe manualmente.
+            Cron cada hora a Telegram (GitHub Actions).{" "}
+            <strong className="text-foreground font-medium">Vista previa</strong>{" "}
+            muestra el mensaje aquí abajo (no envía).{" "}
+            <strong className="text-foreground font-medium">Enviar a Telegram</strong>{" "}
+            usa el mismo informe y lo manda al bot.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -599,22 +628,59 @@ export function InformeIaContent() {
             variant="outline"
             size="sm"
             onClick={() => previewMutation.mutate()}
-            disabled={hourlyPending}
+            disabled={hourlyPending || informeQuery.isLoading}
           >
-            <RiBrainLine className="size-4" />
+            <RiBrainLine
+              className={cn("size-4", previewMutation.isPending && "animate-pulse")}
+            />
             Vista previa
           </Button>
           <Button
             variant="secondary"
             size="sm"
             onClick={() => sendMutation.mutate()}
-            disabled={hourlyPending}
+            disabled={hourlyPending || informeQuery.isLoading}
           >
-            <RiBrainLine className="size-4" />
+            <RiBrainLine
+              className={cn("size-4", sendMutation.isPending && "animate-pulse")}
+            />
             Enviar a Telegram
           </Button>
         </div>
       </div>
+
+      {hourlyLoadingLabel ? (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm dark:border-blue-500/30 dark:bg-blue-500/10">
+          <RiRefreshLine className="size-4 shrink-0 animate-spin text-blue-600" />
+          <p className="text-blue-800 dark:text-blue-300">
+            {hourlyLoadingLabel} Puede tardar hasta 1 minuto.
+          </p>
+        </div>
+      ) : null}
+
+      {hourlyError ? (
+        <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
+          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
+          <p className="text-red-800 dark:text-red-300">{hourlyError}</p>
+        </div>
+      ) : null}
+
+      {telegramSent !== null ? (
+        <p className="text-muted-foreground text-xs">
+          {telegramSent > 0
+            ? `Informe enviado a ${telegramSent} chat(s) de Telegram.`
+            : "No se envió a Telegram (revisa TELEGRAM_BOT_TOKEN y TELEGRAM_ALLOWED_USER_IDS en Vercel)."}
+        </p>
+      ) : null}
+
+      {aiText ? (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm whitespace-pre-wrap">
+          <p className="text-muted-foreground mb-2 text-xs font-medium">
+            Vista previa del mensaje de Telegram
+          </p>
+          {aiText}
+        </div>
+      ) : null}
 
       {data && data.olvidoAlerts.length > 0 ? (
         <div className="flex gap-2 rounded-lg border border-orange-200 bg-orange-50/80 px-4 py-3 text-sm dark:border-orange-500/30 dark:bg-orange-500/10">
@@ -668,20 +734,6 @@ export function InformeIaContent() {
           title={`${data.campaignsToPause.length} campaña${data.campaignsToPause.length === 1 ? "" : "s"} ≥30k COP hoy sin ventas — considera apagar`}
           items={data.campaignsToPause}
         />
-      ) : null}
-
-      {telegramSent !== null ? (
-        <p className="text-muted-foreground text-xs">
-          {telegramSent > 0
-            ? `Informe enviado a ${telegramSent} chat(s) de Telegram.`
-            : "No se envió a Telegram (revisa TELEGRAM_BOT_TOKEN y TELEGRAM_ALLOWED_USER_IDS)."}
-        </p>
-      ) : null}
-
-      {aiText ? (
-        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm whitespace-pre-wrap">
-          {aiText}
-        </div>
       ) : null}
 
       {informeQuery.isLoading ? (

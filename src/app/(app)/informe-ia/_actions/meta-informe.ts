@@ -18,7 +18,8 @@ export const syncMetaInformeAction = createServerAction(async () =>
 
 /** Vista previa del informe horario (mismo texto que Telegram, sin enviar). */
 export const previewMetaInformeHourlyAction = createServerAction(async () => {
-  const payload = await buildMetaHourlyReportPayload()
+  const informe = await getMetaInformePayload()
+  const payload = await buildMetaHourlyReportPayload(informe)
   const text = await buildMetaHourlyTelegramMessage(payload)
   return {
     text,
@@ -30,7 +31,9 @@ export const previewMetaInformeHourlyAction = createServerAction(async () => {
 /** Envía el informe horario a los chats configurados en Telegram. */
 export const sendMetaInformeHourlyToTelegramAction = createServerAction(
   async () => {
-    const result = await sendMetaHourlyReportToTelegram()
+    const informe = await getMetaInformePayload()
+    const payload = await buildMetaHourlyReportPayload(informe)
+    const result = await sendMetaHourlyReportToTelegram(payload)
     return {
       text: result.message,
       sent: result.sent,
