@@ -1,5 +1,7 @@
 import "dotenv/config"
-import { defineConfig, env } from "prisma/config"
+import { defineConfig } from "prisma/config"
+
+import { migrationDatabaseUrl } from "./prisma/migration-database-url"
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,6 +9,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Conexión directa (no pooler) para migrate deploy en CI/Vercel
+    url: migrationDatabaseUrl(),
   },
 })
