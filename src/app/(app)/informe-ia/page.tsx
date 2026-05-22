@@ -3,8 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { InformeIaContent } from "./_components/informe-ia-content"
 
 export const metadata = {
-  title: "Informe IA | Marketing",
-  description: "Checklist de activación Meta y ventas por día",
+  title: "Informe IA · Meta | Marketing",
+  description: "Checklist de activación Meta (desde hoy) y ventas por día",
 }
 
 export default function InformeIaPage() {

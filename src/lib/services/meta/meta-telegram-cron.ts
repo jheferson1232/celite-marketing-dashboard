@@ -79,7 +79,7 @@ export async function runMetaNightlyReport(): Promise<{
   }
 
   const today = getDashboardToday()
-  const informe = await getMetaInformePayload(7)
+  const informe = await getMetaInformePayload()
   const kpis = await getAccountKpis(getTodayDateRange())
 
   const soldAdsets: {

@@ -37,7 +37,7 @@ const navItems = [
   },
   {
     id: "informe-ia",
-    title: "Informe IA",
+    title: "Informe IA (Meta)",
     href: "/informe-ia",
     icon: RiBrainLine,
   },

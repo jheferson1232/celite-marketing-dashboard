@@ -11,14 +11,14 @@ import {
 import { generateActivationReminderCommentary } from "@/lib/services/meta/meta-cron-commentary"
 import { getDashboardHour, getDashboardToday } from "@/lib/date"
 
-export const getMetaInformeAction = createServerAction(
-  async (days: number = 7) => getMetaInformePayload(days)
+export const getMetaInformeAction = createServerAction(async () =>
+  getMetaInformePayload()
 )
 
 export const syncMetaInformeAction = createServerAction(async () => {
   await syncMetaTrackCatalog()
   await syncMetaOperativeStateForDate(getDashboardToday())
-  return getMetaInformePayload(7)
+  return getMetaInformePayload()
 })
 
 export const setMetaIntentActiveAction = createServerAction(
@@ -30,7 +30,7 @@ export const setMetaIntentActiveAction = createServerAction(
     intentActive: boolean
   }) => {
     await setMetaIntentActive(entityId, intentActive)
-    return getMetaInformePayload(7)
+    return getMetaInformePayload()
   }
 )
 

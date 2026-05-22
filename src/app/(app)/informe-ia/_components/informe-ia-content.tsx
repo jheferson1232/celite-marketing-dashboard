@@ -176,7 +176,7 @@ export function InformeIaContent() {
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
-    queryFn: () => runServerAction(getMetaInformeAction(7)),
+    queryFn: () => runServerAction(getMetaInformeAction()),
     staleTime: 2 * 60 * 1000,
   })
 
@@ -217,12 +217,13 @@ export function InformeIaContent() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            Informe IA
+            Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Marca las campañas y conjuntos que activaste. El cron (08:00–18:00)
-            te avisa por Telegram si olvidaste encenderlos en Meta. Verde = vendió
-            ese día; rojo = gastó sin ventas.
+            Solo Facebook/Meta. El historial empieza hoy y crece día a día (sin
+            días anteriores). Marca lo que activaste; el cron (08:00–18:00) te
+            avisa por Telegram si olvidaste encenderlo en Ads Manager. Verde =
+            vendió; rojo = gastó sin ventas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -281,8 +282,11 @@ export function InformeIaContent() {
         <>
           <p className="text-muted-foreground text-sm">
             Hoy: gasto {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)}{" "}
-            · {data.accountPurchasesToday} compras · Rango{" "}
-            {data.dateRange.from} → {data.dateRange.to}
+            · {data.accountPurchasesToday} compras · Informe desde{" "}
+            {formatDayLabel(data.informeStartDate)}
+            {data.dateRange.from !== data.dateRange.to
+              ? ` (${formatDayLabel(data.dateRange.from)} → ${formatDayLabel(data.dateRange.to)})`
+              : " (solo hoy)"}
           </p>
           <div className="min-w-0 overflow-x-auto rounded-lg border">
             <InformeTable

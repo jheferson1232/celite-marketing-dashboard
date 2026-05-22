@@ -1,10 +1,10 @@
 import prisma from "@/lib/prisma"
+import { getDashboardToday, getTodayDateRange } from "@/lib/date"
 import {
-  buildDateKeys,
-  getDashboardToday,
-  getLastNDaysRange,
-  getTodayDateRange,
-} from "@/lib/date"
+  getMetaInformeDateKeys,
+  getMetaInformeDateRange,
+  getMetaInformeStartDate,
+} from "@/lib/meta-informe"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
 import { getCachedMetaCampaignCatalog } from "./campaign-catalog"
 import { getCachedMetaAdsetsCatalog, normalizeAdSetFromApi } from "./adsets-catalog"
@@ -43,6 +43,7 @@ export type InformeCampaignGroup = {
 
 export type MetaInformePayload = {
   date: string
+  informeStartDate: string
   dateRange: { from: string; to: string }
   groups: InformeCampaignGroup[]
   forgotten: InformeEntityRow[]
@@ -137,6 +138,8 @@ async function upsertOperativeDay(
 }
 
 export async function syncMetaOperativeStateForDate(date: string): Promise<void> {
+  if (date < getMetaInformeStartDate()) return
+
   const api = getMetaClient()
   const [campaigns, adsetsRaw] = await Promise.all([
     getCachedMetaCampaignCatalog(api),
@@ -193,6 +196,8 @@ export async function setMetaIntentActive(
   intentActive: boolean,
   date = getDashboardToday()
 ): Promise<void> {
+  if (date < getMetaInformeStartDate()) return
+
   await prisma.metaOperativeDay.upsert({
     where: { date_entityId: { date, entityId } },
     create: {
@@ -243,21 +248,51 @@ function toInformeRow(
   }
 }
 
-export async function getMetaInformePayload(
-  days = 7
-): Promise<MetaInformePayload> {
+async function pruneOperativeDaysBeforeInformeStart(): Promise<void> {
+  const start = getMetaInformeStartDate()
+  await prisma.metaOperativeDay.deleteMany({ where: { date: { lt: start } } })
+}
+
+function dayCellsForEntity(
+  metaId: string,
+  type: "campaign" | "adset",
+  dateKeys: string[],
+  campaignDaily: Map<string, MetaDailyMetricCell[]>,
+  adsetDaily: Map<string, MetaDailyMetricCell[]>
+): InformeEntityRow["dayCells"] {
+  const source =
+    type === "campaign" ? campaignDaily.get(metaId) : adsetDaily.get(metaId)
+  const byDate = new Map(source?.map((d) => [d.date, d]))
+  return dateKeys.map((date) => {
+    const cell = byDate.get(date)
+    return (
+      cell ?? {
+        date,
+        spend: 0,
+        purchases: 0,
+        saleStatus: "neutral" as const,
+      }
+    )
+  })
+}
+
+type MetaDailyMetricCell = InformeEntityRow["dayCells"][number]
+
+export async function getMetaInformePayload(): Promise<MetaInformePayload> {
   await syncMetaTrackCatalog()
+  await pruneOperativeDaysBeforeInformeStart()
 
   const today = getDashboardToday()
-  const dateRange = getLastNDaysRange(days)
-  const dateKeys = buildDateKeys(dateRange.from, dateRange.to)
+  const informeStartDate = getMetaInformeStartDate()
+  const dateRange = getMetaInformeDateRange()
+  const dateKeys = getMetaInformeDateKeys()
 
   await syncMetaOperativeStateForDate(today)
 
   const [entities, operativeRows, daily, accountKpis] = await Promise.all([
     prisma.metaTrackEntity.findMany({ orderBy: { name: "asc" } }),
     prisma.metaOperativeDay.findMany({
-      where: { date: { in: dateKeys } },
+      where: { date: { gte: dateRange.from, lte: dateRange.to } },
     }),
     getMetaAccountDailyInsights(dateRange),
     getAccountKpis(getTodayDateRange()),
@@ -282,12 +317,13 @@ export async function getMetaInformePayload(
     const campaignRow = toInformeRow(
       campaign,
       todayOp ?? null,
-      campaignDaily.get(campaign.metaId) ?? dateKeys.map((date) => ({
-        date,
-        spend: 0,
-        purchases: 0,
-        saleStatus: "neutral" as const,
-      }))
+      dayCellsForEntity(
+        campaign.metaId,
+        "campaign",
+        dateKeys,
+        campaignDaily,
+        adsetDaily
+      )
     )
 
     const adsets = adsetEntities
@@ -297,12 +333,13 @@ export async function getMetaInformePayload(
         return toInformeRow(
           adset,
           op ?? null,
-          adsetDaily.get(adset.metaId) ?? dateKeys.map((date) => ({
-            date,
-            spend: 0,
-            purchases: 0,
-            saleStatus: "neutral" as const,
-          }))
+          dayCellsForEntity(
+            adset.metaId,
+            "adset",
+            dateKeys,
+            campaignDaily,
+            adsetDaily
+          )
         )
       })
 
@@ -314,6 +351,7 @@ export async function getMetaInformePayload(
 
   return {
     date: today,
+    informeStartDate,
     dateRange,
     groups,
     forgotten,
