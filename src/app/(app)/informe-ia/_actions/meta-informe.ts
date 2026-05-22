@@ -4,22 +4,18 @@ import { createServerAction } from "@/lib/server-action"
 import {
   getMetaInformePayload,
   setMetaIntentActive,
-  syncMetaOperativeStateForDate,
-  syncMetaTrackCatalog,
   getForgottenActivations,
 } from "@/lib/services/meta/meta-operative-service"
 import { generateActivationReminderCommentary } from "@/lib/services/meta/meta-cron-commentary"
-import { getDashboardHour, getDashboardToday } from "@/lib/date"
+import { getDashboardHour } from "@/lib/date"
 
 export const getMetaInformeAction = createServerAction(async () =>
   getMetaInformePayload()
 )
 
-export const syncMetaInformeAction = createServerAction(async () => {
-  await syncMetaTrackCatalog()
-  await syncMetaOperativeStateForDate(getDashboardToday())
-  return getMetaInformePayload()
-})
+export const syncMetaInformeAction = createServerAction(async () =>
+  getMetaInformePayload()
+)
 
 export const setMetaIntentActiveAction = createServerAction(
   async ({

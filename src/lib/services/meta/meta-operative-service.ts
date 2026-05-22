@@ -10,7 +10,10 @@ import { getCachedMetaCampaignCatalog } from "./campaign-catalog"
 import { getCachedMetaAdsetsCatalog, normalizeAdSetFromApi } from "./adsets-catalog"
 import { isMetaCampaignActiveForCount } from "./meta-campaign-status"
 import { isMetaAdSetActiveForCount } from "./meta-adset-status"
-import { getMetaAccountDailyInsights } from "./meta-account-daily-insights"
+import {
+  getMetaAccountDailyInsights,
+  type MetaDailyEntityRow,
+} from "./meta-account-daily-insights"
 import { getAccountKpis } from "./account-kpis"
 import { getMetaClient } from "./meta"
 import { normalizeMetaId } from "./meta-ids"
@@ -51,6 +54,92 @@ export type MetaInformePayload = {
   accountPurchasesToday: number
 }
 
+type TrackEntityInput = {
+  metaId: string
+  type: "campaign" | "adset"
+  name: string
+  campaignMetaId: string | null
+}
+
+type MetaDailyMetricCell = InformeEntityRow["dayCells"][number]
+
+const UPSERT_CHUNK = 40
+
+function spendOnDate(row: MetaDailyEntityRow, date: string): number {
+  return row.days.find((d) => d.date === date)?.spend ?? 0
+}
+
+function collectSpendingToday(
+  daily: Awaited<ReturnType<typeof getMetaAccountDailyInsights>>,
+  today: string
+): {
+  campaignRows: MetaDailyEntityRow[]
+  adsetRows: MetaDailyEntityRow[]
+  trackInputs: TrackEntityInput[]
+} {
+  const campaignRows = daily.campaigns.filter((c) => spendOnDate(c, today) > 0)
+  const spendingCampaignIds = new Set(campaignRows.map((c) => c.metaId))
+
+  for (const adset of daily.adsets) {
+    if (spendOnDate(adset, today) > 0 && adset.campaignMetaId) {
+      spendingCampaignIds.add(adset.campaignMetaId)
+    }
+  }
+
+  const campaignRowsAll = daily.campaigns.filter((c) =>
+    spendingCampaignIds.has(c.metaId)
+  )
+  const adsetRows = daily.adsets.filter(
+    (a) =>
+      spendOnDate(a, today) > 0 &&
+      a.campaignMetaId &&
+      spendingCampaignIds.has(a.campaignMetaId)
+  )
+
+  const trackInputs: TrackEntityInput[] = [
+    ...campaignRowsAll.map((c) => ({
+      metaId: c.metaId,
+      type: "campaign" as const,
+      name: c.name,
+      campaignMetaId: null,
+    })),
+    ...adsetRows.map((a) => ({
+      metaId: a.metaId,
+      type: "adset" as const,
+      name: a.name,
+      campaignMetaId: a.campaignMetaId ?? null,
+    })),
+  ]
+
+  return { campaignRows: campaignRowsAll, adsetRows, trackInputs }
+}
+
+async function upsertTrackEntitiesBatch(
+  inputs: TrackEntityInput[]
+): Promise<void> {
+  for (let i = 0; i < inputs.length; i += UPSERT_CHUNK) {
+    const chunk = inputs.slice(i, i + UPSERT_CHUNK)
+    await prisma.$transaction(
+      chunk.map((input) =>
+        prisma.metaTrackEntity.upsert({
+          where: { metaId_type: { metaId: input.metaId, type: input.type } },
+          create: {
+            metaId: input.metaId,
+            type: input.type,
+            name: input.name,
+            campaignMetaId: input.campaignMetaId,
+            objective: "",
+          },
+          update: {
+            name: input.name,
+            campaignMetaId: input.campaignMetaId,
+          },
+        })
+      )
+    )
+  }
+}
+
 function isCampaignActive(campaign: MetaCampaign): boolean {
   return isMetaCampaignActiveForCount(campaign)
 }
@@ -60,56 +149,6 @@ function isAdsetActive(adset: MetaAdSet): boolean {
     status: adset.status,
     effective_status: adset.effective_status,
   })
-}
-
-export async function syncMetaTrackCatalog(): Promise<void> {
-  const api = getMetaClient()
-  const [campaigns, adsetsRaw] = await Promise.all([
-    getCachedMetaCampaignCatalog(api),
-    getCachedMetaAdsetsCatalog(api),
-  ])
-
-  for (const campaign of campaigns) {
-    const metaId = normalizeMetaId(campaign.id)
-    if (!metaId) continue
-    const status = (campaign.effective_status || campaign.status || "").toUpperCase()
-    if (status === "DELETED") continue
-
-    await prisma.metaTrackEntity.upsert({
-      where: { metaId_type: { metaId, type: "campaign" } },
-      create: {
-        metaId,
-        type: "campaign",
-        name: campaign.name || `Campaña ${metaId}`,
-        campaignMetaId: null,
-        objective: "",
-      },
-      update: {
-        name: campaign.name || `Campaña ${metaId}`,
-      },
-    })
-  }
-
-  for (const raw of adsetsRaw) {
-    const adset = normalizeAdSetFromApi(raw as MetaAdSet & { campaign_id?: string | { id?: string } })
-    const metaId = adset?.id
-    if (!metaId) continue
-
-    await prisma.metaTrackEntity.upsert({
-      where: { metaId_type: { metaId, type: "adset" } },
-      create: {
-        metaId,
-        type: "adset",
-        name: adset.name || `Conjunto ${metaId}`,
-        campaignMetaId: adset.campaign_id,
-        objective: "",
-      },
-      update: {
-        name: adset.name || `Conjunto ${metaId}`,
-        campaignMetaId: adset.campaign_id,
-      },
-    })
-  }
 }
 
 async function upsertOperativeDay(
@@ -137,8 +176,17 @@ async function upsertOperativeDay(
   })
 }
 
-export async function syncMetaOperativeStateForDate(date: string): Promise<void> {
-  if (date < getMetaInformeStartDate()) return
+/** Sincroniza estado Meta + métricas solo para las entidades del informe (gasto hoy). */
+export async function syncMetaOperativeStateForDate(
+  date: string,
+  metaIds: string[]
+): Promise<void> {
+  if (date < getMetaInformeStartDate() || metaIds.length === 0) return
+
+  const entities = await prisma.metaTrackEntity.findMany({
+    where: { metaId: { in: metaIds } },
+  })
+  if (entities.length === 0) return
 
   const api = getMetaClient()
   const [campaigns, adsetsRaw] = await Promise.all([
@@ -151,12 +199,14 @@ export async function syncMetaOperativeStateForDate(date: string): Promise<void>
   )
   const adsetById = new Map<string, MetaAdSet>()
   for (const raw of adsetsRaw) {
-    const adset = normalizeAdSetFromApi(raw as MetaAdSet & { campaign_id?: string | { id?: string } })
+    const adset = normalizeAdSetFromApi(
+      raw as MetaAdSet & { campaign_id?: string | { id?: string } }
+    )
     if (adset?.id) adsetById.set(adset.id, adset)
   }
 
-  const entities = await prisma.metaTrackEntity.findMany()
-  const range = date === getDashboardToday() ? getTodayDateRange() : { from: date, to: date }
+  const range =
+    date === getDashboardToday() ? getTodayDateRange() : { from: date, to: date }
   const daily = await getMetaAccountDailyInsights(range)
 
   const campaignDay = new Map(
@@ -253,6 +303,23 @@ async function pruneOperativeDaysBeforeInformeStart(): Promise<void> {
   await prisma.metaOperativeDay.deleteMany({ where: { date: { lt: start } } })
 }
 
+/** Quita entidades del catálogo completo antiguo; conserva gasto hoy o check «Activé». */
+async function pruneStaleTrackEntities(
+  keepMetaIds: string[],
+  today: string
+): Promise<void> {
+  await prisma.metaTrackEntity.deleteMany({
+    where: {
+      metaId: { notIn: keepMetaIds },
+      NOT: {
+        operativeDays: {
+          some: { date: today, intentActive: true },
+        },
+      },
+    },
+  })
+}
+
 function dayCellsForEntity(
   metaId: string,
   type: "campaign" | "adset",
@@ -276,26 +343,50 @@ function dayCellsForEntity(
   })
 }
 
-type MetaDailyMetricCell = InformeEntityRow["dayCells"][number]
-
 export async function getMetaInformePayload(): Promise<MetaInformePayload> {
-  await syncMetaTrackCatalog()
-  await pruneOperativeDaysBeforeInformeStart()
-
   const today = getDashboardToday()
   const informeStartDate = getMetaInformeStartDate()
   const dateRange = getMetaInformeDateRange()
   const dateKeys = getMetaInformeDateKeys()
 
-  await syncMetaOperativeStateForDate(today)
+  await pruneOperativeDaysBeforeInformeStart()
 
-  const [entities, operativeRows, daily, accountKpis] = await Promise.all([
-    prisma.metaTrackEntity.findMany({ orderBy: { name: "asc" } }),
+  const [daily, accountKpis] = await Promise.all([
+    getMetaAccountDailyInsights(dateRange),
+    getAccountKpis(getTodayDateRange()),
+  ])
+
+  const { campaignRows, adsetRows, trackInputs } = collectSpendingToday(
+    daily,
+    today
+  )
+  const metaIds = [...new Set(trackInputs.map((t) => t.metaId))]
+
+  await upsertTrackEntitiesBatch(trackInputs)
+  await pruneStaleTrackEntities(metaIds, today)
+  await syncMetaOperativeStateForDate(today, metaIds)
+
+  const metaIdSet = new Set(metaIds)
+  if (metaIdSet.size === 0) {
+    return {
+      date: today,
+      informeStartDate,
+      dateRange,
+      groups: [],
+      forgotten: [],
+      accountSpendToday: accountKpis.totalSpend,
+      accountPurchasesToday: accountKpis.purchases,
+    }
+  }
+
+  const [entities, operativeRows] = await Promise.all([
+    prisma.metaTrackEntity.findMany({
+      where: { metaId: { in: [...metaIdSet] } },
+      orderBy: { name: "asc" },
+    }),
     prisma.metaOperativeDay.findMany({
       where: { date: { gte: dateRange.from, lte: dateRange.to } },
     }),
-    getMetaAccountDailyInsights(dateRange),
-    getAccountKpis(getTodayDateRange()),
   ])
 
   const operativeByEntityDate = new Map<string, (typeof operativeRows)[0]>()
@@ -306,13 +397,20 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
   const campaignDaily = new Map(daily.campaigns.map((c) => [c.metaId, c.days]))
   const adsetDaily = new Map(daily.adsets.map((a) => [a.metaId, a.days]))
 
-  const campaignEntities = entities.filter((e) => e.type === "campaign")
-  const adsetEntities = entities.filter((e) => e.type === "adset")
+  const entityByKey = new Map(
+    entities.map((e) => [`${e.type}:${e.metaId}`, e] as const)
+  )
 
   const groups: InformeCampaignGroup[] = []
   const allRows: InformeEntityRow[] = []
 
-  for (const campaign of campaignEntities) {
+  const sortedCampaignRows = [...campaignRows].sort(
+    (a, b) => spendOnDate(b, today) - spendOnDate(a, today)
+  )
+
+  for (const cRow of sortedCampaignRows) {
+    const campaign = entityByKey.get(`campaign:${cRow.metaId}`)
+    if (!campaign) continue
     const todayOp = operativeByEntityDate.get(`${campaign.id}:${today}`)
     const campaignRow = toInformeRow(
       campaign,
@@ -326,9 +424,12 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       )
     )
 
-    const adsets = adsetEntities
-      .filter((a) => a.campaignMetaId === campaign.metaId)
-      .map((adset) => {
+    const adsets = adsetRows
+      .filter((a) => a.campaignMetaId === cRow.metaId)
+      .sort((a, b) => spendOnDate(b, today) - spendOnDate(a, today))
+      .map((aRow) => {
+        const adset = entityByKey.get(`adset:${aRow.metaId}`)
+        if (!adset) return null
         const op = operativeByEntityDate.get(`${adset.id}:${today}`)
         return toInformeRow(
           adset,
@@ -342,6 +443,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
           )
         )
       })
+      .filter((row): row is InformeEntityRow => row !== null)
 
     groups.push({ campaign: campaignRow, adsets })
     allRows.push(campaignRow, ...adsets)
@@ -369,35 +471,20 @@ export type ForgottenActivationItem = {
 export async function getForgottenActivations(
   date = getDashboardToday()
 ): Promise<ForgottenActivationItem[]> {
-  await syncMetaTrackCatalog()
-  await syncMetaOperativeStateForDate(date)
-
-  const entities = await prisma.metaTrackEntity.findMany()
-  const operative = await prisma.metaOperativeDay.findMany({ where: { date } })
-  const opByEntity = new Map(operative.map((o) => [o.entityId, o]))
-  const nameById = new Map(entities.map((e) => [e.id, e]))
-
-  const forgotten: ForgottenActivationItem[] = []
-
-  for (const entity of entities) {
-    const day = opByEntity.get(entity.id)
-    if (!day?.intentActive || day.metaWasActive) continue
-
-    if (entity.type === "campaign") {
-      forgotten.push({ type: "campaign", name: entity.name })
-    } else {
-      const campaign = entities.find(
-        (c) => c.type === "campaign" && c.metaId === entity.campaignMetaId
-      )
-      forgotten.push({
-        type: "adset",
-        name: entity.name,
-        campaignName: campaign?.name,
-      })
+  const informe = await getMetaInformePayload()
+  return informe.forgotten.map((f) => {
+    if (f.type === "campaign") {
+      return { type: "campaign" as const, name: f.name }
     }
-  }
-
-  return forgotten
+    const group = informe.groups.find((g) =>
+      g.adsets.some((a) => a.entityId === f.entityId)
+    )
+    return {
+      type: "adset" as const,
+      name: f.name,
+      campaignName: group?.campaign.name,
+    }
+  })
 }
 
 export function formatCop(amount: number): string {

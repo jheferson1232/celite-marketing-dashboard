@@ -276,8 +276,22 @@ export function InformeIaContent() {
         <Skeleton className="h-96 w-full rounded-lg" />
       ) : informeQuery.isError ? (
         <p className="text-destructive text-sm">
-          No se pudo cargar el informe. Revisa Meta y la base de datos.
+          {informeQuery.error?.message ||
+            "No se pudo cargar el informe. Revisa Meta y la base de datos."}
         </p>
+      ) : data && data.groups.length === 0 ? (
+        <>
+          <p className="text-muted-foreground text-sm">
+            Hoy: gasto{" "}
+            {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)} ·{" "}
+            {data.accountPurchasesToday} compras. Ninguna campaña con gasto hoy
+            en Meta (o aún no sincronizó).
+          </p>
+          <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-8 text-center text-sm">
+            Cuando una campaña o conjunto gaste hoy, aparecerá aquí para marcar
+            si la activaste.
+          </p>
+        </>
       ) : data ? (
         <>
           <p className="text-muted-foreground text-sm">
