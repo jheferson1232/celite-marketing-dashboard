@@ -6,9 +6,10 @@ El asistente en Meta/TikTok y el historial de chats usan **PostgreSQL** vía Pri
 
 1. En [Vercel Dashboard](https://vercel.com) → tu proyecto → **Storage** → **Create Database** → **Neon**.
 2. Conecta la base al proyecto `celite-marketing-dashboard`.
-3. Vercel creará `DATABASE_URL` (y a veces `POSTGRES_URL`) en Environment Variables.
-   - Si Neon te da URL con `-pooler` en el host, el build usa automáticamente la URL directa para `prisma migrate deploy`.
-   - Opcional: añade `DIRECT_URL` con la conexión sin pooler (Neon → Connection string → **Direct**).
+3. Vercel creará `DATABASE_URL` (pooler) y `DATABASE_URL_UNPOOLED` (directa). El build prioriza la directa para `prisma migrate deploy`.
+   - Si solo tienes `DATABASE_URL` con `-pooler` en el host, se deriva la URL directa automáticamente.
+   - En **Settings → Environment Variables**, activa las variables para **Production**, **Preview** y **Build** (no solo Runtime).
+   - Opcional: `DIRECT_URL` o `POSTGRES_PRISMA_URL` si usas plantillas antiguas de Vercel Postgres.
 4. En tu máquina, con la URL de producción copiada:
 
    ```bash
