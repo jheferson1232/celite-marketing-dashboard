@@ -6,13 +6,10 @@ name: Meta Telegram hourly
 
 on:
   schedule:
-    # Cada hora en UTC (la app usa America/Lima para el texto y el cierre 23:00)
-    - cron: "0 * * * *"
+    # Cada hora en UTC. Minuto 17 (no :00): GitHub retrasa/descarta muchos crons en el
+    # inicio de hora por alta carga — ver docs.github.com/en/actions/.../schedule
+    - cron: "17 * * * *"
   workflow_dispatch:
-
-concurrency:
-  group: meta-telegram-hourly
-  cancel-in-progress: false
 
 jobs:
   trigger:

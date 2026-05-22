@@ -45,7 +45,9 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 
 ## Cron horario (GitHub Actions — recomendado en Hobby)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`0 * * * *` UTC).
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`17 * * * *` UTC, minuto 17 para evitar el pico de carga de GitHub al inicio de cada hora).
+
+> **Fiabilidad:** GitHub Actions **no garantiza** una ejecución exacta cada hora (puede haber huecos de varias horas). Si necesitas horario estricto, usa [cron-job.org](#alternativa-cron-joborg) contra el mismo endpoint.
 
 ### Configuración (una vez)
 
