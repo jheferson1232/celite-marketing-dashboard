@@ -31,7 +31,6 @@ import {
 import {
   computeInformeScore,
   finalizePointsTotal,
-  shouldNotifyOlvido,
   type InformeEstadoKind,
 } from "./meta-informe-scoring"
 import type { MetaAdSet } from "./types"
@@ -52,7 +51,7 @@ export type InformeEntityRow = {
   estadoKind: InformeEstadoKind
   estadoLabel: string
   notifyOlvido: boolean
-  rowHighlight: "none" | "red" | "orange"
+  rowHighlight: "none" | "red"
   dayCells: {
     date: string
     spend: number
@@ -126,7 +125,7 @@ export type StoredOperativeDay = OperativeSnapshot & {
   estadoKind: InformeEstadoKind
   estadoLabel: string
   notifyOlvido: boolean
-  rowHighlight: "none" | "red" | "orange"
+  rowHighlight: "none" | "red"
 }
 
 function saleStatusFromMetrics(
@@ -286,9 +285,7 @@ function buildDaySnapshot(
     spendToday: spend,
     purchasesToday: purchases,
     cpaToday: cpa,
-    metaWasActive,
     yesterdaySpend: prev.spend,
-    yesterdayMetaWasActive: prev.metaWasActive,
   })
   return {
     spend,
@@ -299,7 +296,7 @@ function buildDaySnapshot(
     points: score.points,
     estadoKind: score.estadoKind,
     estadoLabel: score.estadoLabel,
-    notifyOlvido: score.notifyOlvido,
+    notifyOlvido: false,
     rowHighlight: score.rowHighlight,
   }
 }
@@ -483,11 +480,6 @@ function buildInformeRow(
       emptyPrev
     )
 
-  const notifyOlvido = shouldNotifyOlvido(
-    pointsTotal,
-    todayDay.notifyOlvido
-  )
-
   return {
     entityId: entity.id,
     metaId: entity.metaId,
@@ -502,7 +494,7 @@ function buildInformeRow(
     pointsTotal,
     estadoKind: todayDay.estadoKind,
     estadoLabel: todayDay.estadoLabel,
-    notifyOlvido,
+    notifyOlvido: false,
     rowHighlight: todayDay.rowHighlight,
     dayCells,
   }
@@ -714,7 +706,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     allRows.push(campaignRow, ...adsets)
   }
 
-  const olvidoAlerts = allRows.filter((r) => r.notifyOlvido)
+  const olvidoAlerts: InformeEntityRow[] = []
   const sinVentasAlerts = allRows.filter((r) => r.estadoKind === "sin_ventas")
   const cpaAltoAlerts = allRows.filter((r) => r.estadoKind === "cpa_alto")
   const adsetsToPause = collectAdsetsToPause(groups)
@@ -750,35 +742,18 @@ export type OlvidoNotificationItem = {
 /** @deprecated Usar getOlvidoNotifications */
 export type ForgottenActivationItem = OlvidoNotificationItem
 
+/** @deprecated Regla de olvido eliminada; siempre vacío. */
 export function mapOlvidoNotificationsFromInforme(
-  informe: MetaInformePayload
+  _informe: MetaInformePayload
 ): OlvidoNotificationItem[] {
-  return informe.olvidoAlerts.map((row) => {
-    if (row.type === "campaign") {
-      return {
-        type: "campaign" as const,
-        name: row.name,
-        estadoLabel: row.estadoLabel,
-      }
-    }
-    const group = informe.groups.find((g) =>
-      g.adsets.some((a) => a.entityId === row.entityId)
-    )
-    return {
-      type: "adset" as const,
-      name: row.name,
-      campaignName: group?.campaign.name,
-      estadoLabel: row.estadoLabel,
-    }
-  })
+  return []
 }
 
+/** @deprecated Regla de olvido eliminada; siempre vacío. */
 export async function getOlvidoNotifications(
-  date = getDashboardToday()
+  _date = getDashboardToday()
 ): Promise<OlvidoNotificationItem[]> {
-  void date
-  const informe = await getMetaInformePayload()
-  return mapOlvidoNotificationsFromInforme(informe)
+  return []
 }
 
 export async function getForgottenActivations(

@@ -10,9 +10,7 @@ import { getAccountKpis } from "./account-kpis"
 import {
   formatCop,
   getMetaInformePayload,
-  mapOlvidoNotificationsFromInforme,
   type MetaInformePayload,
-  type OlvidoNotificationItem,
 } from "./meta-operative-service"
 import { generateHourlyOperativeCommentary } from "./meta-cron-commentary"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
@@ -28,7 +26,6 @@ export type MetaHourlyReportPayload = {
   campaigns: InformeCampaignSummary[]
   adsetsToPause: InformePauseItem[]
   campaignsToPause: InformePauseItem[]
-  olvido: OlvidoNotificationItem[]
 }
 
 /** Una sola sync de informe; opcionalmente reutiliza payload ya cargado. */
@@ -48,7 +45,6 @@ export async function buildMetaHourlyReportPayload(
     campaigns: buildInformeCampaignSummaries(informe.groups),
     adsetsToPause: collectAdsetsToPause(informe.groups),
     campaignsToPause: collectCampaignsToPause(informe.groups),
-    olvido: mapOlvidoNotificationsFromInforme(informe),
   }
 }
 

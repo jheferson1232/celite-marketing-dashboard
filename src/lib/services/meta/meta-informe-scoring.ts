@@ -11,7 +11,6 @@ export const INFORME_CPA_PENALTY_COP = 15_000
 
 export type InformeEstadoKind =
   | "ok"
-  | "olvido"
   | "sin_ventas"
   | "cpa_alto"
   | "gasto_alto_ayer"
@@ -21,40 +20,18 @@ export type InformeScoreInput = {
   spendToday: number
   purchasesToday: number
   cpaToday: number
-  metaWasActive: boolean
   yesterdaySpend?: number
-  yesterdayMetaWasActive?: boolean
 }
 
 export type InformeScoreResult = {
   points: number | null
   estadoKind: InformeEstadoKind
   estadoLabel: string
-  notifyOlvido: boolean
-  rowHighlight: "none" | "red" | "orange"
+  rowHighlight: "none" | "red"
 }
 
 export function computeInformeScore(input: InformeScoreInput): InformeScoreResult {
-  const {
-    spendToday,
-    purchasesToday,
-    cpaToday,
-    yesterdaySpend = 0,
-    yesterdayMetaWasActive = true,
-  } = input
-
-  const olvidoNextDay =
-    yesterdaySpend > 0 && yesterdayMetaWasActive === false
-
-  if (olvidoNextDay) {
-    return {
-      points: null,
-      estadoKind: "olvido",
-      estadoLabel: "⚠ Olvido — no activaste",
-      notifyOlvido: true,
-      rowHighlight: "orange",
-    }
-  }
+  const { spendToday, purchasesToday, cpaToday, yesterdaySpend = 0 } = input
 
   /** Ayer gastó ≥10k → hoy −1 (aunque hoy no gaste o venda bien). */
   if (yesterdaySpend >= INFORME_SPEND_PENALTY_COP) {
@@ -62,7 +39,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
       points: -1,
       estadoKind: "gasto_alto_ayer",
       estadoLabel: "Gasto alto ayer",
-      notifyOlvido: false,
       rowHighlight: "red",
     }
   }
@@ -72,7 +48,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
       points: null,
       estadoKind: "neutral",
       estadoLabel: "—",
-      notifyOlvido: false,
       rowHighlight: "none",
     }
   }
@@ -83,7 +58,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
         points: 0,
         estadoKind: "neutral",
         estadoLabel: "Sin ventas",
-        notifyOlvido: false,
         rowHighlight: "none",
       }
     }
@@ -92,7 +66,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
         points: -1,
         estadoKind: "sin_ventas",
         estadoLabel: "Sin ventas",
-        notifyOlvido: false,
         rowHighlight: "red",
       }
     }
@@ -100,7 +73,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
       points: 0,
       estadoKind: "sin_ventas",
       estadoLabel: "Sin ventas",
-      notifyOlvido: false,
       rowHighlight: "red",
     }
   }
@@ -110,7 +82,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
       points: -1,
       estadoKind: "cpa_alto",
       estadoLabel: "CPA alto",
-      notifyOlvido: false,
       rowHighlight: "red",
     }
   }
@@ -120,7 +91,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
       points: 1,
       estadoKind: "ok",
       estadoLabel: "OK",
-      notifyOlvido: false,
       rowHighlight: "none",
     }
   }
@@ -129,7 +99,6 @@ export function computeInformeScore(input: InformeScoreInput): InformeScoreResul
     points: 0,
     estadoKind: "ok",
     estadoLabel: "OK",
-    notifyOlvido: false,
     rowHighlight: "none",
   }
 }
@@ -147,14 +116,4 @@ export function formatInformePoints(points: number | null): string {
   if (points === null) return "—"
   if (points > 0) return `+${points}`
   return String(points)
-}
-
-/** Acumulado ≤ −3: no merece activar → sin alertas Telegram. */
-export function shouldNotifyOlvido(
-  pointsTotal: number,
-  rawNotify: boolean,
-  cutoff = -3
-): boolean {
-  if (!rawNotify) return false
-  return pointsTotal > cutoff
 }

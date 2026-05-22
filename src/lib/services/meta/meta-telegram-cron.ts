@@ -6,11 +6,7 @@ import {
 import { getAllowedTelegramUserIds } from "@/lib/telegram/config"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
 import { getAccountKpis } from "./account-kpis"
-import {
-  formatCop,
-  getMetaInformePayload,
-  getOlvidoNotifications,
-} from "./meta-operative-service"
+import { formatCop, getMetaInformePayload } from "./meta-operative-service"
 import { generateNightlyCommentary } from "./meta-cron-commentary"
 import { sendMetaHourlyReportToTelegram } from "./meta-hourly-report"
 
@@ -96,8 +92,6 @@ export async function runMetaNightlyReport(): Promise<{
     }
   }
 
-  const olvido = await getOlvidoNotifications()
-
   const mapRowWithCampaign = (row: (typeof informe.sinVentasAlerts)[0]) => ({
     name: row.name,
     campaignName:
@@ -114,7 +108,6 @@ export async function runMetaNightlyReport(): Promise<{
   const cpaAlto = informe.cpaAltoAlerts.map(mapRowWithCampaign)
 
   const message = await generateNightlyCommentary({
-    olvido,
     sinVentas,
     cpaAlto,
     accountSpend: kpis.totalSpend,

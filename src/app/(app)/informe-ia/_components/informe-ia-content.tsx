@@ -37,7 +37,6 @@ import type {
   InformeEntityRow,
   InformeTableTotals,
 } from "@/lib/services/meta/meta-operative-service"
-import { formatInformePoints } from "@/lib/services/meta/meta-informe-scoring"
 import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
   getMetaInformeAction,
@@ -51,9 +50,11 @@ function formatDayLabel(date: string): string {
   return `${d}/${m}`
 }
 
-function formatDayHeader(date: string, yesterday: string): string {
-  if (date === yesterday) return "Ayer"
-  return formatDayLabel(date)
+/** Fecha completa para columnas ayer/hoy (ej. 21/05/2026). */
+function formatInformeDate(date: string): string {
+  const [y, m, d] = date.split("-")
+  if (!y || !m || !d) return date
+  return `${d}/${m}/${y}`
 }
 
 function PauseAlertsBanner({
@@ -103,106 +104,167 @@ function PauseAlertsBanner({
   )
 }
 
-function rowHighlightClass(highlight: InformeEntityRow["rowHighlight"]): string {
-  if (highlight === "red") return "bg-red-50/80 dark:bg-red-500/10"
-  if (highlight === "orange") return "bg-orange-50/80 dark:bg-orange-500/10"
-  return ""
+type PeriodMetrics = {
+  spend: number
+  purchases: number
+  cpa: number
 }
 
-function DayCell({ cell }: { cell: InformeEntityRow["dayCells"][0] }) {
-  return (
-    <div
-      className={cn(
-        "rounded-md px-1.5 py-1 text-center text-xs",
-        cell.saleStatus === "green" &&
-          "bg-green-50 text-green-800 dark:bg-green-500/15 dark:text-green-400",
-        cell.saleStatus === "red" &&
-          "bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-400",
-        cell.saleStatus === "neutral" && "bg-muted/40 text-muted-foreground"
-      )}
-      title={`${cell.date}: ${formatCurrency(cell.spend, META_DASHBOARD_CURRENCY)}, ${cell.purchases} compras, pts ${formatInformePoints(cell.points)}`}
-    >
-      <div className="font-medium tabular-nums">
-        {formatInformePoints(cell.points)}
-      </div>
-      <div className="text-muted-foreground">
-        {cell.purchases > 0 ? `${cell.purchases}v` : "—"}
-      </div>
-    </div>
-  )
-}
-
-function getDisplayMetrics(row: InformeEntityRow, yesterday: string) {
-  const hasToday = row.spendToday > 0 || row.purchasesToday > 0
-  if (hasToday) {
-    return {
-      spend: row.spendToday,
-      purchases: row.purchasesToday,
-      cpa: row.cpaToday,
-      period: "hoy" as const,
-    }
-  }
-
+function getYesterdayMetrics(
+  row: InformeEntityRow,
+  yesterday: string
+): PeriodMetrics {
   const yCell = row.dayCells.find((d) => d.date === yesterday)
-  if (yCell && (yCell.spend > 0 || yCell.purchases > 0)) {
-    return {
-      spend: yCell.spend,
-      purchases: yCell.purchases,
-      cpa: yCell.purchases > 0 ? yCell.spend / yCell.purchases : 0,
-      period: "ayer" as const,
-    }
+  const spend = yCell?.spend ?? 0
+  const purchases = yCell?.purchases ?? 0
+  return {
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : 0,
   }
+}
 
-  return { spend: 0, purchases: 0, cpa: 0, period: null }
+function getTodayMetrics(row: InformeEntityRow): PeriodMetrics {
+  return {
+    spend: row.spendToday,
+    purchases: row.purchasesToday,
+    cpa: row.cpaToday,
+  }
+}
+
+function getDayTotalsMetrics(
+  totals: InformeTableTotals,
+  date: string
+): PeriodMetrics {
+  const day = totals.dayTotals.find((d) => d.date === date)
+  const spend = day?.spend ?? 0
+  const purchases = day?.purchases ?? 0
+  return {
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : 0,
+  }
+}
+
+function PeriodMetricsCells({
+  metrics,
+  periodLabel,
+  highlightCpa = true,
+}: {
+  metrics: PeriodMetrics
+  periodLabel: string
+  /** En fila total no colorear CPA (evita celdas rojas/naranjas confusas). */
+  highlightCpa?: boolean
+}) {
+  const cpaHighlight = highlightCpa
+    ? getCostPerResultCellClassName(metrics.cpa, META_DASHBOARD_CURRENCY)
+    : ""
+
+  return (
+    <>
+      <TableCell
+        className="text-right tabular-nums"
+        title={`Gasto ${periodLabel}`}
+      >
+        {metrics.spend > 0
+          ? formatCurrency(metrics.spend, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+      <TableCell
+        className="text-right tabular-nums"
+        title={`Compras ${periodLabel}`}
+      >
+        {metrics.purchases > 0 ? formatNumber(metrics.purchases) : "—"}
+      </TableCell>
+      <TableCell
+        className={cn("text-right tabular-nums", cpaHighlight)}
+        title={`CPA ${periodLabel}`}
+      >
+        {metrics.cpa > 0
+          ? formatCurrency(metrics.cpa, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+    </>
+  )
 }
 
 function MetricsCells({
   row,
   yesterday,
+  today,
 }: {
   row: InformeEntityRow
   yesterday: string
+  today: string
 }) {
-  const m = getDisplayMetrics(row, yesterday)
-  const cpaHighlight = getCostPerResultCellClassName(
-    m.cpa,
-    META_DASHBOARD_CURRENCY
-  )
-  const periodHint =
-    m.period === "ayer"
-      ? " (ayer)"
-      : m.period === "hoy"
-        ? " (hoy)"
-        : ""
-
   return (
     <>
-      <TableCell className="text-right tabular-nums" title={`Gasto${periodHint}`}>
-        <div>
-          {m.spend > 0
-            ? formatCurrency(m.spend, META_DASHBOARD_CURRENCY)
-            : "—"}
-        </div>
-        {m.period === "ayer" ? (
-          <div className="text-muted-foreground text-[10px] font-normal">
-            ayer
-          </div>
-        ) : null}
-      </TableCell>
-      <TableCell
-        className="text-right tabular-nums"
-        title={`Compras${periodHint}`}
-      >
-        {m.purchases > 0 ? formatNumber(m.purchases) : "—"}
-      </TableCell>
-      <TableCell
-        className={cn("text-right tabular-nums", cpaHighlight)}
-        title={`CPA${periodHint}`}
-      >
-        {m.cpa > 0 ? formatCurrency(m.cpa, META_DASHBOARD_CURRENCY) : "—"}
-      </TableCell>
+      <PeriodMetricsCells
+        metrics={getYesterdayMetrics(row, yesterday)}
+        periodLabel={formatInformeDate(yesterday)}
+      />
+      <PeriodMetricsCells
+        metrics={getTodayMetrics(row)}
+        periodLabel={formatInformeDate(today)}
+      />
     </>
   )
+}
+
+function InformeAccountSummary({
+  totals,
+  yesterday,
+  today,
+  informeStartDate,
+  dateRange,
+}: {
+  totals: InformeTableTotals
+  yesterday: string
+  today: string
+  informeStartDate: string
+  dateRange: { from: string; to: string }
+}) {
+  const ayer = getDayTotalsMetrics(totals, yesterday)
+  const hoy = getTodayMetricsFromTotals(totals)
+
+  return (
+    <div className="text-muted-foreground flex flex-col gap-1 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6">
+      <p>
+        <strong className="text-foreground font-medium">
+          {formatInformeDate(yesterday)}:
+        </strong>{" "}
+        gasto {formatCurrency(ayer.spend, META_DASHBOARD_CURRENCY)} ·{" "}
+        {formatNumber(ayer.purchases)} compras
+        {ayer.cpa > 0
+          ? ` · CPA ${formatCurrency(ayer.cpa, META_DASHBOARD_CURRENCY)}`
+          : ""}
+      </p>
+      <p>
+        <strong className="text-foreground font-medium">
+          {formatInformeDate(today)}:
+        </strong>{" "}
+        gasto {formatCurrency(hoy.spend, META_DASHBOARD_CURRENCY)} ·{" "}
+        {formatNumber(hoy.purchases)} compras
+        {hoy.cpa > 0
+          ? ` · CPA ${formatCurrency(hoy.cpa, META_DASHBOARD_CURRENCY)}`
+          : ""}
+      </p>
+      <p className="text-xs sm:basis-full">
+        Informe desde {formatDayLabel(informeStartDate)}
+        {dateRange.from !== dateRange.to
+          ? ` · historial ${formatDayLabel(dateRange.from)} → ${formatDayLabel(dateRange.to)}`
+          : ""}
+      </p>
+    </div>
+  )
+}
+
+function getTodayMetricsFromTotals(totals: InformeTableTotals): PeriodMetrics {
+  return {
+    spend: totals.spendToday,
+    purchases: totals.purchasesToday,
+    cpa: totals.cpaToday,
+  }
 }
 
 function AdsetCountCells({
@@ -245,8 +307,8 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
           className={cn(
             "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
             row.metaWasActive
-              ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
-              : "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400"
+              ? "bg-green-100 text-green-800 dark:bg-green-500/25 dark:text-green-300"
+              : "bg-red-100 text-red-800 dark:bg-red-500/25 dark:text-red-300"
           )}
         >
           {row.metaWasActive ? "ON" : "OFF"}
@@ -256,22 +318,10 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
         className={cn(
           "min-w-[140px] text-center text-xs",
           row.rowHighlight === "red" &&
-            "font-medium text-red-600 dark:text-red-400",
-          row.rowHighlight === "orange" &&
-            "font-medium text-orange-600 dark:text-orange-400"
+            "font-medium text-red-600 dark:text-red-400"
         )}
       >
         {row.estadoLabel}
-      </TableCell>
-      <TableCell
-        className={cn(
-          "w-[56px] text-center tabular-nums text-sm font-medium",
-          row.pointsTotal > 0 && "text-green-600 dark:text-green-400",
-          row.pointsTotal < 0 && "text-red-600 dark:text-red-400"
-        )}
-        title="Suma del rango (máximo −1 por fila)"
-      >
-        {formatInformePoints(row.pointsTotal)}
       </TableCell>
     </>
   )
@@ -280,6 +330,7 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
 function EntityRow({
   row,
   yesterday,
+  today,
   indent,
   leadingCell,
   adSetsCount,
@@ -287,13 +338,14 @@ function EntityRow({
 }: {
   row: InformeEntityRow
   yesterday: string
+  today: string
   indent?: boolean
   leadingCell?: React.ReactNode
   adSetsCount?: number
   activeAdSetsCount?: number
 }) {
   return (
-    <TableRow className={cn(rowHighlightClass(row.rowHighlight), indent && "bg-muted/20")}>
+    <TableRow className={cn(indent && "bg-muted/20")}>
       <TableCell className={cn("max-w-[260px]", indent && "pl-10")}>
         <div className="flex items-center gap-2">
           {leadingCell}
@@ -310,12 +362,7 @@ function EntityRow({
         adSetsCount={adSetsCount}
         activeAdSetsCount={activeAdSetsCount}
       />
-      <MetricsCells row={row} yesterday={yesterday} />
-      {row.dayCells.map((cell) => (
-        <TableCell key={cell.date} className="w-[52px] p-1">
-          <DayCell cell={cell} />
-        </TableCell>
-      ))}
+      <MetricsCells row={row} yesterday={yesterday} today={today} />
     </TableRow>
   )
 }
@@ -325,11 +372,13 @@ function CampaignGroupRows({
   isExpanded,
   onToggleExpand,
   yesterday,
+  today,
 }: {
   group: InformeCampaignGroup
   isExpanded: boolean
   onToggleExpand: () => void
   yesterday: string
+  today: string
 }) {
   const adsetCount = group.adsets.length
 
@@ -338,6 +387,7 @@ function CampaignGroupRows({
       <EntityRow
         row={group.campaign}
         yesterday={yesterday}
+        today={today}
         adSetsCount={group.adSetsCount}
         activeAdSetsCount={group.activeAdSetsCount}
         leadingCell={
@@ -380,6 +430,7 @@ function CampaignGroupRows({
               key={adset.entityId}
               row={adset}
               yesterday={yesterday}
+              today={today}
               indent
             />
           ))
@@ -391,76 +442,43 @@ function CampaignGroupRows({
 function InformeTotalsRow({
   totals,
   yesterday,
-  dayHeaders,
+  today,
 }: {
   totals: InformeTableTotals
   yesterday: string
-  dayHeaders: string[]
+  today: string
 }) {
-  const dayByDate = new Map(totals.dayTotals.map((d) => [d.date, d]))
-  const yDay = dayByDate.get(yesterday)
-  const hasToday =
-    totals.spendToday > 0 || totals.purchasesToday > 0
-  const spend = hasToday ? totals.spendToday : (yDay?.spend ?? 0)
-  const purchases = hasToday
-    ? totals.purchasesToday
-    : (yDay?.purchases ?? 0)
-  const cpa = purchases > 0 ? spend / purchases : 0
-  const cpaHighlight = getCostPerResultCellClassName(
-    cpa,
-    META_DASHBOARD_CURRENCY
-  )
+  const ayer = getDayTotalsMetrics(totals, yesterday)
+  const hoy = getTodayMetricsFromTotals(totals)
 
   return (
     <TableRow className="bg-muted/60 border-t-2 font-semibold">
-      <TableCell>Total (conjuntos)</TableCell>
-      <TableCell />
-      <TableCell />
-      <TableCell />
-      <TableCell />
-      <TableCell
-        className={cn(
-          "text-center tabular-nums",
-          totals.pointsTotal > 0 && "text-green-600 dark:text-green-400",
-          totals.pointsTotal < 0 && "text-red-600 dark:text-red-400"
-        )}
-        title="Suma de puntos solo conjuntos"
-      >
-        {formatInformePoints(totals.pointsTotal)}
+      <TableCell colSpan={5} className="text-left">
+        Total (conjuntos)
       </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {spend > 0 ? formatCurrency(spend, META_DASHBOARD_CURRENCY) : "—"}
-      </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {purchases > 0 ? formatNumber(purchases) : "—"}
-      </TableCell>
-      <TableCell className={cn("text-right tabular-nums", cpaHighlight)}>
-        {cpa > 0 ? formatCurrency(cpa, META_DASHBOARD_CURRENCY) : "—"}
-      </TableCell>
-      {dayHeaders.map((date) => {
-        const day = dayByDate.get(date)
-        return (
-          <TableCell key={date} className="p-1 text-center text-xs tabular-nums">
-            <div>{formatInformePoints(day?.points ?? 0)}</div>
-            <div className="text-muted-foreground font-normal">
-              {formatDayHeader(date, yesterday)}
-            </div>
-          </TableCell>
-        )
-      })}
+      <PeriodMetricsCells
+        metrics={ayer}
+        periodLabel={formatInformeDate(yesterday)}
+        highlightCpa={false}
+      />
+      <PeriodMetricsCells
+        metrics={hoy}
+        periodLabel={formatInformeDate(today)}
+        highlightCpa={false}
+      />
     </TableRow>
   )
 }
 
 function InformeTable({
   groups,
-  dayHeaders,
   yesterday,
+  today,
   totals,
 }: {
   groups: InformeCampaignGroup[]
-  dayHeaders: string[]
   yesterday: string
+  today: string
   totals: InformeTableTotals
 }) {
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
@@ -483,26 +501,45 @@ function InformeTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="min-w-[220px]">Nombre</TableHead>
-          <TableHead className="text-center">Meta</TableHead>
-          <TableHead className="text-center">Estado</TableHead>
-          <TableHead className="text-center">Puntos</TableHead>
-          <TableHead className="text-center">Conjuntos</TableHead>
-          <TableHead className="text-center">Conj. activos</TableHead>
-          <TableHead className="text-right" title="Hoy; si no hay gasto, muestra ayer">
-            Gasto
+          <TableHead className="min-w-[220px]" rowSpan={2}>
+            Nombre
           </TableHead>
-          <TableHead className="text-right" title="Hoy; si no hay ventas, muestra ayer">
+          <TableHead className="text-center" rowSpan={2}>
+            Meta
+          </TableHead>
+          <TableHead className="text-center" rowSpan={2}>
+            Estado
+          </TableHead>
+          <TableHead className="text-center" rowSpan={2}>
+            Conjuntos
+          </TableHead>
+          <TableHead className="text-center" rowSpan={2}>
+            Conj. activos
+          </TableHead>
+          <TableHead
+            colSpan={3}
+            className="border-border bg-muted/40 text-center text-xs font-semibold tabular-nums"
+          >
+            {formatInformeDate(yesterday)}
+          </TableHead>
+          <TableHead
+            colSpan={3}
+            className="border-border bg-muted/20 text-center text-xs font-semibold tabular-nums"
+          >
+            {formatInformeDate(today)}
+          </TableHead>
+        </TableRow>
+        <TableRow>
+          <TableHead className="bg-muted/40 text-right text-xs">Gasto</TableHead>
+          <TableHead className="bg-muted/40 text-right text-xs">
             Compras
           </TableHead>
-          <TableHead className="text-right" title="Hoy; si no hay ventas, muestra ayer">
-            CPA
+          <TableHead className="bg-muted/40 text-right text-xs">CPA</TableHead>
+          <TableHead className="bg-muted/20 text-right text-xs">Gasto</TableHead>
+          <TableHead className="bg-muted/20 text-right text-xs">
+            Compras
           </TableHead>
-          {dayHeaders.map((date) => (
-            <TableHead key={date} className="p-1 text-center text-xs">
-              {formatDayHeader(date, yesterday)}
-            </TableHead>
-          ))}
+          <TableHead className="bg-muted/20 text-right text-xs">CPA</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -513,6 +550,7 @@ function InformeTable({
             isExpanded={expandedCampaignIds.has(group.campaign.metaId)}
             onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
             yesterday={yesterday}
+            today={today}
           />
         ))}
       </TableBody>
@@ -520,7 +558,7 @@ function InformeTable({
         <InformeTotalsRow
           totals={totals}
           yesterday={yesterday}
-          dayHeaders={dayHeaders}
+          today={today}
         />
       </TableFooter>
     </Table>
@@ -593,7 +631,6 @@ export function InformeIaContent() {
       : null
 
   const data = informeQuery.data
-  const dayHeaders = data?.groups[0]?.campaign.dayCells.map((d) => d.date) ?? []
   const pending = syncMutation.isPending
 
   const metaApiStatus = useMemo(
@@ -623,11 +660,6 @@ export function InformeIaContent() {
       hourlyError,
     ]
   )
-
-  const accountCpa =
-    data && data.accountPurchasesToday > 0
-      ? data.accountSpendToday / data.accountPurchasesToday
-      : 0
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
@@ -715,22 +747,6 @@ export function InformeIaContent() {
         </div>
       ) : null}
 
-      {data && data.olvidoAlerts.length > 0 ? (
-        <div className="flex gap-2 rounded-lg border border-orange-200 bg-orange-50/80 px-4 py-3 text-sm dark:border-orange-500/30 dark:bg-orange-500/10">
-          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-orange-600" />
-          <div>
-            <p className="font-medium text-orange-800 dark:text-orange-300">
-              {data.olvidoAlerts.length} olvido
-              {data.olvidoAlerts.length === 1 ? "" : "s"} — no activaste ayer
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Ayer hubo gasto pero Meta estaba apagado. Enciéndelos en Ads
-              Manager. Con ≤ −3 puntos acumulados no se envían avisos.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {data && data.sinVentasAlerts.length > 0 ? (
         <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
           <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
@@ -788,36 +804,32 @@ export function InformeIaContent() {
         </div>
       ) : data && data.groups.length === 0 ? (
         <>
-          <p className="text-muted-foreground text-sm">
-            Hoy: gasto{" "}
-            {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)} ·{" "}
-            {data.accountPurchasesToday} compras. Ninguna campaña con gasto hoy
-            en Meta (o aún no sincronizó).
-          </p>
+          <InformeAccountSummary
+            totals={data.totals}
+            yesterday={data.yesterday}
+            today={data.date}
+            informeStartDate={data.informeStartDate}
+            dateRange={data.dateRange}
+          />
           <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-8 text-center text-sm">
-            Cuando una campaña o conjunto gaste hoy, aparecerá aquí con puntos
-            y estado automático.
+            Ninguna campaña con gasto hoy en Meta (o aún no sincronizó). Cuando
+            una campaña o conjunto gaste, aparecerá aquí con puntos y estado.
           </p>
         </>
       ) : data ? (
         <>
-          <p className="text-muted-foreground text-sm">
-            Hoy: gasto{" "}
-            {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)} ·{" "}
-            {formatNumber(data.accountPurchasesToday)} compras
-            {accountCpa > 0
-              ? ` · CPA ${formatCurrency(accountCpa, META_DASHBOARD_CURRENCY)}`
-              : ""}{" "}
-            · Informe desde {formatDayLabel(data.informeStartDate)}
-            {data.dateRange.from !== data.dateRange.to
-              ? ` (${formatDayLabel(data.dateRange.from)} → ${formatDayLabel(data.dateRange.to)})`
-              : " (solo hoy)"}
-          </p>
+          <InformeAccountSummary
+            totals={data.totals}
+            yesterday={data.yesterday}
+            today={data.date}
+            informeStartDate={data.informeStartDate}
+            dateRange={data.dateRange}
+          />
           <div className="min-w-0 overflow-x-auto rounded-lg border">
             <InformeTable
               groups={data.groups}
-              dayHeaders={dayHeaders}
               yesterday={data.yesterday}
+              today={data.date}
               totals={data.totals}
             />
           </div>

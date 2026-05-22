@@ -25,7 +25,6 @@ async function main() {
     campaigns: payload.campaigns.length,
     adsetsToPause: payload.adsetsToPause.length,
     campaignsToPause: payload.campaignsToPause.length,
-    olvido: payload.olvido.length,
   })
 
   console.log("\n--- Mensaje Telegram ---\n")

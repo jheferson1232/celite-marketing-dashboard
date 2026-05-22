@@ -4,9 +4,6 @@ import {
   getDashboardYesterday,
 } from "@/lib/date"
 
-/** No notificar olvidos si el acumulado de puntos es ≤ este valor. */
-export const INFORME_NOTIFY_POINTS_CUTOFF = -3
-
 /**
  * Historial desde ayer (Lima) hacia adelante.
  * META_INFORME_START_DATE solo puede retrasar el arranque, nunca ir antes de ayer.

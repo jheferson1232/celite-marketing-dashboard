@@ -1,7 +1,6 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
 import type { MetaHourlyReportPayload } from "./meta-hourly-report"
-import type { OlvidoNotificationItem } from "./meta-operative-service"
 
 export async function generateHourlyOperativeCommentary(
   payload: MetaHourlyReportPayload
@@ -14,7 +13,7 @@ export async function generateHourlyOperativeCommentary(
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
       system: `Asistente operativo Meta Ads (Colombia, COP, español).
-Resumen horario para Telegram: campañas activas hoy, qué conjuntos APAGAR (gasto ≥10k sin compras), qué campañas APAGAR (gasto ≥30k sin compras), olvidos de activación si hay.
+Resumen horario para Telegram: campañas activas hoy, qué conjuntos APAGAR (gasto ≥10k sin compras), qué campañas APAGAR (gasto ≥30k sin compras).
 Sé directo: lista qué apagar y por qué. Máximo 14 líneas. **negrita** en nombres.`,
       prompt: JSON.stringify(payload, null, 2),
     })
@@ -25,38 +24,7 @@ Sé directo: lista qué apagar y por qué. Máximo 14 líneas. **negrita** en no
   }
 }
 
-export async function generateActivationReminderCommentary(
-  olvido: OlvidoNotificationItem[],
-  hour: number
-): Promise<string> {
-  if (olvido.length === 0) {
-    return `✅ **Meta ${hour}:00** — No hay olvidos de activación (ayer gastó y hoy Meta sigue coherente).`
-  }
-
-  if (!process.env.OPENAI_API_KEY?.trim()) {
-    return buildTemplateReminder(olvido, hour)
-  }
-
-  try {
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
-      system: `Eres un asistente operativo de Meta Ads en español (Colombia, COP).
-Recuerdas campañas/conjuntos donde AYER hubo gasto pero Meta estaba APAGADO (olvido de activación).
-No recomiendas apagar por mal rendimiento. Máximo 8 líneas. Usa **negrita** para nombres.`,
-      prompt: `Hora ${hour}:00 (Lima). Ayer gastaron pero Meta estaba OFF — el operador no activó a tiempo:
-${JSON.stringify(olvido, null, 2)}
-
-Escribe un recordatorio breve para Telegram. Empieza con emoji de alerta.`,
-    })
-    return text.trim() || buildTemplateReminder(olvido, hour)
-  } catch (error) {
-    console.error("Meta cron OpenAI:", error)
-    return buildTemplateReminder(olvido, hour)
-  }
-}
-
 export async function generateNightlyCommentary(payload: {
-  olvido: OlvidoNotificationItem[]
   sinVentas: {
     name: string
     campaignName?: string
@@ -80,8 +48,8 @@ export async function generateNightlyCommentary(payload: {
   try {
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: `Asistente Meta Ads (COP, español). Cierre del día: gasto, ventas, conjuntos que vendieron, olvidos de activación (ayer gastó + Meta OFF), gasto alto sin ventas (−1 punto).
-Sugiere qué reactivar mañana si aplica. No ejecutes cambios. Máximo 12 líneas.`,
+      system: `Asistente Meta Ads (COP, español). Cierre del día: gasto, ventas, conjuntos que vendieron, gasto alto sin ventas, CPA alto.
+Sugiere qué revisar mañana si aplica. No ejecutes cambios. Máximo 12 líneas.`,
       prompt: JSON.stringify(payload, null, 2),
     })
     return text.trim() || buildTemplateNightly(payload)
@@ -123,42 +91,14 @@ function buildTemplateHourly(payload: MetaHourlyReportPayload): string {
           .join("\n")
       : "• Ninguna"
 
-  const olvido =
-    payload.olvido.length > 0
-      ? payload.olvido
-          .map((o) =>
-            o.type === "campaign"
-              ? `• Campaña **${o.name}**`
-              : `• **${o.name}** (${o.campaignName || "—"})`
-          )
-          .join("\n")
-      : "• Ninguno"
-
   return (
     `**Campañas hoy:**\n${campañas}\n\n` +
     `🔴 **Conjuntos a apagar** (≥10k sin ventas):\n${conjuntos}\n\n` +
-    `🔴 **Campañas a apagar** (≥30k sin ventas):\n${campañasApagar}\n\n` +
-    `⚠️ **Olvido activación:**\n${olvido}`
-  )
-}
-
-function buildTemplateReminder(
-  olvido: OlvidoNotificationItem[],
-  hour: number
-): string {
-  const lines = olvido.map((f) => {
-    if (f.type === "campaign") return `• Campaña **${f.name}**`
-    return `• Conjunto **${f.name}** (${f.campaignName || "sin campaña"})`
-  })
-  return (
-    `⚠️ **Meta ${hour}:00** — Ayer gastaron pero no activaste en Meta:\n\n` +
-    lines.join("\n") +
-    `\n\nEnciéndelos en Ads Manager.`
+    `🔴 **Campañas a apagar** (≥30k sin ventas):\n${campañasApagar}`
   )
 }
 
 function buildTemplateNightly(payload: {
-  olvido: OlvidoNotificationItem[]
   sinVentas: {
     name: string
     campaignName?: string
@@ -185,17 +125,6 @@ function buildTemplateNightly(payload: {
           )
           .join("\n")
       : "• Ningún conjunto con compras hoy"
-
-  const olvidoLines =
-    payload.olvido.length > 0
-      ? payload.olvido
-          .map((f) =>
-            f.type === "campaign"
-              ? `• Campaña **${f.name}**`
-              : `• **${f.name}** (${f.campaignName || "—"})`
-          )
-          .join("\n")
-      : "• Ninguno"
 
   const sinVentasLines =
     payload.sinVentas.length > 0
@@ -224,8 +153,7 @@ function buildTemplateNightly(payload: {
     `💰 Gasto hoy: ${payload.accountSpend.toLocaleString("es-CO")} COP · ` +
     `${payload.accountPurchases} compras\n\n` +
     `✅ Vendieron (conjuntos):\n${sold}\n\n` +
-    `⚠️ Olvido activación (ayer gastó, Meta OFF):\n${olvidoLines}\n\n` +
-    `🔴 Gasto alto sin ventas (−1):\n${sinVentasLines}\n\n` +
-    `🔴 CPA > 15k (−1):\n${cpaAltoLines}`
+    `🔴 Gasto alto sin ventas:\n${sinVentasLines}\n\n` +
+    `🔴 CPA > 15k:\n${cpaAltoLines}`
   )
 }

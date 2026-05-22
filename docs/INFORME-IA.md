@@ -7,7 +7,7 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
 3. **Cron** — Cada hora (GitHub Actions → `/api/cron/meta-telegram-reports`): resumen + sugerencias de apagar conjuntos/campañas sin ventas.
-4. **Cierre 23:00** (America/Lima) — Informe nocturno adicional con olvidos, sin ventas y CPA alto.
+4. **Cierre 23:00** (America/Lima) — Informe nocturno adicional con sin ventas y CPA alto.
 
 OpenAI (`gpt-4o-mini`) solo redacta el texto de Telegram si existe `OPENAI_API_KEY`; los puntos y umbrales son reglas fijas en código.
 
@@ -94,7 +94,15 @@ curl -s -H "Authorization: Bearer $CRON_SECRET" \
 - **0** — CPA intermedio o sin datos relevantes.
 - **−1** — Sin ventas con gasto ≥ 10k, o CPA &gt; 15k con ventas.
 - Columna **Puntos** — Suma ayer+hoy con tope **−1** por fila.
-- **Olvido** — Ayer hubo gasto y Meta estaba apagado; no notifica si puntos totales ≤ −3.
+## Estados en tabla (columna Estado)
+
+Evaluación del día (prioridad de arriba a abajo):
+
+- **Gasto alto ayer** — Ayer gastó ≥ 10k COP.
+- **—** — Hoy sin gasto.
+- **Sin ventas** — Hoy con gasto y 0 compras (rojo si gasto ≥ 10k o entre 5k–10k).
+- **CPA alto** — Hoy con ventas y CPA &gt; 15k COP.
+- **OK** — Hoy con ventas y CPA aceptable (+1 si CPA &lt; 10k).
 
 ## Sugerencias de apagar (Telegram)
 
