@@ -106,6 +106,8 @@ Evaluación del día (prioridad de arriba a abajo):
 
 ## Sugerencias de apagar (Telegram)
 
+Solo entidades **activas en Meta (ON)**; si ya están apagadas no se repiten en el mensaje.
+
 - **Conjunto** — Gasto hoy ≥ 10k COP y 0 compras.
 - **Campaña** — Gasto hoy ≥ 30k COP y 0 compras.
 

@@ -95,9 +95,9 @@ export type MetaInformePayload = {
   sinVentasAlerts: InformeEntityRow[]
   /** CPA &gt; 15k con ventas (−1). */
   cpaAltoAlerts: InformeEntityRow[]
-  /** Conjunto ≥10k COP hoy sin compras (Telegram: apagar). */
+  /** Conjunto ON ≥10k COP hoy sin compras (Telegram: apagar). */
   adsetsToPause: InformePauseItem[]
-  /** Campaña ≥30k COP hoy sin compras (Telegram: apagar). */
+  /** Campaña ON ≥30k COP hoy sin compras (Telegram: apagar). */
   campaignsToPause: InformePauseItem[]
   yesterday: string
   totals: InformeTableTotals

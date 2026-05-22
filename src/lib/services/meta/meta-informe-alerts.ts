@@ -16,6 +16,7 @@ export type InformeCampaignGroupForAlerts = {
     name: string
     spendToday: number
     purchasesToday: number
+    metaWasActive: boolean
   }[]
 }
 
@@ -44,7 +45,11 @@ export function collectAdsetsToPause(
     for (const adset of group.adsets) {
       const spend = adset.spendToday
       const purchases = adset.purchasesToday
-      if (spend >= INFORME_ADSET_APAGAR_SPEND_COP && purchases === 0) {
+      if (
+        adset.metaWasActive &&
+        spend >= INFORME_ADSET_APAGAR_SPEND_COP &&
+        purchases === 0
+      ) {
         items.push({
           type: "adset",
           name: adset.name,
@@ -65,7 +70,11 @@ export function collectCampaignsToPause(
   for (const group of groups) {
     const spend = group.campaign.spendToday
     const purchases = group.campaign.purchasesToday
-    if (spend >= INFORME_CAMPAIGN_APAGAR_SPEND_COP && purchases === 0) {
+    if (
+      group.campaign.metaWasActive &&
+      spend >= INFORME_CAMPAIGN_APAGAR_SPEND_COP &&
+      purchases === 0
+    ) {
       items.push({
         type: "campaign",
         name: group.campaign.name,

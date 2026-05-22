@@ -13,8 +13,8 @@ export async function generateHourlyOperativeCommentary(
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
       system: `Asistente operativo Meta Ads (Colombia, COP, español).
-Resumen horario para Telegram: campañas activas hoy, qué conjuntos APAGAR (gasto ≥10k sin compras), qué campañas APAGAR (gasto ≥30k sin compras).
-Sé directo: lista qué apagar y por qué. Máximo 14 líneas. **negrita** en nombres.`,
+Resumen horario para Telegram: campañas activas hoy, qué conjuntos APAGAR (solo si están ON en Meta: gasto ≥10k sin compras), qué campañas APAGAR (solo ON: gasto ≥30k sin compras).
+No sugieras apagar campañas/conjuntos que ya están OFF. Máximo 14 líneas. **negrita** en nombres.`,
       prompt: JSON.stringify(payload, null, 2),
     })
     return text.trim() || buildTemplateHourly(payload)
