@@ -1,4 +1,5 @@
-import { Suspense, type ReactNode } from "react"
+import { Suspense } from "react"
+import { AppPageScrollShell } from "@/components/app-page-scroll-shell"
 import { Skeleton } from "@/components/ui/skeleton"
 import { InformeIaContent } from "./_components/informe-ia-content"
 
@@ -9,19 +10,9 @@ export const metadata = {
   description: "Checklist de activación Meta (desde hoy) y ventas por día",
 }
 
-function InformeIaScrollShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden">
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain">
-        {children}
-      </div>
-    </div>
-  )
-}
-
 export default function InformeIaPage() {
   return (
-    <InformeIaScrollShell>
+    <AppPageScrollShell>
       <Suspense
         fallback={
           <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
@@ -32,6 +23,6 @@ export default function InformeIaPage() {
       >
         <InformeIaContent />
       </Suspense>
-    </InformeIaScrollShell>
+    </AppPageScrollShell>
   )
 }
