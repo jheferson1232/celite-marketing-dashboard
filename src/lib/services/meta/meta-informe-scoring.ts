@@ -222,3 +222,38 @@ export function getAdsetEstadoTodayDisplay(input: {
     sinComprasCriticoCOP: INFORME_ADSET_APAGAR_SPEND_COP,
   })
 }
+
+export type InformeEstadoFilter = "ALL" | "EXCELENTE" | "EN_CURSO" | "CRITICO"
+
+export type InformeEstadoFilterKey = "EXCELENTE" | "EN_CURSO" | "CRITICO"
+
+export function getInformeEntityEstadoDisplay(entity: {
+  type: "campaign" | "adset"
+  spendToday: number
+  purchasesToday: number
+  cpaToday: number
+}): AdsetEstadoTodayDisplay {
+  return entity.type === "campaign"
+    ? getCampaignEstadoTodayDisplay(entity)
+    : getAdsetEstadoTodayDisplay(entity)
+}
+
+export function informeEstadoToneToFilterKey(
+  tone: AdsetEstadoTodayTone
+): InformeEstadoFilterKey | null {
+  if (tone === "green") return "EXCELENTE"
+  if (tone === "orange") return "EN_CURSO"
+  if (tone === "red") return "CRITICO"
+  return null
+}
+
+export function informeEstadoFilterForEntity(entity: {
+  type: "campaign" | "adset"
+  spendToday: number
+  purchasesToday: number
+  cpaToday: number
+}): InformeEstadoFilterKey | null {
+  return informeEstadoToneToFilterKey(
+    getInformeEntityEstadoDisplay(entity).tone
+  )
+}

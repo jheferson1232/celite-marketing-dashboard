@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
@@ -34,16 +34,15 @@ import {
 import type {
   InformeCampaignGroup,
   InformeEntityRow,
-  MetaInformePayload,
   InformeTableTotals,
 } from "@/lib/services/meta/meta-operative-service"
-import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
-  getAdsetEstadoTodayDisplay,
-  getCampaignEstadoTodayDisplay,
-  INFORME_CPA_PENALTY_COP,
-  INFORME_SPEND_PENALTY_COP,
+  getInformeEntityEstadoDisplay,
+  informeEstadoFilterForEntity,
+  type InformeEstadoFilter,
+  type InformeEstadoFilterKey,
 } from "@/lib/services/meta/meta-informe-scoring"
+import { InformeEstadoFilters } from "./informe-estado-filters"
 import {
   getMetaInformeAction,
   previewMetaInformeHourlyAction,
@@ -74,214 +73,40 @@ function formatInformeRowLabel(
   return group ? `${row.name} (${group.campaign.name})` : row.name
 }
 
-type InformeAlertVariant = "red" | "amber"
-
-const INFORME_ALERT_STYLES: Record<
-  InformeAlertVariant,
-  { border: string; title: string; icon: string }
-> = {
-  red: {
-    border:
-      "border-red-200 bg-red-50/80 dark:border-red-500/30 dark:bg-red-500/10",
-    title: "text-red-800 dark:text-red-300",
-    icon: "text-red-600",
-  },
-  amber: {
-    border:
-      "border-amber-200 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10",
-    title: "text-amber-800 dark:text-amber-300",
-    icon: "text-amber-600",
-  },
-}
-
-const INFORME_ALERT_MAX_ITEMS = 8
-
-function formatInformeRowName(
-  row: InformeEntityRow,
+function countInformeEstadoFilters(
   groups: InformeCampaignGroup[]
-): string {
-  return formatInformeRowLabel(row, groups)
-}
-
-function sliceAlertItems(allNames: string[]): {
-  items: string[]
-  extra: number
-} {
-  const items = allNames.slice(0, INFORME_ALERT_MAX_ITEMS)
-  return {
-    items,
-    extra: Math.max(0, allNames.length - items.length),
+): Record<InformeEstadoFilterKey, number> {
+  const counts: Record<InformeEstadoFilterKey, number> = {
+    EXCELENTE: 0,
+    EN_CURSO: 0,
+    CRITICO: 0,
   }
+  for (const group of groups) {
+    for (const row of [group.campaign, ...group.adsets]) {
+      const key = informeEstadoFilterForEntity(row)
+      if (key) counts[key]++
+    }
+  }
+  return counts
 }
 
-/** Etiqueta + lista vertical (un nombre por línea). */
-function InformeAlertLine({
-  variant,
-  label,
-  items,
-  extra = 0,
-}: {
-  variant: InformeAlertVariant
-  label: string
-  items: string[]
-  extra?: number
-}) {
-  if (items.length === 0) return null
-  const styles = INFORME_ALERT_STYLES[variant]
+function filterInformeGroups(
+  groups: InformeCampaignGroup[],
+  filter: InformeEstadoFilter
+): InformeCampaignGroup[] {
+  if (filter === "ALL") return groups
 
-  return (
-    <div className="min-w-0 text-[11px] leading-snug sm:text-xs">
-      <p className={cn("font-medium", styles.title)}>{label}</p>
-      <ul className="text-muted-foreground mt-0.5 space-y-0.5">
-        {items.map((name, index) => (
-          <li key={`${label}-${index}-${name}`} className="truncate" title={name}>
-            {name}
-          </li>
-        ))}
-        {extra > 0 ? (
-          <li className="text-muted-foreground/80">+{extra} más</li>
-        ) : null}
-      </ul>
-    </div>
-  )
-}
-
-/** Bloque por nivel (campañas rojo / conjuntos amarillo). */
-function InformeAlertSection({
-  variant,
-  heading,
-  lines,
-}: {
-  variant: InformeAlertVariant
-  heading: string
-  lines: { label: string; items: string[]; extra?: number }[]
-}) {
-  const visible = lines.filter((l) => l.items.length > 0)
-  if (visible.length === 0) return null
-  const styles = INFORME_ALERT_STYLES[variant]
-
-  return (
-    <section
-      className={cn("rounded-md border px-2 py-1.5 sm:px-2.5", styles.border)}
-    >
-      <div
-        className={cn(
-          "mb-0.5 flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase sm:text-[11px]",
-          styles.title
-        )}
-      >
-        <RiAlertLine className={cn("size-3 shrink-0", styles.icon)} />
-        {heading}
-      </div>
-      <div className="flex flex-col gap-2">
-        {visible.map((line) => (
-          <InformeAlertLine
-            key={line.label}
-            variant={variant}
-            label={line.label}
-            items={line.items}
-            extra={line.extra}
-          />
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function InformeAlertsPanel({ data }: { data: MetaInformePayload }) {
-  const highSpendNoSales = (rows: InformeEntityRow[]) =>
-    rows.filter(
-      (r) =>
-        r.spendToday >= INFORME_SPEND_PENALTY_COP && r.purchasesToday === 0
-    )
-
-  const campaignSinVentas = highSpendNoSales(
-    data.sinVentasAlerts.filter((r) => r.type === "campaign")
-  )
-  const adsetSinVentas = highSpendNoSales(
-    data.sinVentasAlerts.filter((r) => r.type === "adset")
-  )
-  const campaignCpaAlto = data.cpaAltoAlerts.filter((r) => r.type === "campaign")
-  const adsetCpaAlto = data.cpaAltoAlerts.filter((r) => r.type === "adset")
-
-  const campaignLines = [
-    {
-      label: "Sin ventas ≥10k",
-      ...sliceAlertItems(
-        campaignSinVentas.map((r) => formatInformeRowName(r, data.groups))
-      ),
-    },
-    {
-      label: "CPA >15k",
-      ...sliceAlertItems(
-        campaignCpaAlto.map((r) => formatInformeRowName(r, data.groups))
-      ),
-    },
-    {
-      label: "Apagar ≥30k",
-      ...sliceAlertItems(
-        data.campaignsToPause.map((item) =>
-          item.type === "adset" && item.campaignName
-            ? `${item.name} (${item.campaignName})`
-            : item.name
-        )
-      ),
-    },
-  ]
-
-  const adsetLines = [
-    {
-      label: "Sin ventas ≥10k",
-      ...sliceAlertItems(
-        adsetSinVentas.map((r) => formatInformeRowName(r, data.groups))
-      ),
-    },
-    {
-      label: "CPA >15k",
-      ...sliceAlertItems(
-        adsetCpaAlto.map((r) => formatInformeRowName(r, data.groups))
-      ),
-    },
-    {
-      label: "Apagar ≥10k",
-      ...sliceAlertItems(
-        data.adsetsToPause.map((item) =>
-          item.campaignName
-            ? `${item.name} (${item.campaignName})`
-            : item.name
-        )
-      ),
-    },
-  ]
-
-  const hasCampaign = campaignLines.some((l) => l.items.length > 0)
-  const hasAdset = adsetLines.some((l) => l.items.length > 0)
-
-  if (!hasCampaign && !hasAdset) return null
-
-  return (
-    <div
-      className={cn(
-        "grid gap-1.5",
-        hasCampaign && hasAdset ? "sm:grid-cols-2" : "grid-cols-1"
-      )}
-    >
-      {hasCampaign ? (
-        <InformeAlertSection
-          variant="red"
-          heading="Campañas"
-          lines={campaignLines}
-        />
-      ) : null}
-      {hasAdset ? (
-        <InformeAlertSection
-          variant="amber"
-          heading="Conjuntos"
-          lines={adsetLines}
-        />
-      ) : null}
-    </div>
-  )
+  return groups
+    .map((group) => {
+      const campaignMatches =
+        informeEstadoFilterForEntity(group.campaign) === filter
+      const matchingAdsets = group.adsets.filter(
+        (adset) => informeEstadoFilterForEntity(adset) === filter
+      )
+      if (!campaignMatches && matchingAdsets.length === 0) return null
+      return { ...group, adsets: matchingAdsets }
+    })
+    .filter((group): group is InformeCampaignGroup => group !== null)
 }
 
 type PeriodMetrics = {
@@ -531,7 +356,7 @@ function AdsetCountCells({
 }
 
 const INFORME_ESTADO_TONE_CLASS: Record<
-  ReturnType<typeof getAdsetEstadoTodayDisplay>["tone"],
+  ReturnType<typeof getInformeEntityEstadoDisplay>["tone"],
   string
 > = {
   green: "font-medium text-green-600 dark:text-green-400",
@@ -541,18 +366,12 @@ const INFORME_ESTADO_TONE_CLASS: Record<
 }
 
 function StatusCells({ row }: { row: InformeEntityRow }) {
-  const estadoDisplay =
-    row.type === "campaign"
-      ? getCampaignEstadoTodayDisplay({
-          spendToday: row.spendToday,
-          purchasesToday: row.purchasesToday,
-          cpaToday: row.cpaToday,
-        })
-      : getAdsetEstadoTodayDisplay({
-          spendToday: row.spendToday,
-          purchasesToday: row.purchasesToday,
-          cpaToday: row.cpaToday,
-        })
+  const estadoDisplay = getInformeEntityEstadoDisplay({
+    type: row.type,
+    spendToday: row.spendToday,
+    purchasesToday: row.purchasesToday,
+    cpaToday: row.cpaToday,
+  })
 
   return (
     <>
@@ -779,16 +598,33 @@ function InformeTable({
   today,
   totals,
   informeStartDate,
+  estadoFilter,
 }: {
   groups: InformeCampaignGroup[]
   yesterday: string
   today: string
   totals: InformeTableTotals
   informeStartDate: string
+  estadoFilter: InformeEstadoFilter
 }) {
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
     () => new Set()
   )
+
+  useEffect(() => {
+    if (estadoFilter === "ALL") return
+    setExpandedCampaignIds((current) => {
+      const next = new Set(current)
+      for (const group of groups) {
+        const campaignMatches =
+          informeEstadoFilterForEntity(group.campaign) === estadoFilter
+        if (!campaignMatches && group.adsets.length > 0) {
+          next.add(group.campaign.metaId)
+        }
+      }
+      return next
+    })
+  }, [estadoFilter, groups])
 
   const handleToggleExpand = useCallback((campaignMetaId: string) => {
     setExpandedCampaignIds((current) => {
@@ -896,6 +732,7 @@ export function InformeIaContent() {
   const [aiText, setAiText] = useState<string | null>(null)
   const [telegramSent, setTelegramSent] = useState<number | null>(null)
   const [hourlyError, setHourlyError] = useState<string | null>(null)
+  const [estadoFilter, setEstadoFilter] = useState<InformeEstadoFilter>("ALL")
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
@@ -952,6 +789,16 @@ export function InformeIaContent() {
   const data = informeQuery.data
   const pending = syncMutation.isPending
 
+  const estadoCounts = useMemo(
+    () => (data ? countInformeEstadoFilters(data.groups) : null),
+    [data]
+  )
+
+  const filteredGroups = useMemo(
+    () => (data ? filterInformeGroups(data.groups, estadoFilter) : []),
+    [data, estadoFilter]
+  )
+
   const metaApiStatus = useMemo(
     () =>
       getMetaInformeApiStatus({
@@ -988,20 +835,11 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada hora a Telegram (GitHub Actions). Avisos:{" "}
-            <span className="font-medium text-red-700 dark:text-red-300">
-              rojo = campañas
-            </span>
-            ,{" "}
-            <span className="font-medium text-amber-700 dark:text-amber-300">
-              amarillo = conjuntos
-            </span>
-            . En <strong className="text-foreground font-medium">Estado</strong>
-            , según CPA de hoy:{" "}
-            <span className="text-green-700 dark:text-green-400">Excelente</span> /{" "}
-            <span className="text-orange-700 dark:text-orange-400">En curso</span> /{" "}
-            <span className="text-red-700 dark:text-red-400">Crítico</span> (campañas y
-            conjuntos).
+            Cron cada hora a Telegram (GitHub Actions). Filtra por estado de hoy
+            (CPA):{" "}
+            <span className="text-green-700 dark:text-green-400">Excelente</span>,{" "}
+            <span className="text-orange-700 dark:text-orange-400">En curso</span> o{" "}
+            <span className="text-red-700 dark:text-red-400">Crítico</span>.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1082,8 +920,6 @@ export function InformeIaContent() {
         </div>
       ) : null}
 
-      {data ? <InformeAlertsPanel data={data} /> : null}
-
       {informeQuery.isLoading ? (
         <Skeleton className="h-96 w-full rounded-lg" />
       ) : informeQuery.isError ? (
@@ -1124,15 +960,35 @@ export function InformeIaContent() {
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
-          <div className="min-w-0 overflow-x-auto rounded-lg border">
-            <InformeTable
-              groups={data.groups}
-              yesterday={data.yesterday}
-              today={data.date}
-              totals={data.totals}
-              informeStartDate={data.informeStartDate}
+          {estadoCounts ? (
+            <InformeEstadoFilters
+              counts={estadoCounts}
+              selectedFilter={estadoFilter}
+              onFilterChange={setEstadoFilter}
             />
-          </div>
+          ) : null}
+          {filteredGroups.length === 0 ? (
+            <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
+              Ninguna campaña ni conjunto con estado{" "}
+              {estadoFilter === "EXCELENTE"
+                ? "Excelente"
+                : estadoFilter === "EN_CURSO"
+                  ? "En curso"
+                  : "Crítico"}{" "}
+              hoy. Prueba otro filtro o «todas».
+            </p>
+          ) : (
+            <div className="min-w-0 overflow-x-auto rounded-lg border">
+              <InformeTable
+                groups={filteredGroups}
+                yesterday={data.yesterday}
+                today={data.date}
+                totals={data.totals}
+                informeStartDate={data.informeStartDate}
+                estadoFilter={estadoFilter}
+              />
+            </div>
+          )}
         </>
       ) : null}
     </div>
