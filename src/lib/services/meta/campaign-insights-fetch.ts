@@ -1,5 +1,5 @@
-import axios from "axios"
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
+import { metaGraphGet } from "./meta-graph-retry"
 import { normalizeMetaId } from "./meta-ids"
 import type { DateRange, MetaInsightRow, MetaInsightsResponse } from "./types"
 
@@ -8,7 +8,7 @@ const CAMPAIGN_INSIGHT_FIELDS =
 
 /** Insights a nivel campaña con paginación completa. */
 export async function fetchAllCampaignInsights(
-  api: AxiosInstance,
+  api: MetaApiClient,
   dateRange: DateRange
 ): Promise<MetaInsightRow[]> {
   const timeRange = JSON.stringify({
@@ -22,7 +22,7 @@ export async function fetchAllCampaignInsights(
       level: "campaign",
       fields: CAMPAIGN_INSIGHT_FIELDS,
       time_range: timeRange,
-      limit: 500,
+      limit: "500",
     },
   })
 
@@ -30,9 +30,9 @@ export async function fetchAllCampaignInsights(
 
   let nextUrl = response.data.paging?.next
   while (nextUrl) {
-    const nextResponse = await axios.get<MetaInsightsResponse>(nextUrl)
-    insights.push(...(nextResponse.data.data ?? []))
-    nextUrl = nextResponse.data.paging?.next
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    insights.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
   }
 
   return insights

@@ -1,4 +1,4 @@
-import axios from "axios"
+import { metaGraphGet } from "./meta-graph-retry"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
 
@@ -33,11 +33,11 @@ async function fetchAllAdVideoSourcesMap(): Promise<Map<string, string>> {
 
   do {
     const response: { data: MetaAdVideosResponse } = nextUrl
-      ? await axios.get<MetaAdVideosResponse>(nextUrl)
+      ? { data: await metaGraphGet<MetaAdVideosResponse>(nextUrl) }
       : await api.get<MetaAdVideosResponse>("/advideos", {
           params: {
             fields: "id,source",
-            limit: 100,
+            limit: "100",
           },
         })
 

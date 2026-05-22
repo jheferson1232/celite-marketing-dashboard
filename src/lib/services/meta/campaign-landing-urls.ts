@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
 import { extractCreativeDestinationUrl } from "./creative-url"
 import { isMetaRateLimitError } from "./meta-errors"
 import { fetchUniqueLandingUrlsFromAdIds } from "./fetch-ad-creatives-batch"
@@ -48,7 +48,7 @@ async function fetchLandingUrlsViaBatchFallback(
 
 /** URLs de destino únicas de una campaña (cola + pocas llamadas a Graph). */
 export async function getMetaCampaignLandingUrls(
-  _api: AxiosInstance,
+  _api: MetaApiClient,
   campaignId: string
 ): Promise<string[]> {
   try {

@@ -1,5 +1,5 @@
-import axios from "axios"
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
+import { metaGraphGet } from "./meta-graph-retry"
 import { buildDateKeys } from "@/lib/date"
 import { normalizeMetaId } from "./meta-ids"
 import { getPurchasesFromInsight } from "./purchase-metrics"
@@ -32,7 +32,7 @@ function saleStatus(spend: number, purchases: number): MetaDailyMetricCell["sale
 }
 
 async function fetchDailyInsights(
-  api: AxiosInstance,
+  api: MetaApiClient,
   level: "campaign" | "adset",
   dateRange: DateRange
 ): Promise<MetaInsightRow[]> {
@@ -52,8 +52,8 @@ async function fetchDailyInsights(
       level,
       fields,
       time_range: timeRange,
-      time_increment: 1,
-      limit: 500,
+      time_increment: "1",
+      limit: "500",
     },
   })
 
@@ -61,9 +61,9 @@ async function fetchDailyInsights(
 
   let nextUrl = response.data.paging?.next
   while (nextUrl) {
-    const nextResponse = await axios.get<MetaInsightsResponse>(nextUrl)
-    insights.push(...(nextResponse.data.data ?? []))
-    nextUrl = nextResponse.data.paging?.next
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    insights.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
   }
 
   return insights

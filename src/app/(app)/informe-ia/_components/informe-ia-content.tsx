@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
@@ -10,6 +10,8 @@ import {
   RiRefreshLine,
   RiStackLine,
 } from "@remixicon/react"
+import { MetaConfigErrorHint } from "@/components/meta-config-error-hint"
+import { MetaApiStatusIndicator } from "@/components/meta-api-status-indicator"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -23,6 +25,8 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
+import { getMetaInformeApiStatus } from "@/lib/meta-api-status"
+import { isMetaConfigError } from "@/lib/services/meta/meta-errors"
 import { runServerAction } from "@/lib/server-action"
 import {
   formatNumber,
@@ -592,6 +596,34 @@ export function InformeIaContent() {
   const dayHeaders = data?.groups[0]?.campaign.dayCells.map((d) => d.date) ?? []
   const pending = syncMutation.isPending
 
+  const metaApiStatus = useMemo(
+    () =>
+      getMetaInformeApiStatus({
+        informe: {
+          isLoading: informeQuery.isLoading,
+          isFetching: informeQuery.isFetching,
+          isError: informeQuery.isError || syncMutation.isError,
+          isSuccess: informeQuery.isSuccess && !syncMutation.isError,
+          error:
+            (informeQuery.error as Error | null) ??
+            (syncMutation.error as Error | null),
+        },
+        isSyncing: syncMutation.isPending,
+        hourlyError,
+      }),
+    [
+      informeQuery.isLoading,
+      informeQuery.isFetching,
+      informeQuery.isError,
+      informeQuery.isSuccess,
+      informeQuery.error,
+      syncMutation.isError,
+      syncMutation.isPending,
+      syncMutation.error,
+      hourlyError,
+    ]
+  )
+
   const accountCpa =
     data && data.accountPurchasesToday > 0
       ? data.accountSpendToday / data.accountPurchasesToday
@@ -612,7 +644,8 @@ export function InformeIaContent() {
             usa el mismo informe y lo manda al bot.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <MetaApiStatusIndicator status={metaApiStatus} />
           <Button
             variant="outline"
             size="sm"
@@ -739,10 +772,20 @@ export function InformeIaContent() {
       {informeQuery.isLoading ? (
         <Skeleton className="h-96 w-full rounded-lg" />
       ) : informeQuery.isError ? (
-        <p className="text-destructive text-sm">
-          {informeQuery.error?.message ||
-            "No se pudo cargar el informe. Revisa Meta y la base de datos."}
-        </p>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">
+            {informeQuery.error && isMetaConfigError(informeQuery.error)
+              ? "Meta no está configurado en este entorno."
+              : "No se pudo cargar el informe."}
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {informeQuery.error?.message ||
+              "Revisa Meta, la base de datos y las variables en Vercel."}
+          </p>
+          {informeQuery.error && isMetaConfigError(informeQuery.error) ? (
+            <MetaConfigErrorHint />
+          ) : null}
+        </div>
       ) : data && data.groups.length === 0 ? (
         <>
           <p className="text-muted-foreground text-sm">

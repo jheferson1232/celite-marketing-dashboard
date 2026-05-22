@@ -1,4 +1,7 @@
 import axios from "axios"
+import { isMetaConfigError } from "./meta-env"
+
+export { isMetaConfigError, MetaEnvNotConfiguredError } from "./meta-env"
 
 type MetaApiErrorBody = {
   code?: number
@@ -7,18 +10,33 @@ type MetaApiErrorBody = {
   message?: string
 }
 
-export function isMetaRateLimitAxiosError(error: unknown): boolean {
-  if (!axios.isAxiosError(error)) return false
-
-  const metaError = error.response?.data?.error as MetaApiErrorBody | undefined
+export function isMetaRateLimitStatus(status: number, body: unknown): boolean {
+  const metaError = (body as { error?: MetaApiErrorBody } | null)?.error
   const code = metaError?.code
 
   return (
-    error.response?.status === 429 ||
+    status === 429 ||
     code === 17 ||
     code === 613 ||
     code === 80004 ||
     metaError?.error_subcode === 2446079
+  )
+}
+
+export function metaGraphErrorMessage(status: number, body: unknown): string {
+  const metaError = (body as { error?: MetaApiErrorBody } | null)?.error
+  const message =
+    metaError?.error_user_msg?.trim() ||
+    metaError?.message?.trim() ||
+    `Meta API respondió con estado ${status}.`
+  return message
+}
+
+export function isMetaRateLimitAxiosError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false
+  return isMetaRateLimitStatus(
+    error.response?.status ?? 0,
+    error.response?.data
   )
 }
 
@@ -43,6 +61,9 @@ export function isMetaRateLimitError(error: unknown): boolean {
 }
 
 export function getMetaErrorMessage(error: unknown): string {
+  if (isMetaConfigError(error) && error instanceof Error) {
+    return error.message
+  }
   if (error instanceof Error && error.message.trim()) {
     return error.message
   }

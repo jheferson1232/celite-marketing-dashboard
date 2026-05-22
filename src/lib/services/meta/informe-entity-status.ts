@@ -1,4 +1,4 @@
-import axios from "axios"
+import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 import { isMetaCampaignActiveForCount } from "./meta-campaign-status"
 import { isMetaAdSetActiveForCount } from "./meta-adset-status"
@@ -17,15 +17,11 @@ async function fetchInformeEntityStatus(
   const token = process.env.META_ACCESS_TOKEN
   if (!token) return false
 
-  const { data } = await axios.get<MetaStatusRow>(
-    `https://graph.facebook.com/v25.0/${metaId}`,
-    {
-      params: {
-        access_token: token,
-        fields: "status,effective_status",
-      },
-    }
-  )
+  const url = new URL(`https://graph.facebook.com/v25.0/${metaId}`)
+  url.searchParams.set("access_token", token)
+  url.searchParams.set("fields", "status,effective_status")
+
+  const data = await metaGraphGet<MetaStatusRow>(url.toString())
 
   if (type === "campaign") {
     return isMetaCampaignActiveForCount(data)

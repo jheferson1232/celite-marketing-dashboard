@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
 import { metaGraphGet } from "./meta-graph-retry"
 
 type MetaPagedResponse<T> = {
@@ -12,7 +12,7 @@ type FetchAllMetaPagesOptions = {
 
 /** Recorre todas las páginas de un endpoint Meta Graph (paging.next). */
 export async function fetchAllMetaPages<T>(
-  api: AxiosInstance,
+  api: MetaApiClient,
   path: string,
   params: Record<string, string>,
   options?: FetchAllMetaPagesOptions

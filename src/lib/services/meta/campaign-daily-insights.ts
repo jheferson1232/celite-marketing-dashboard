@@ -83,8 +83,8 @@ async function fetchMetaCampaignDailyInsights(
       fields: "date_start,spend,actions",
       filtering: campaignFilter,
       time_range: timeRange,
-      time_increment: 1,
-      limit: 500,
+      time_increment: "1",
+      limit: "500",
     },
   })
 

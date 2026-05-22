@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
 import { fetchAllGraphEdgePages } from "./fetch-graph-edge"
 import { fetchAllMetaPages } from "./paginated-fetch"
 import { buildAdsetsByCampaignId } from "./meta-adset-count"
@@ -42,7 +42,7 @@ export function normalizeAdSetFromApi(adset: AdSetApiRow): MetaAdSet | null {
 
 /** Catálogo global de conjuntos (cuenta). */
 export async function getCachedMetaAdsetsCatalog(
-  api: AxiosInstance
+  api: MetaApiClient
 ): Promise<MetaAdSet[]> {
   return withMetaCache("meta:adsets:catalog:v5", ADSETS_CATALOG_TTL_MS, async () => {
     const rows = await fetchAllMetaPages<AdSetApiRow>(api, "/adsets", {
@@ -122,7 +122,7 @@ async function supplementZeroCountCampaigns(
  * Mapa campaña → conjuntos: catálogo global + edge por campaña cuando el global devuelve 0.
  */
 export async function getAdsetsByCampaignMap(
-  api: AxiosInstance,
+  api: MetaApiClient,
   campaignIds: string[]
 ): Promise<Map<string, MetaAdSet[]>> {
   const catalog = await getCachedMetaAdsetsCatalog(api)

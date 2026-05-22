@@ -103,7 +103,7 @@ export function DashboardContent() {
     const landingTimer = window.setTimeout(() => setLandingMapEnabled(true), 4_000)
     const extendedTimer = window.setTimeout(
       () => setExtendedMetricsEnabled(true),
-      10_000
+      2_000
     )
     return () => {
       window.clearTimeout(adsetTimer)
@@ -135,12 +135,23 @@ export function DashboardContent() {
   const metaLandingUrlsLoading =
     landingMapEnabled && (isLandingUrlsMapPending || isLandingUrlsMapFetching)
 
-  const { data: extendedMetrics } = useQuery({
+  const {
+    data: extendedMetrics,
+    isFetching: isExtendedMetricsFetching,
+    isPending: isExtendedMetricsPending,
+    isError: isExtendedMetricsError,
+    error: extendedMetricsError,
+  } = useQuery({
     queryKey: ["campaigns-extended-metrics"],
     queryFn: () => runServerAction(getCampaignsExtendedMetrics()),
     enabled: extendedMetricsEnabled,
     ...extendedQueryOptions,
   })
+
+  const extendedMetricsLoading =
+    extendedMetricsEnabled &&
+    !extendedMetrics &&
+    (isExtendedMetricsPending || isExtendedMetricsFetching)
 
   const campaignsEnriched = useMemo((): CampaignRow[] | undefined => {
     if (!campaigns) return undefined
@@ -155,15 +166,13 @@ export function DashboardContent() {
       if (!extendedMetrics) return withUrls
 
       const extended = extendedMetrics[campaign.id]
-      if (!extended) return withUrls
-
       return {
         ...withUrls,
-        purchases7d: extended.purchases7d,
-        cpa7d: extended.cpa7d,
-        totalPurchases: extended.totalPurchases,
-        totalSpend: extended.totalSpend,
-        totalCpa: extended.totalCpa,
+        purchases7d: extended?.purchases7d ?? 0,
+        cpa7d: extended?.cpa7d ?? 0,
+        totalPurchases: extended?.totalPurchases ?? 0,
+        totalSpend: extended?.totalSpend ?? 0,
+        totalCpa: extended?.totalCpa ?? 0,
       }
     })
   }, [campaigns, extendedMetrics, landingUrlsMap])
@@ -234,6 +243,12 @@ export function DashboardContent() {
             showAllCampaignsFilter
             showMetaActiveCampaignFilter
             metaLandingUrlsLoading={metaLandingUrlsLoading}
+            extendedMetricsLoading={extendedMetricsLoading}
+            extendedMetricsError={
+              isExtendedMetricsError
+                ? (extendedMetricsError as Error)
+                : null
+            }
           />
         </TabsContent>
         <TabsContent value="ads" className="min-w-0 outline-none">

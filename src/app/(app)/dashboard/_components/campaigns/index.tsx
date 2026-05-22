@@ -64,6 +64,8 @@ interface CampaignsTableProps {
   /** Meta: chip «activos» (azul) y «apagadas» por interruptor de campaña. */
   showMetaActiveCampaignFilter?: boolean
   metaLandingUrlsLoading?: boolean
+  extendedMetricsLoading?: boolean
+  extendedMetricsError?: Error | null
   columnVisibilityStorageKey?: string
   defaultColumnVisibility?: VisibilityState
 }
@@ -89,6 +91,8 @@ export function CampaignsTable({
   showAllCampaignsFilter = false,
   showMetaActiveCampaignFilter = false,
   metaLandingUrlsLoading = false,
+  extendedMetricsLoading = false,
+  extendedMetricsError = null,
   columnVisibilityStorageKey = META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
   defaultColumnVisibility = enableMetaExtendedMetrics
     ? META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
@@ -231,12 +235,14 @@ export function CampaignsTable({
         enableTikTokManage,
         enableMetaExtendedMetrics,
         metaLandingUrlsLoading,
+        extendedMetricsLoading,
       }),
     [
       currency,
       enableTikTokManage,
       enableMetaExtendedMetrics,
       metaLandingUrlsLoading,
+      extendedMetricsLoading,
       expandedCampaignIds,
       handleToggleAdSets,
       handleOpenDetails,
@@ -282,6 +288,19 @@ export function CampaignsTable({
         />
         <ColumnVisibilityToggle table={table} />
       </div>
+
+      {enableMetaExtendedMetrics && extendedMetricsError ? (
+        <p className="text-destructive text-xs">
+          No se pudieron cargar ventas 7d / totales:{" "}
+          {extendedMetricsError.message}
+        </p>
+      ) : null}
+
+      {enableMetaExtendedMetrics && extendedMetricsLoading ? (
+        <p className="text-muted-foreground text-xs">
+          Cargando ventas de los últimos 7 días y totales desde Meta…
+        </p>
+      ) : null}
 
       <div className="min-w-0 w-full max-w-full rounded-lg border">
         <Table>

@@ -51,7 +51,7 @@ async function fetchAdsWithCreativeAndInsights(
         "insights{spend,impressions,clicks,ctr,frequency,actions,cost_per_action_type}",
       "time_range[since]": dateRange.from,
       "time_range[until]": dateRange.to,
-      limit: 100,
+      limit: "100",
     },
   })
 

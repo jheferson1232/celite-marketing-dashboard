@@ -1,4 +1,5 @@
 import { extractCreativeDestinationUrl } from "./creative-url"
+import { buildMetaGraphUrl } from "./meta-graph-fetch"
 import { metaGraphGet } from "./meta-graph-retry"
 
 const CREATIVE_BATCH_FIELDS =
@@ -14,8 +15,7 @@ const BATCH_DELAY_MS = 900
 export async function fetchUniqueLandingUrlsFromAdIds(
   adIds: string[]
 ): Promise<string[]> {
-  const token = process.env.META_ACCESS_TOKEN
-  if (!token || adIds.length === 0) return []
+  if (adIds.length === 0) return []
 
   const urlMap = new Map<string, string>()
   const uniqueIds = [...new Set(adIds.filter(Boolean))]
@@ -27,14 +27,10 @@ export async function fetchUniqueLandingUrlsFromAdIds(
     }
 
     const data = await metaGraphGet<Record<string, { creative?: unknown }>>(
-      "https://graph.facebook.com/v25.0/",
-      {
-        params: {
-          ids: chunk.join(","),
-          fields: CREATIVE_BATCH_FIELDS,
-          access_token: token,
-        },
-      }
+      buildMetaGraphUrl("", {
+        ids: chunk.join(","),
+        fields: CREATIVE_BATCH_FIELDS,
+      })
     )
 
     for (const ad of Object.values(data)) {
@@ -44,7 +40,6 @@ export async function fetchUniqueLandingUrlsFromAdIds(
       if (!url) continue
       if (!urlMap.has(url)) urlMap.set(url, url)
     }
-
   }
 
   return [...urlMap.values()].sort((a, b) => a.localeCompare(b))

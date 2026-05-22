@@ -1,4 +1,3 @@
-import axios from "axios"
 import {
   fetchAdImageUrlsByHash,
   fetchAdVideoPicturesById,
@@ -11,6 +10,7 @@ import { fetchPurchaseGenderByAdId } from "./purchase-gender"
 import { extractCreativeDestinationUrl } from "./creative-url"
 import { extractVideoIdFromCreative } from "./extract-video-id"
 import { getMetaClient } from "./meta"
+import { buildMetaGraphUrl } from "./meta-graph-fetch"
 import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 import type {
@@ -64,7 +64,7 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
         "purchase_roas",
       ].join(","),
       time_range: timeRange,
-      limit: 500,
+      limit: "500",
     },
   })
 
@@ -72,9 +72,9 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
 
   let nextUrl = response.data.paging?.next
   while (nextUrl) {
-    const nextResponse = await axios.get<MetaAdInsightsResponse>(nextUrl)
-    insights.push(...nextResponse.data.data)
-    nextUrl = nextResponse.data.paging?.next
+    const nextResponse = await metaGraphGet<MetaAdInsightsResponse>(nextUrl)
+    insights.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
   }
 
   if (insights.length === 0) return []
@@ -110,14 +110,10 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
     try {
       const data = token
         ? await metaGraphGet<Record<string, unknown>>(
-            "https://graph.facebook.com/v25.0/",
-            {
-              params: {
-                ids: chunk.join(","),
-                fields: CREATIVE_FIELDS,
-                access_token: token,
-              },
-            }
+            buildMetaGraphUrl("", {
+              ids: chunk.join(","),
+              fields: CREATIVE_FIELDS,
+            })
           )
         : {}
 

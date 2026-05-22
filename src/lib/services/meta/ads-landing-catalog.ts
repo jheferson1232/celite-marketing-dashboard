@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
 import { fetchAllMetaPages } from "./paginated-fetch"
 import { withMetaCache } from "./meta-cache"
 import type { MetaAdForLanding } from "./collect-meta-landing-urls-by-campaign"
@@ -12,7 +12,7 @@ const ADS_LANDING_FIELDS =
 
 /** Todos los anuncios con creativo (una paginación cacheada, como ads en TikTok). */
 export async function getCachedMetaAdsLandingCatalog(
-  api: AxiosInstance
+  api: MetaApiClient
 ): Promise<MetaAdForLanding[]> {
   return withMetaCache("meta:ads:landing-catalog:v2", LANDING_CATALOG_TTL_MS, () =>
     fetchAllMetaPages<MetaAdForLanding>(

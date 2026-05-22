@@ -37,6 +37,7 @@ interface GetCampaignColumnsOptions {
   enableTikTokManage?: boolean
   enableMetaExtendedMetrics?: boolean
   metaLandingUrlsLoading?: boolean
+  extendedMetricsLoading?: boolean
 }
 
 export function getCampaignColumns({
@@ -47,6 +48,7 @@ export function getCampaignColumns({
   enableTikTokManage = false,
   enableMetaExtendedMetrics = false,
   metaLandingUrlsLoading = false,
+  extendedMetricsLoading = false,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
   const showLifetimeMetrics = enableTikTokManage || enableMetaExtendedMetrics
@@ -246,9 +248,14 @@ export function getCampaignColumns({
             ),
             cell: ({ row }) => (
               <div className="text-right">
-                {(row.original.purchases7d ?? 0) > 0
-                  ? formatNumber(row.original.purchases7d ?? 0)
-                  : "-"}
+                {extendedMetricsLoading &&
+                row.original.purchases7d === undefined ? (
+                  <span className="text-muted-foreground">…</span>
+                ) : (row.original.purchases7d ?? 0) > 0 ? (
+                  formatNumber(row.original.purchases7d ?? 0)
+                ) : (
+                  "-"
+                )}
               </div>
             ),
           } satisfies ColumnDef<CampaignRow>,
@@ -266,7 +273,14 @@ export function getCampaignColumns({
               const highlight = getCostPerResultCellClassName(cpa7d, currency)
               return (
                 <div className={cn("-m-2 p-2 text-right", highlight)}>
-                  {cpa7d > 0 ? formatCurrency(cpa7d, currency) : "-"}
+                  {extendedMetricsLoading &&
+                  row.original.cpa7d === undefined ? (
+                    <span className="text-muted-foreground">…</span>
+                  ) : cpa7d > 0 ? (
+                    formatCurrency(cpa7d, currency)
+                  ) : (
+                    "-"
+                  )}
                 </div>
               )
             },
@@ -285,9 +299,14 @@ export function getCampaignColumns({
             ),
             cell: ({ row }) => (
               <div className="text-right font-medium">
-                {(row.original.totalPurchases ?? 0) > 0
-                  ? formatNumber(row.original.totalPurchases ?? 0)
-                  : "-"}
+                {extendedMetricsLoading &&
+                row.original.totalPurchases === undefined ? (
+                  <span className="text-muted-foreground">…</span>
+                ) : (row.original.totalPurchases ?? 0) > 0 ? (
+                  formatNumber(row.original.totalPurchases ?? 0)
+                ) : (
+                  "-"
+                )}
               </div>
             ),
           } satisfies ColumnDef<CampaignRow>,

@@ -1,4 +1,4 @@
-import axios from "axios"
+import { metaGraphGet } from "./meta-graph-retry"
 import { getPurchasesFromActions } from "./purchases"
 import { getMetaClient } from "./meta"
 import type { DateRange, MetaAction, MetaInsightsResponse } from "./types"
@@ -46,7 +46,7 @@ export async function fetchPurchaseGenderByAdId(
       breakdowns: "gender",
       fields: "ad_id,actions",
       time_range: timeRange,
-      limit: 500,
+      limit: "500",
     },
   })
 
@@ -54,9 +54,9 @@ export async function fetchPurchaseGenderByAdId(
 
   let nextUrl = response.data.paging?.next
   while (nextUrl) {
-    const nextResponse = await axios.get<MetaInsightsResponse>(nextUrl)
-    rows.push(...(nextResponse.data.data as GenderInsightRow[]))
-    nextUrl = nextResponse.data.paging?.next
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    rows.push(...((nextResponse.data ?? []) as GenderInsightRow[]))
+    nextUrl = nextResponse.paging?.next
   }
 
   const byAdId = new Map<string, PurchasesByGender>()

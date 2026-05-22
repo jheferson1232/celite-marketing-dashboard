@@ -1,5 +1,5 @@
-import axios from "axios"
-import type { AxiosInstance } from "axios"
+import type { MetaApiClient } from "./meta"
+import { metaGraphGet } from "./meta-graph-retry"
 import { addDaysToDateString, getDashboardToday } from "@/lib/date"
 import { normalizeMetaId } from "./meta-ids"
 import { withMetaCache } from "./meta-cache"
@@ -22,7 +22,7 @@ const ADSET_INSIGHTS_TTL_MS = 5 * 60 * 1000
 
 /** Insights a nivel conjunto (una sola paginación cacheada por periodo). */
 export async function fetchAllAdsetInsights(
-  api: AxiosInstance,
+  api: MetaApiClient,
   dateRange: DateRange
 ): Promise<MetaInsightRow[]> {
   const timeRange = JSON.stringify({
@@ -36,7 +36,7 @@ export async function fetchAllAdsetInsights(
       level: "adset",
       fields: ADSET_INSIGHT_FIELDS,
       time_range: timeRange,
-      limit: 500,
+      limit: "500",
     },
   })
 
@@ -44,9 +44,9 @@ export async function fetchAllAdsetInsights(
 
   let nextUrl = response.data.paging?.next
   while (nextUrl) {
-    const nextResponse = await axios.get<MetaInsightsResponse>(nextUrl)
-    insights.push(...(nextResponse.data.data ?? []))
-    nextUrl = nextResponse.data.paging?.next
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    insights.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
   }
 
   return insights
@@ -74,7 +74,7 @@ export function adsetInsightsToMapByAdSetId(
 }
 
 export async function getCachedMetaAdsetInsights(
-  api: AxiosInstance,
+  api: MetaApiClient,
   dateRange: DateRange
 ): Promise<MetaInsightRow[]> {
   const cacheKey = `meta:adset-insights:${dateRange.from}:${dateRange.to}`

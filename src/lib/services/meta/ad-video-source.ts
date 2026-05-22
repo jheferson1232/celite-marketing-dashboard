@@ -1,6 +1,6 @@
-import axios from "axios"
 import { extractVideoIdFromCreative } from "./extract-video-id"
 import { getCreativeVideoSource } from "./creative-video-source"
+import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 
 interface MetaAdCreativeResponse {
@@ -29,20 +29,28 @@ function extractIframeSrc(html: string): string | null {
   return match[1].replace(/&amp;/g, "&")
 }
 
-export async function getAdPreviewEmbedUrl(adId: string): Promise<string | null> {
+function buildMetaGraphUrl(
+  path: string,
+  params: Record<string, string>
+): string | null {
   const token = process.env.META_ACCESS_TOKEN
   if (!token) return null
 
-  const { data } = await axios.get<MetaAdPreviewResponse>(
-    `https://graph.facebook.com/v25.0/${adId}/previews`,
-    {
-      params: {
-        ad_format: "MOBILE_FEED_STANDARD",
-        access_token: token,
-      },
-    }
-  )
+  const url = new URL(`https://graph.facebook.com/v25.0/${path}`)
+  url.searchParams.set("access_token", token)
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value)
+  }
+  return url.toString()
+}
 
+export async function getAdPreviewEmbedUrl(adId: string): Promise<string | null> {
+  const graphUrl = buildMetaGraphUrl(`${adId}/previews`, {
+    ad_format: "MOBILE_FEED_STANDARD",
+  })
+  if (!graphUrl) return null
+
+  const data = await metaGraphGet<MetaAdPreviewResponse>(graphUrl)
   const body = data.data?.[0]?.body
   return body ? extractIframeSrc(body) : null
 }
@@ -52,21 +60,15 @@ export async function getAdVideoSource(adId: string): Promise<{
   embedUrl: string | null
 }> {
   return withMetaCache(`ad-video-source:${adId}`, AD_VIDEO_TTL_MS, async () => {
-    const token = process.env.META_ACCESS_TOKEN
-    if (!token) {
+    const graphUrl = buildMetaGraphUrl(adId, {
+      fields:
+        "creative{id,video_id,object_story_spec{video_data{video_id}},asset_feed_spec{videos{video_id}}}",
+    })
+    if (!graphUrl) {
       return { sourceUrl: null, embedUrl: null }
     }
 
-    const { data } = await axios.get<MetaAdCreativeResponse>(
-      `https://graph.facebook.com/v25.0/${adId}`,
-      {
-        params: {
-          fields:
-            "creative{id,video_id,object_story_spec{video_data{video_id}},asset_feed_spec{videos{video_id}}}",
-          access_token: token,
-        },
-      }
-    )
+    const data = await metaGraphGet<MetaAdCreativeResponse>(graphUrl)
 
     const videoId = extractVideoIdFromCreative(data.creative)
     let sourceUrl: string | null = null
