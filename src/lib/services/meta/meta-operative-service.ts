@@ -1,6 +1,11 @@
 import prisma from "@/lib/prisma"
 import { getInformePrisma } from "@/lib/informe-db"
-import { getDashboardToday, getTodayDateRange } from "@/lib/date"
+import {
+  addDaysToDateString,
+  getDashboardToday,
+  getDashboardYesterday,
+  getTodayDateRange,
+} from "@/lib/date"
 import {
   getMetaInformeDateKeys,
   getMetaInformeDateRange,
@@ -10,9 +15,26 @@ import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
 import {
   getMetaAccountDailyInsights,
   type MetaDailyEntityRow,
+  type MetaDailyMetricCell,
 } from "./meta-account-daily-insights"
+import { getAdsetsByCampaignMap } from "./adsets-catalog"
 import { getInformeEntitiesActiveMap } from "./informe-entity-status"
 import { getAccountKpis } from "./account-kpis"
+import { countAdSetsForCampaign } from "./meta-adset-count"
+import { getMetaClient } from "./meta"
+import { normalizeMetaId } from "./meta-ids"
+import {
+  collectAdsetsToPause,
+  collectCampaignsToPause,
+  type InformePauseItem,
+} from "./meta-informe-alerts"
+import {
+  computeInformeScore,
+  finalizePointsTotal,
+  shouldNotifyOlvido,
+  type InformeEstadoKind,
+} from "./meta-informe-scoring"
+import type { MetaAdSet } from "./types"
 
 export type InformeEntityRow = {
   entityId: string
@@ -20,24 +42,46 @@ export type InformeEntityRow = {
   type: "campaign" | "adset"
   name: string
   campaignMetaId: string | null
-  intentActive: boolean
   metaWasActive: boolean
-  forgotActivation: boolean
   soldToday: boolean
   purchasesToday: number
   spendToday: number
   cpaToday: number
+  /** Suma de puntos en el rango (ayer → hoy). */
+  pointsTotal: number
+  estadoKind: InformeEstadoKind
+  estadoLabel: string
+  notifyOlvido: boolean
+  rowHighlight: "none" | "red" | "orange"
   dayCells: {
     date: string
     spend: number
     purchases: number
+    points: number | null
     saleStatus: "green" | "red" | "neutral"
+  }[]
+}
+
+export type InformeTableTotals = {
+  spendToday: number
+  purchasesToday: number
+  cpaToday: number
+  pointsTotal: number
+  dayTotals: {
+    date: string
+    spend: number
+    purchases: number
+    points: number
   }[]
 }
 
 export type InformeCampaignGroup = {
   campaign: InformeEntityRow
   adsets: InformeEntityRow[]
+  /** Total de conjuntos en la campaña (catálogo Meta). */
+  adSetsCount: number
+  /** Conjuntos con estado activo en Meta (misma regla que el dashboard). */
+  activeAdSetsCount: number
 }
 
 export type MetaInformePayload = {
@@ -45,7 +89,19 @@ export type MetaInformePayload = {
   informeStartDate: string
   dateRange: { from: string; to: string }
   groups: InformeCampaignGroup[]
+  /** Compat cron: filas con ⚠ Olvido (no activaste ayer). */
   forgotten: InformeEntityRow[]
+  olvidoAlerts: InformeEntityRow[]
+  /** Gasto ≥10k sin ventas (−1). */
+  sinVentasAlerts: InformeEntityRow[]
+  /** CPA &gt; 15k con ventas (−1). */
+  cpaAltoAlerts: InformeEntityRow[]
+  /** Conjunto ≥10k COP hoy sin compras (Telegram: apagar). */
+  adsetsToPause: InformePauseItem[]
+  /** Campaña ≥30k COP hoy sin compras (Telegram: apagar). */
+  campaignsToPause: InformePauseItem[]
+  yesterday: string
+  totals: InformeTableTotals
   accountSpendToday: number
   accountPurchasesToday: number
 }
@@ -57,7 +113,30 @@ type TrackEntityInput = {
   campaignMetaId: string | null
 }
 
-type MetaDailyMetricCell = InformeEntityRow["dayCells"][number]
+type OperativeSnapshot = {
+  metaWasActive: boolean
+  sold: boolean
+  purchases: number
+  spend: number
+}
+
+export type StoredOperativeDay = OperativeSnapshot & {
+  cpa: number
+  points: number | null
+  estadoKind: InformeEstadoKind
+  estadoLabel: string
+  notifyOlvido: boolean
+  rowHighlight: "none" | "red" | "orange"
+}
+
+function saleStatusFromMetrics(
+  spend: number,
+  purchases: number
+): InformeEntityRow["dayCells"][number]["saleStatus"] {
+  if (purchases > 0) return "green"
+  if (spend >= 30_000) return "red"
+  return "neutral"
+}
 
 const UPSERT_CHUNK = 40
 
@@ -65,19 +144,25 @@ function spendOnDate(row: MetaDailyEntityRow, date: string): number {
   return row.days.find((d) => d.date === date)?.spend ?? 0
 }
 
-function collectSpendingToday(
+function hasSpendOnAnyDate(row: MetaDailyEntityRow, dateKeys: string[]): boolean {
+  return dateKeys.some((d) => spendOnDate(row, d) > 0)
+}
+
+function collectSpendingInRange(
   daily: Awaited<ReturnType<typeof getMetaAccountDailyInsights>>,
-  today: string
+  dateKeys: string[]
 ): {
   campaignRows: MetaDailyEntityRow[]
   adsetRows: MetaDailyEntityRow[]
   trackInputs: TrackEntityInput[]
 } {
-  const campaignRows = daily.campaigns.filter((c) => spendOnDate(c, today) > 0)
+  const campaignRows = daily.campaigns.filter((c) =>
+    hasSpendOnAnyDate(c, dateKeys)
+  )
   const spendingCampaignIds = new Set(campaignRows.map((c) => c.metaId))
 
   for (const adset of daily.adsets) {
-    if (spendOnDate(adset, today) > 0 && adset.campaignMetaId) {
+    if (hasSpendOnAnyDate(adset, dateKeys) && adset.campaignMetaId) {
       spendingCampaignIds.add(adset.campaignMetaId)
     }
   }
@@ -87,7 +172,7 @@ function collectSpendingToday(
   )
   const adsetRows = daily.adsets.filter(
     (a) =>
-      spendOnDate(a, today) > 0 &&
+      hasSpendOnAnyDate(a, dateKeys) &&
       a.campaignMetaId &&
       spendingCampaignIds.has(a.campaignMetaId)
   )
@@ -142,12 +227,7 @@ async function upsertTrackEntitiesBatch(
 async function upsertOperativeDay(
   entityId: string,
   date: string,
-  patch: {
-    metaWasActive?: boolean
-    sold?: boolean
-    purchases?: number
-    spend?: number
-  }
+  snapshot: StoredOperativeDay
 ) {
   const { metaOperativeDay } = getInformePrisma()
   await metaOperativeDay.upsert({
@@ -156,13 +236,72 @@ async function upsertOperativeDay(
       date,
       entityId,
       intentActive: false,
-      metaWasActive: patch.metaWasActive ?? false,
-      sold: patch.sold ?? false,
-      purchases: patch.purchases ?? 0,
-      spend: patch.spend ?? 0,
+      metaWasActive: snapshot.metaWasActive,
+      sold: snapshot.sold,
+      purchases: snapshot.purchases,
+      spend: snapshot.spend,
+      cpa: snapshot.cpa,
+      points: snapshot.points,
+      estadoKind: snapshot.estadoKind,
+      estadoLabel: snapshot.estadoLabel,
+      notifyOlvido: snapshot.notifyOlvido,
+      rowHighlight: snapshot.rowHighlight,
     },
-    update: patch,
+    update: {
+      metaWasActive: snapshot.metaWasActive,
+      sold: snapshot.sold,
+      purchases: snapshot.purchases,
+      spend: snapshot.spend,
+      cpa: snapshot.cpa,
+      points: snapshot.points,
+      estadoKind: snapshot.estadoKind,
+      estadoLabel: snapshot.estadoLabel,
+      notifyOlvido: snapshot.notifyOlvido,
+      rowHighlight: snapshot.rowHighlight,
+    },
   })
+}
+
+async function upsertInformeAccountDay(
+  date: string,
+  accountSpend: number,
+  accountPurchases: number
+): Promise<void> {
+  const { metaInformeAccountDay } = getInformePrisma()
+  await metaInformeAccountDay.upsert({
+    where: { date },
+    create: { date, accountSpend, accountPurchases },
+    update: { accountSpend, accountPurchases },
+  })
+}
+
+function buildDaySnapshot(
+  spend: number,
+  purchases: number,
+  metaWasActive: boolean,
+  prev: OperativeSnapshot
+): StoredOperativeDay {
+  const cpa = purchases > 0 ? spend / purchases : 0
+  const score = computeInformeScore({
+    spendToday: spend,
+    purchasesToday: purchases,
+    cpaToday: cpa,
+    metaWasActive,
+    yesterdaySpend: prev.spend,
+    yesterdayMetaWasActive: prev.metaWasActive,
+  })
+  return {
+    spend,
+    purchases,
+    metaWasActive,
+    sold: purchases > 0,
+    cpa,
+    points: score.points,
+    estadoKind: score.estadoKind,
+    estadoLabel: score.estadoLabel,
+    notifyOlvido: score.notifyOlvido,
+    rowHighlight: score.rowHighlight,
+  }
 }
 
 /** Sincroniza estado Meta + métricas solo para las entidades del informe (gasto hoy). */
@@ -191,6 +330,32 @@ export async function syncMetaOperativeStateForDate(
     daily.adsets.map((a) => [a.metaId, new Map(a.days.map((d) => [d.date, d]))])
   )
 
+  const isToday = date === getDashboardToday()
+  const prevDate = addDaysToDateString(date, -1)
+  const entityIds = entities.map((e) => e.id)
+
+  const { metaOperativeDay } = getInformePrisma()
+  const [existingTodayRows, prevRows] = await Promise.all([
+    metaOperativeDay.findMany({
+      where: { date, entityId: { in: entityIds } },
+    }),
+    metaOperativeDay.findMany({
+      where: { date: prevDate, entityId: { in: entityIds } },
+    }),
+  ])
+  const existingByEntity = new Map(existingTodayRows.map((r) => [r.entityId, r]))
+  const prevByEntity = new Map(
+    prevRows.map((r) => [
+      r.entityId,
+      {
+        spend: r.spend,
+        purchases: r.purchases,
+        metaWasActive: r.metaWasActive,
+        sold: r.sold,
+      },
+    ])
+  )
+
   for (const entity of entities) {
     const dayMap =
       entity.type === "campaign"
@@ -198,42 +363,62 @@ export async function syncMetaOperativeStateForDate(
         : adsetDay.get(entity.metaId)
     const cell = dayMap?.get(date)
 
-    const metaWasActive =
+    const spend = cell?.spend ?? 0
+    const purchases = cell?.purchases ?? 0
+    const liveActive =
       activeByKey.get(`${entity.type}:${entity.metaId}`) ?? false
+    const existing = existingByEntity.get(entity.id)
+    const metaWasActive = isToday
+      ? liveActive
+      : (existing?.metaWasActive ?? liveActive)
 
-    await upsertOperativeDay(entity.id, date, {
-      metaWasActive,
-      sold: (cell?.purchases ?? 0) > 0,
-      purchases: cell?.purchases ?? 0,
-      spend: cell?.spend ?? 0,
-    })
-  }
-}
-
-export async function setMetaIntentActive(
-  entityId: string,
-  intentActive: boolean,
-  date = getDashboardToday()
-): Promise<void> {
-  if (date < getMetaInformeStartDate()) return
-
-  const { metaOperativeDay } = getInformePrisma()
-  await metaOperativeDay.upsert({
-    where: { date_entityId: { date, entityId } },
-    create: {
-      date,
-      entityId,
-      intentActive,
-      metaWasActive: false,
-      sold: false,
-      purchases: 0,
+    const prev: OperativeSnapshot = prevByEntity.get(entity.id) ?? {
       spend: 0,
-    },
-    update: { intentActive },
-  })
+      purchases: 0,
+      metaWasActive: true,
+      sold: false,
+    }
+
+    const snapshot = buildDaySnapshot(spend, purchases, metaWasActive, prev)
+    await upsertOperativeDay(entity.id, date, snapshot)
+  }
+
+  const kpis = await getAccountKpis({ from: date, to: date })
+  await upsertInformeAccountDay(date, kpis.totalSpend, kpis.purchases)
 }
 
-function toInformeRow(
+function getDailyCell(
+  metaId: string,
+  type: "campaign" | "adset",
+  date: string,
+  campaignDaily: Map<string, MetaDailyMetricCell[]>,
+  adsetDaily: Map<string, MetaDailyMetricCell[]>
+): MetaDailyMetricCell | undefined {
+  const source =
+    type === "campaign" ? campaignDaily.get(metaId) : adsetDaily.get(metaId)
+  return source?.find((d) => d.date === date)
+}
+
+function getStoredDay(
+  entityId: string,
+  metaId: string,
+  type: "campaign" | "adset",
+  date: string,
+  storedByEntityDate: Map<string, StoredOperativeDay>,
+  campaignDaily: Map<string, MetaDailyMetricCell[]>,
+  adsetDaily: Map<string, MetaDailyMetricCell[]>,
+  prev: OperativeSnapshot
+): StoredOperativeDay {
+  const stored = storedByEntityDate.get(`${entityId}:${date}`)
+  if (stored) return stored
+
+  const cell = getDailyCell(metaId, type, date, campaignDaily, adsetDaily)
+  const spend = cell?.spend ?? 0
+  const purchases = cell?.purchases ?? 0
+  return buildDaySnapshot(spend, purchases, false, prev)
+}
+
+function buildInformeRow(
   entity: {
     id: string
     metaId: string
@@ -241,96 +426,146 @@ function toInformeRow(
     name: string
     campaignMetaId: string | null
   },
-  operative: {
-    intentActive: boolean
-    metaWasActive: boolean
-    sold: boolean
-    purchases: number
-    spend: number
-  } | null,
-  dayCells: InformeEntityRow["dayCells"]
+  dateKeys: string[],
+  today: string,
+  storedByEntityDate: Map<string, StoredOperativeDay>,
+  campaignDaily: Map<string, MetaDailyMetricCell[]>,
+  adsetDaily: Map<string, MetaDailyMetricCell[]>
 ): InformeEntityRow {
-  const intentActive = operative?.intentActive ?? false
-  const metaWasActive = operative?.metaWasActive ?? false
+  const type = entity.type as "campaign" | "adset"
+  const dayCells: InformeEntityRow["dayCells"] = []
+  let pointsTotal = 0
+
+  const emptyPrev: OperativeSnapshot = {
+    spend: 0,
+    purchases: 0,
+    metaWasActive: true,
+    sold: false,
+  }
+
+  for (const date of dateKeys) {
+    const prevDate = addDaysToDateString(date, -1)
+    const prevStored = storedByEntityDate.get(`${entity.id}:${prevDate}`)
+    const prev: OperativeSnapshot = prevStored ?? emptyPrev
+
+    const day = getStoredDay(
+      entity.id,
+      entity.metaId,
+      type,
+      date,
+      storedByEntityDate,
+      campaignDaily,
+      adsetDaily,
+      prev
+    )
+    dayCells.push({
+      date,
+      spend: day.spend,
+      purchases: day.purchases,
+      points: day.points,
+      saleStatus: saleStatusFromMetrics(day.spend, day.purchases),
+    })
+    if (day.points !== null) pointsTotal += day.points
+  }
+
+  pointsTotal = finalizePointsTotal(dayCells, pointsTotal)
+
+  const todayDay =
+    storedByEntityDate.get(`${entity.id}:${today}`) ??
+    getStoredDay(
+      entity.id,
+      entity.metaId,
+      type,
+      today,
+      storedByEntityDate,
+      campaignDaily,
+      adsetDaily,
+      emptyPrev
+    )
+
+  const notifyOlvido = shouldNotifyOlvido(
+    pointsTotal,
+    todayDay.notifyOlvido
+  )
+
   return {
     entityId: entity.id,
     metaId: entity.metaId,
-    type: entity.type as "campaign" | "adset",
+    type,
     name: entity.name,
     campaignMetaId: entity.campaignMetaId,
-    intentActive,
-    metaWasActive,
-    forgotActivation: intentActive && !metaWasActive,
-    soldToday: operative?.sold ?? false,
-    purchasesToday: operative?.purchases ?? 0,
-    spendToday: operative?.spend ?? 0,
-    cpaToday:
-      (operative?.purchases ?? 0) > 0
-        ? (operative?.spend ?? 0) / (operative?.purchases ?? 1)
-        : 0,
+    metaWasActive: todayDay.metaWasActive,
+    soldToday: todayDay.sold,
+    purchasesToday: todayDay.purchases,
+    spendToday: todayDay.spend,
+    cpaToday: todayDay.cpa,
+    pointsTotal,
+    estadoKind: todayDay.estadoKind,
+    estadoLabel: todayDay.estadoLabel,
+    notifyOlvido,
+    rowHighlight: todayDay.rowHighlight,
     dayCells,
   }
+}
+
+function computeInformeTotals(
+  rows: InformeEntityRow[],
+  dateKeys: string[],
+  today: string
+): InformeTableTotals {
+  const adsetRows = rows.filter((r) => r.type === "adset")
+  const spendToday = adsetRows.reduce((s, r) => s + r.spendToday, 0)
+  const purchasesToday = adsetRows.reduce((s, r) => s + r.purchasesToday, 0)
+  const pointsTotal = adsetRows.reduce((s, r) => s + r.pointsTotal, 0)
+  const cpaToday =
+    purchasesToday > 0 ? spendToday / purchasesToday : 0
+
+  const dayTotals = dateKeys.map((date) => {
+    let spend = 0
+    let purchases = 0
+    let points = 0
+    for (const row of adsetRows) {
+      const cell = row.dayCells.find((d) => d.date === date)
+      if (!cell) continue
+      spend += cell.spend
+      purchases += cell.purchases
+      points += cell.points ?? 0
+    }
+    return { date, spend, purchases, points }
+  })
+
+  return { spendToday, purchasesToday, cpaToday, pointsTotal, dayTotals }
 }
 
 async function pruneOperativeDaysBeforeInformeStart(): Promise<void> {
   try {
     const start = getMetaInformeStartDate()
-    const { metaOperativeDay } = getInformePrisma()
-    await metaOperativeDay.deleteMany({ where: { date: { lt: start } } })
+    const { metaOperativeDay, metaInformeAccountDay } = getInformePrisma()
+    await Promise.all([
+      metaOperativeDay.deleteMany({ where: { date: { lt: start } } }),
+      metaInformeAccountDay.deleteMany({ where: { date: { lt: start } } }),
+    ])
   } catch {
     // Tablas aún no creadas en Neon o cliente desactualizado
   }
 }
 
-/** Quita entidades del catálogo completo antiguo; conserva gasto hoy o check «Activé». */
-async function pruneStaleTrackEntities(
-  keepMetaIds: string[],
-  today: string
-): Promise<void> {
+async function pruneStaleTrackEntities(keepMetaIds: string[]): Promise<void> {
   if (keepMetaIds.length === 0) return
 
   try {
     const { metaTrackEntity } = getInformePrisma()
     await metaTrackEntity.deleteMany({
-      where: {
-        metaId: { notIn: keepMetaIds },
-        NOT: {
-          operativeDays: {
-            some: { date: today, intentActive: true },
-          },
-        },
-      },
+      where: { metaId: { notIn: keepMetaIds } },
     })
   } catch {
     // Sin tablas o sin filas previas
   }
 }
 
-function dayCellsForEntity(
-  metaId: string,
-  type: "campaign" | "adset",
-  dateKeys: string[],
-  campaignDaily: Map<string, MetaDailyMetricCell[]>,
-  adsetDaily: Map<string, MetaDailyMetricCell[]>
-): InformeEntityRow["dayCells"] {
-  const source =
-    type === "campaign" ? campaignDaily.get(metaId) : adsetDaily.get(metaId)
-  const byDate = new Map(source?.map((d) => [d.date, d]))
-  return dateKeys.map((date) => {
-    const cell = byDate.get(date)
-    return (
-      cell ?? {
-        date,
-        spend: 0,
-        purchases: 0,
-        saleStatus: "neutral" as const,
-      }
-    )
-  })
-}
-
 export async function getMetaInformePayload(): Promise<MetaInformePayload> {
   const today = getDashboardToday()
+  const yesterday = getDashboardYesterday()
   const informeStartDate = getMetaInformeStartDate()
   const dateRange = getMetaInformeDateRange()
   const dateKeys = getMetaInformeDateKeys()
@@ -342,15 +577,20 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     getAccountKpis(getTodayDateRange()),
   ])
 
-  const { campaignRows, adsetRows, trackInputs } = collectSpendingToday(
+  const { campaignRows, adsetRows, trackInputs } = collectSpendingInRange(
     daily,
-    today
+    dateKeys
   )
   const metaIds = [...new Set(trackInputs.map((t) => t.metaId))]
 
   await upsertTrackEntitiesBatch(trackInputs)
-  await pruneStaleTrackEntities(metaIds, today)
-  await syncMetaOperativeStateForDate(today, metaIds)
+  await pruneStaleTrackEntities(metaIds)
+
+  if (metaIds.length > 0) {
+    for (const d of dateKeys) {
+      await syncMetaOperativeStateForDate(d, metaIds)
+    }
+  }
 
   const metaIdSet = new Set(metaIds)
   if (metaIdSet.size === 0) {
@@ -360,6 +600,24 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       dateRange,
       groups: [],
       forgotten: [],
+      olvidoAlerts: [],
+      sinVentasAlerts: [],
+      cpaAltoAlerts: [],
+      adsetsToPause: [],
+      campaignsToPause: [],
+      yesterday,
+      totals: {
+        spendToday: 0,
+        purchasesToday: 0,
+        cpaToday: 0,
+        pointsTotal: 0,
+        dayTotals: dateKeys.map((date) => ({
+          date,
+          spend: 0,
+          purchases: 0,
+          points: 0,
+        })),
+      },
       accountSpendToday: accountKpis.totalSpend,
       accountPurchasesToday: accountKpis.purchases,
     }
@@ -376,9 +634,20 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     }),
   ])
 
-  const operativeByEntityDate = new Map<string, (typeof operativeRows)[0]>()
+  const storedByEntityDate = new Map<string, StoredOperativeDay>()
   for (const row of operativeRows) {
-    operativeByEntityDate.set(`${row.entityId}:${row.date}`, row)
+    storedByEntityDate.set(`${row.entityId}:${row.date}`, {
+      spend: row.spend,
+      purchases: row.purchases,
+      metaWasActive: row.metaWasActive,
+      sold: row.sold,
+      cpa: row.cpa,
+      points: row.points,
+      estadoKind: row.estadoKind as InformeEstadoKind,
+      estadoLabel: row.estadoLabel,
+      notifyOlvido: row.notifyOlvido,
+      rowHighlight: row.rowHighlight as StoredOperativeDay["rowHighlight"],
+    })
   }
 
   const campaignDaily = new Map(daily.campaigns.map((c) => [c.metaId, c.days]))
@@ -395,20 +664,23 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     (a, b) => spendOnDate(b, today) - spendOnDate(a, today)
   )
 
+  const campaignMetaIds = sortedCampaignRows.map((c) => c.metaId)
+  const adsetsByCampaign =
+    campaignMetaIds.length > 0
+      ? await getAdsetsByCampaignMap(getMetaClient(), campaignMetaIds)
+      : new Map<string, MetaAdSet[]>()
+
   for (const cRow of sortedCampaignRows) {
     const campaign = entityByKey.get(`campaign:${cRow.metaId}`)
     if (!campaign) continue
-    const todayOp = operativeByEntityDate.get(`${campaign.id}:${today}`)
-    const campaignRow = toInformeRow(
+
+    const campaignRow = buildInformeRow(
       campaign,
-      todayOp ?? null,
-      dayCellsForEntity(
-        campaign.metaId,
-        "campaign",
-        dateKeys,
-        campaignDaily,
-        adsetDaily
-      )
+      dateKeys,
+      today,
+      storedByEntityDate,
+      campaignDaily,
+      adsetDaily
     )
 
     const adsets = adsetRows
@@ -417,61 +689,96 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       .map((aRow) => {
         const adset = entityByKey.get(`adset:${aRow.metaId}`)
         if (!adset) return null
-        const op = operativeByEntityDate.get(`${adset.id}:${today}`)
-        return toInformeRow(
+        return buildInformeRow(
           adset,
-          op ?? null,
-          dayCellsForEntity(
-            adset.metaId,
-            "adset",
-            dateKeys,
-            campaignDaily,
-            adsetDaily
-          )
+          dateKeys,
+          today,
+          storedByEntityDate,
+          campaignDaily,
+          adsetDaily
         )
       })
       .filter((row): row is InformeEntityRow => row !== null)
 
-    groups.push({ campaign: campaignRow, adsets })
+    const catalogAdsets =
+      adsetsByCampaign.get(normalizeMetaId(cRow.metaId)) ?? []
+    const { total: adSetsCount, active: activeAdSetsCount } =
+      countAdSetsForCampaign(catalogAdsets)
+
+    groups.push({
+      campaign: campaignRow,
+      adsets,
+      adSetsCount,
+      activeAdSetsCount,
+    })
     allRows.push(campaignRow, ...adsets)
   }
 
-  const forgotten = allRows.filter((r) => r.forgotActivation)
+  const olvidoAlerts = allRows.filter((r) => r.notifyOlvido)
+  const sinVentasAlerts = allRows.filter((r) => r.estadoKind === "sin_ventas")
+  const cpaAltoAlerts = allRows.filter((r) => r.estadoKind === "cpa_alto")
+  const adsetsToPause = collectAdsetsToPause(groups)
+  const campaignsToPause = collectCampaignsToPause(groups)
+
+  const totals = computeInformeTotals(allRows, dateKeys, today)
 
   return {
     date: today,
     informeStartDate,
     dateRange,
     groups,
-    forgotten,
+    forgotten: olvidoAlerts,
+    olvidoAlerts,
+    sinVentasAlerts,
+    cpaAltoAlerts,
+    adsetsToPause,
+    campaignsToPause,
+    yesterday,
+    totals,
     accountSpendToday: accountKpis.totalSpend,
     accountPurchasesToday: accountKpis.purchases,
   }
 }
 
-export type ForgottenActivationItem = {
+export type OlvidoNotificationItem = {
   type: "campaign" | "adset"
   name: string
   campaignName?: string
+  estadoLabel: string
+}
+
+/** @deprecated Usar getOlvidoNotifications */
+export type ForgottenActivationItem = OlvidoNotificationItem
+
+export async function getOlvidoNotifications(
+  date = getDashboardToday()
+): Promise<OlvidoNotificationItem[]> {
+  void date
+  const informe = await getMetaInformePayload()
+  return informe.olvidoAlerts.map((row) => {
+    if (row.type === "campaign") {
+      return {
+        type: "campaign" as const,
+        name: row.name,
+        estadoLabel: row.estadoLabel,
+      }
+    }
+    const group = informe.groups.find((g) =>
+      g.adsets.some((a) => a.entityId === row.entityId)
+    )
+    return {
+      type: "adset" as const,
+      name: row.name,
+      campaignName: group?.campaign.name,
+      estadoLabel: row.estadoLabel,
+    }
+  })
 }
 
 export async function getForgottenActivations(
   date = getDashboardToday()
-): Promise<ForgottenActivationItem[]> {
-  const informe = await getMetaInformePayload()
-  return informe.forgotten.map((f) => {
-    if (f.type === "campaign") {
-      return { type: "campaign" as const, name: f.name }
-    }
-    const group = informe.groups.find((g) =>
-      g.adsets.some((a) => a.entityId === f.entityId)
-    )
-    return {
-      type: "adset" as const,
-      name: f.name,
-      campaignName: group?.campaign.name,
-    }
-  })
+): Promise<OlvidoNotificationItem[]> {
+  return getOlvidoNotifications(date)
 }
 
 export function formatCop(amount: number): string {

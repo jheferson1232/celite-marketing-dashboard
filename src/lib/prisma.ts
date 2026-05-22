@@ -12,7 +12,11 @@ function createPrismaClient() {
 }
 
 function hasInformeModels(client: PrismaClient) {
-  return Boolean(client.metaTrackEntity && client.metaOperativeDay)
+  return Boolean(
+    client.metaTrackEntity &&
+      client.metaOperativeDay &&
+      client.metaInformeAccountDay
+  )
 }
 
 let prisma = globalForPrisma.prisma ?? createPrismaClient()

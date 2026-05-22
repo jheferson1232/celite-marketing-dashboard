@@ -8,13 +8,11 @@ import { sendTelegramLongMessage } from "@/lib/telegram/bot"
 import { getAccountKpis } from "./account-kpis"
 import {
   formatCop,
-  getForgottenActivations,
   getMetaInformePayload,
+  getOlvidoNotifications,
 } from "./meta-operative-service"
-import {
-  generateActivationReminderCommentary,
-  generateNightlyCommentary,
-} from "./meta-cron-commentary"
+import { generateNightlyCommentary } from "./meta-cron-commentary"
+import { sendMetaHourlyReportToTelegram } from "./meta-hourly-report"
 
 export function getCronSecret(): string | undefined {
   return process.env.CRON_SECRET?.trim()
@@ -46,26 +44,23 @@ async function sendToAllowedUsers(text: string): Promise<number> {
   return sent
 }
 
-export async function runMetaHourlyActivationReport(): Promise<{
+/** Cada hora: resumen + conjuntos ≥10k sin ventas + campañas ≥30k sin ventas. */
+export async function runMetaHourlyOperativeReport(): Promise<{
   skipped: boolean
   hour: number
-  forgottenCount: number
   sent: number
+  adsetsToPause: number
+  campaignsToPause: number
 }> {
   const hour = getDashboardHour()
-  if (hour < 8 || hour > 18) {
-    return { skipped: true, hour, forgottenCount: 0, sent: 0 }
-  }
-
-  const forgotten = await getForgottenActivations()
-  const message = await generateActivationReminderCommentary(forgotten, hour)
-  const sent = await sendToAllowedUsers(message)
+  const result = await sendMetaHourlyReportToTelegram()
 
   return {
     skipped: false,
     hour,
-    forgottenCount: forgotten.length,
-    sent,
+    sent: result.sent,
+    adsetsToPause: result.adsetsToPause,
+    campaignsToPause: result.campaignsToPause,
   }
 }
 
@@ -101,23 +96,30 @@ export async function runMetaNightlyReport(): Promise<{
     }
   }
 
-  const stillOffMarked = informe.forgotten.map((f) => ({
-    type: f.type,
-    name: f.name,
+  const olvido = await getOlvidoNotifications()
+
+  const mapRowWithCampaign = (row: (typeof informe.sinVentasAlerts)[0]) => ({
+    name: row.name,
     campaignName:
-      f.type === "adset"
+      row.type === "adset"
         ? informe.groups.find((g) =>
-            g.adsets.some((a) => a.entityId === f.entityId)
+            g.adsets.some((a) => a.entityId === row.entityId)
           )?.campaign.name
         : undefined,
-  }))
+    spendToday: row.spendToday,
+    cpaToday: row.cpaToday,
+  })
+
+  const sinVentas = informe.sinVentasAlerts.map(mapRowWithCampaign)
+  const cpaAlto = informe.cpaAltoAlerts.map(mapRowWithCampaign)
 
   const message = await generateNightlyCommentary({
-    forgotten: stillOffMarked,
+    olvido,
+    sinVentas,
+    cpaAlto,
     accountSpend: kpis.totalSpend,
     accountPurchases: kpis.purchases,
     soldAdsets,
-    stillOffMarked,
   })
 
   const sent = await sendToAllowedUsers(
@@ -131,11 +133,14 @@ export async function runMetaNightlyReport(): Promise<{
 
 export async function runMetaTelegramCron(): Promise<{
   hour: number
-  hourly: Awaited<ReturnType<typeof runMetaHourlyActivationReport>>
+  hourly: Awaited<ReturnType<typeof runMetaHourlyOperativeReport>>
   nightly: Awaited<ReturnType<typeof runMetaNightlyReport>>
 }> {
   const hour = getDashboardHour()
-  const hourly = await runMetaHourlyActivationReport()
+  const hourly = await runMetaHourlyOperativeReport()
   const nightly = await runMetaNightlyReport()
   return { hour, hourly, nightly }
 }
+
+/** @deprecated Usar runMetaHourlyOperativeReport */
+export const runMetaHourlyActivationReport = runMetaHourlyOperativeReport

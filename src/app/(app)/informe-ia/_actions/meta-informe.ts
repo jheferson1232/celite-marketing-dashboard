@@ -1,13 +1,12 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
+import { getMetaInformePayload } from "@/lib/services/meta/meta-operative-service"
 import {
-  getMetaInformePayload,
-  setMetaIntentActive,
-  getForgottenActivations,
-} from "@/lib/services/meta/meta-operative-service"
-import { generateActivationReminderCommentary } from "@/lib/services/meta/meta-cron-commentary"
-import { getDashboardHour } from "@/lib/date"
+  buildMetaHourlyReportPayload,
+  buildMetaHourlyTelegramMessage,
+  sendMetaHourlyReportToTelegram,
+} from "@/lib/services/meta/meta-hourly-report"
 
 export const getMetaInformeAction = createServerAction(async () =>
   getMetaInformePayload()
@@ -17,22 +16,29 @@ export const syncMetaInformeAction = createServerAction(async () =>
   getMetaInformePayload()
 )
 
-export const setMetaIntentActiveAction = createServerAction(
-  async ({
-    entityId,
-    intentActive,
-  }: {
-    entityId: string
-    intentActive: boolean
-  }) => {
-    await setMetaIntentActive(entityId, intentActive)
-    return getMetaInformePayload()
+/** Vista previa del informe horario (mismo texto que Telegram, sin enviar). */
+export const previewMetaInformeHourlyAction = createServerAction(async () => {
+  const payload = await buildMetaHourlyReportPayload()
+  const text = await buildMetaHourlyTelegramMessage(payload)
+  return {
+    text,
+    adsetsToPause: payload.adsetsToPause,
+    campaignsToPause: payload.campaignsToPause,
+  }
+})
+
+/** Envía el informe horario a los chats configurados en Telegram. */
+export const sendMetaInformeHourlyToTelegramAction = createServerAction(
+  async () => {
+    const result = await sendMetaHourlyReportToTelegram()
+    return {
+      text: result.message,
+      sent: result.sent,
+      adsetsToPause: result.adsetsToPause,
+      campaignsToPause: result.campaignsToPause,
+    }
   }
 )
 
-export const getMetaInformeAiReminderAction = createServerAction(async () => {
-  const forgotten = await getForgottenActivations()
-  const hour = getDashboardHour()
-  const text = await generateActivationReminderCommentary(forgotten, hour)
-  return { text, forgottenCount: forgotten.length }
-})
+/** @deprecated Usar sendMetaInformeHourlyToTelegramAction */
+export const getMetaInformeAiReminderAction = sendMetaInformeHourlyToTelegramAction

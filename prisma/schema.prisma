@@ -48,7 +48,7 @@ model MetaTrackEntity {
   @@index([type, campaignMetaId])
 }
 
-/** Checklist diario: activé (manual), estado Meta, ventas del día. */
+/** Snapshot diario por campaña/conjunto: gasto, ventas, puntos y estado (Informe IA). */
 model MetaOperativeDay {
   id            String          @id @default(cuid())
   date          String
@@ -59,8 +59,23 @@ model MetaOperativeDay {
   sold          Boolean         @default(false)
   purchases     Int             @default(0)
   spend         Float           @default(0)
+  cpa           Float           @default(0)
+  points        Int?
+  estadoKind    String          @default("neutral")
+  estadoLabel   String          @default("—")
+  notifyOlvido  Boolean         @default(false)
+  rowHighlight  String          @default("none")
   updatedAt     DateTime        @updatedAt
 
   @@unique([date, entityId])
   @@index([date])
+  @@index([entityId, date])
+}
+
+/** Totales de cuenta Meta guardados por día (Informe IA). */
+model MetaInformeAccountDay {
+  date             String   @id
+  accountSpend     Float    @default(0)
+  accountPurchases Int      @default(0)
+  syncedAt         DateTime @updatedAt
 }

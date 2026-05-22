@@ -11,12 +11,12 @@ import {
   RiStackLine,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -28,17 +28,81 @@ import {
   formatNumber,
   getCostPerResultCellClassName,
 } from "@/app/(app)/dashboard/_components/campaigns/utils"
-import type { InformeCampaignGroup, InformeEntityRow } from "@/lib/services/meta/meta-operative-service"
+import type {
+  InformeCampaignGroup,
+  InformeEntityRow,
+  InformeTableTotals,
+} from "@/lib/services/meta/meta-operative-service"
+import { formatInformePoints } from "@/lib/services/meta/meta-informe-scoring"
+import type { InformePauseItem } from "@/lib/services/meta/meta-informe-alerts"
 import {
   getMetaInformeAction,
-  getMetaInformeAiReminderAction,
-  setMetaIntentActiveAction,
+  previewMetaInformeHourlyAction,
+  sendMetaInformeHourlyToTelegramAction,
   syncMetaInformeAction,
 } from "../_actions/meta-informe"
 
 function formatDayLabel(date: string): string {
   const [, m, d] = date.split("-")
   return `${d}/${m}`
+}
+
+function formatDayHeader(date: string, yesterday: string): string {
+  if (date === yesterday) return "Ayer"
+  return formatDayLabel(date)
+}
+
+function PauseAlertsBanner({
+  title,
+  items,
+  variant,
+}: {
+  title: string
+  items: InformePauseItem[]
+  variant: "amber" | "red"
+}) {
+  if (items.length === 0) return null
+  const border =
+    variant === "amber"
+      ? "border-amber-200 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10"
+      : "border-red-200 bg-red-50/80 dark:border-red-500/30 dark:bg-red-500/10"
+  const titleColor =
+    variant === "amber"
+      ? "text-amber-800 dark:text-amber-300"
+      : "text-red-800 dark:text-red-300"
+  const iconColor = variant === "amber" ? "text-amber-600" : "text-red-600"
+
+  return (
+    <div className={cn("flex gap-2 rounded-lg border px-4 py-3 text-sm", border)}>
+      <RiAlertLine className={cn("mt-0.5 size-4 shrink-0", iconColor)} />
+      <div className="min-w-0 flex-1">
+        <p className={cn("font-medium", titleColor)}>{title}</p>
+        <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
+          {items.slice(0, 6).map((item) => (
+            <li key={`${item.type}-${item.name}`} className="truncate">
+              {item.type === "adset" && item.campaignName
+                ? `${item.name} (${item.campaignName})`
+                : item.name}
+              {" · "}
+              {formatCurrency(item.spend, META_DASHBOARD_CURRENCY)} ·{" "}
+              {item.purchases} compras
+            </li>
+          ))}
+          {items.length > 6 ? (
+            <li className="text-muted-foreground/80">
+              +{items.length - 6} más en el informe de Telegram
+            </li>
+          ) : null}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function rowHighlightClass(highlight: InformeEntityRow["rowHighlight"]): string {
+  if (highlight === "red") return "bg-red-50/80 dark:bg-red-500/10"
+  if (highlight === "orange") return "bg-orange-50/80 dark:bg-orange-500/10"
+  return ""
 }
 
 function DayCell({ cell }: { cell: InformeEntityRow["dayCells"][0] }) {
@@ -52,58 +116,126 @@ function DayCell({ cell }: { cell: InformeEntityRow["dayCells"][0] }) {
           "bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-400",
         cell.saleStatus === "neutral" && "bg-muted/40 text-muted-foreground"
       )}
-      title={`${cell.date}: ${cell.purchases} compras, ${formatCurrency(cell.spend, META_DASHBOARD_CURRENCY)}`}
+      title={`${cell.date}: ${formatCurrency(cell.spend, META_DASHBOARD_CURRENCY)}, ${cell.purchases} compras, pts ${formatInformePoints(cell.points)}`}
     >
-      <div className="font-medium">{formatDayLabel(cell.date)}</div>
-      <div>{cell.purchases > 0 ? `${cell.purchases}v` : "—"}</div>
+      <div className="font-medium tabular-nums">
+        {formatInformePoints(cell.points)}
+      </div>
+      <div className="text-muted-foreground">
+        {cell.purchases > 0 ? `${cell.purchases}v` : "—"}
+      </div>
     </div>
   )
 }
 
-function MetricsCells({ row }: { row: InformeEntityRow }) {
+function getDisplayMetrics(row: InformeEntityRow, yesterday: string) {
+  const hasToday = row.spendToday > 0 || row.purchasesToday > 0
+  if (hasToday) {
+    return {
+      spend: row.spendToday,
+      purchases: row.purchasesToday,
+      cpa: row.cpaToday,
+      period: "hoy" as const,
+    }
+  }
+
+  const yCell = row.dayCells.find((d) => d.date === yesterday)
+  if (yCell && (yCell.spend > 0 || yCell.purchases > 0)) {
+    return {
+      spend: yCell.spend,
+      purchases: yCell.purchases,
+      cpa: yCell.purchases > 0 ? yCell.spend / yCell.purchases : 0,
+      period: "ayer" as const,
+    }
+  }
+
+  return { spend: 0, purchases: 0, cpa: 0, period: null }
+}
+
+function MetricsCells({
+  row,
+  yesterday,
+}: {
+  row: InformeEntityRow
+  yesterday: string
+}) {
+  const m = getDisplayMetrics(row, yesterday)
   const cpaHighlight = getCostPerResultCellClassName(
-    row.cpaToday,
+    m.cpa,
     META_DASHBOARD_CURRENCY
   )
+  const periodHint =
+    m.period === "ayer"
+      ? " (ayer)"
+      : m.period === "hoy"
+        ? " (hoy)"
+        : ""
 
   return (
     <>
-      <TableCell className="text-right tabular-nums">
-        {formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)}
+      <TableCell className="text-right tabular-nums" title={`Gasto${periodHint}`}>
+        <div>
+          {m.spend > 0
+            ? formatCurrency(m.spend, META_DASHBOARD_CURRENCY)
+            : "—"}
+        </div>
+        {m.period === "ayer" ? (
+          <div className="text-muted-foreground text-[10px] font-normal">
+            ayer
+          </div>
+        ) : null}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {row.purchasesToday > 0 ? formatNumber(row.purchasesToday) : "—"}
+      <TableCell
+        className="text-right tabular-nums"
+        title={`Compras${periodHint}`}
+      >
+        {m.purchases > 0 ? formatNumber(m.purchases) : "—"}
       </TableCell>
-      <TableCell className={cn("text-right tabular-nums", cpaHighlight)}>
-        {row.cpaToday > 0
-          ? formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)
-          : "—"}
+      <TableCell
+        className={cn("text-right tabular-nums", cpaHighlight)}
+        title={`CPA${periodHint}`}
+      >
+        {m.cpa > 0 ? formatCurrency(m.cpa, META_DASHBOARD_CURRENCY) : "—"}
       </TableCell>
     </>
   )
 }
 
-function StatusCells({
-  row,
-  onToggleIntent,
-  pending,
+function AdsetCountCells({
+  adSetsCount,
+  activeAdSetsCount,
 }: {
-  row: InformeEntityRow
-  onToggleIntent: (entityId: string, value: boolean) => void
-  pending: boolean
+  adSetsCount?: number
+  activeAdSetsCount?: number
 }) {
+  if (adSetsCount === undefined || activeAdSetsCount === undefined) {
+    return (
+      <>
+        <TableCell className="text-center text-muted-foreground">—</TableCell>
+        <TableCell className="text-center text-muted-foreground">—</TableCell>
+      </>
+    )
+  }
+
   return (
     <>
-      <TableCell className="w-[88px] text-center">
-        <Checkbox
-          checked={row.intentActive}
-          disabled={pending}
-          onCheckedChange={(checked) =>
-            onToggleIntent(row.entityId, checked === true)
-          }
-          aria-label={`Activé ${row.name}`}
-        />
+      <TableCell className="text-center tabular-nums">{adSetsCount}</TableCell>
+      <TableCell className="text-center tabular-nums">
+        <span
+          className={cn(
+            activeAdSetsCount > 0 && "font-medium text-orange-500"
+          )}
+        >
+          {activeAdSetsCount}
+        </span>
       </TableCell>
+    </>
+  )
+}
+
+function StatusCells({ row }: { row: InformeEntityRow }) {
+  return (
+    <>
       <TableCell className="w-[72px] text-center">
         <span
           className={cn(
@@ -116,16 +248,26 @@ function StatusCells({
           {row.metaWasActive ? "ON" : "OFF"}
         </span>
       </TableCell>
-      <TableCell className="w-[88px] text-center">
-        {row.forgotActivation ? (
-          <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
-            ⚠ Olvido
-          </span>
-        ) : row.intentActive ? (
-          <span className="text-xs text-green-600 dark:text-green-400">OK</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
+      <TableCell
+        className={cn(
+          "min-w-[140px] text-center text-xs",
+          row.rowHighlight === "red" &&
+            "font-medium text-red-600 dark:text-red-400",
+          row.rowHighlight === "orange" &&
+            "font-medium text-orange-600 dark:text-orange-400"
         )}
+      >
+        {row.estadoLabel}
+      </TableCell>
+      <TableCell
+        className={cn(
+          "w-[56px] text-center tabular-nums text-sm font-medium",
+          row.pointsTotal > 0 && "text-green-600 dark:text-green-400",
+          row.pointsTotal < 0 && "text-red-600 dark:text-red-400"
+        )}
+        title="Suma del rango (máximo −1 por fila)"
+      >
+        {formatInformePoints(row.pointsTotal)}
       </TableCell>
     </>
   )
@@ -133,24 +275,21 @@ function StatusCells({
 
 function EntityRow({
   row,
+  yesterday,
   indent,
-  onToggleIntent,
-  pending,
   leadingCell,
+  adSetsCount,
+  activeAdSetsCount,
 }: {
   row: InformeEntityRow
+  yesterday: string
   indent?: boolean
-  onToggleIntent: (entityId: string, value: boolean) => void
-  pending: boolean
   leadingCell?: React.ReactNode
+  adSetsCount?: number
+  activeAdSetsCount?: number
 }) {
   return (
-    <TableRow
-      className={cn(
-        row.forgotActivation && "bg-orange-50/80 dark:bg-orange-500/10",
-        indent && "bg-muted/20"
-      )}
-    >
+    <TableRow className={cn(rowHighlightClass(row.rowHighlight), indent && "bg-muted/20")}>
       <TableCell className={cn("max-w-[260px]", indent && "pl-10")}>
         <div className="flex items-center gap-2">
           {leadingCell}
@@ -162,12 +301,12 @@ function EntityRow({
           </div>
         </div>
       </TableCell>
-      <StatusCells
-        row={row}
-        onToggleIntent={onToggleIntent}
-        pending={pending}
+      <StatusCells row={row} />
+      <AdsetCountCells
+        adSetsCount={adSetsCount}
+        activeAdSetsCount={activeAdSetsCount}
       />
-      <MetricsCells row={row} />
+      <MetricsCells row={row} yesterday={yesterday} />
       {row.dayCells.map((cell) => (
         <TableCell key={cell.date} className="w-[52px] p-1">
           <DayCell cell={cell} />
@@ -181,16 +320,12 @@ function CampaignGroupRows({
   group,
   isExpanded,
   onToggleExpand,
-  dayHeaders,
-  onToggleIntent,
-  pending,
+  yesterday,
 }: {
   group: InformeCampaignGroup
   isExpanded: boolean
   onToggleExpand: () => void
-  dayHeaders: string[]
-  onToggleIntent: (entityId: string, value: boolean) => void
-  pending: boolean
+  yesterday: string
 }) {
   const adsetCount = group.adsets.length
 
@@ -198,8 +333,9 @@ function CampaignGroupRows({
     <>
       <EntityRow
         row={group.campaign}
-        onToggleIntent={onToggleIntent}
-        pending={pending}
+        yesterday={yesterday}
+        adSetsCount={group.adSetsCount}
+        activeAdSetsCount={group.activeAdSetsCount}
         leadingCell={
           <div className="flex shrink-0 items-center gap-1">
             <Button
@@ -231,11 +367,6 @@ function CampaignGroupRows({
                 <RiArrowRightSLine className="size-4" />
               )}
             </Button>
-            {adsetCount > 0 ? (
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {adsetCount}
-              </span>
-            ) : null}
           </div>
         }
       />
@@ -244,9 +375,8 @@ function CampaignGroupRows({
             <EntityRow
               key={adset.entityId}
               row={adset}
+              yesterday={yesterday}
               indent
-              onToggleIntent={onToggleIntent}
-              pending={pending}
             />
           ))
         : null}
@@ -254,16 +384,80 @@ function CampaignGroupRows({
   )
 }
 
+function InformeTotalsRow({
+  totals,
+  yesterday,
+  dayHeaders,
+}: {
+  totals: InformeTableTotals
+  yesterday: string
+  dayHeaders: string[]
+}) {
+  const dayByDate = new Map(totals.dayTotals.map((d) => [d.date, d]))
+  const yDay = dayByDate.get(yesterday)
+  const hasToday =
+    totals.spendToday > 0 || totals.purchasesToday > 0
+  const spend = hasToday ? totals.spendToday : (yDay?.spend ?? 0)
+  const purchases = hasToday
+    ? totals.purchasesToday
+    : (yDay?.purchases ?? 0)
+  const cpa = purchases > 0 ? spend / purchases : 0
+  const cpaHighlight = getCostPerResultCellClassName(
+    cpa,
+    META_DASHBOARD_CURRENCY
+  )
+
+  return (
+    <TableRow className="bg-muted/60 border-t-2 font-semibold">
+      <TableCell>Total (conjuntos)</TableCell>
+      <TableCell />
+      <TableCell />
+      <TableCell />
+      <TableCell />
+      <TableCell
+        className={cn(
+          "text-center tabular-nums",
+          totals.pointsTotal > 0 && "text-green-600 dark:text-green-400",
+          totals.pointsTotal < 0 && "text-red-600 dark:text-red-400"
+        )}
+        title="Suma de puntos solo conjuntos"
+      >
+        {formatInformePoints(totals.pointsTotal)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {spend > 0 ? formatCurrency(spend, META_DASHBOARD_CURRENCY) : "—"}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {purchases > 0 ? formatNumber(purchases) : "—"}
+      </TableCell>
+      <TableCell className={cn("text-right tabular-nums", cpaHighlight)}>
+        {cpa > 0 ? formatCurrency(cpa, META_DASHBOARD_CURRENCY) : "—"}
+      </TableCell>
+      {dayHeaders.map((date) => {
+        const day = dayByDate.get(date)
+        return (
+          <TableCell key={date} className="p-1 text-center text-xs tabular-nums">
+            <div>{formatInformePoints(day?.points ?? 0)}</div>
+            <div className="text-muted-foreground font-normal">
+              {formatDayHeader(date, yesterday)}
+            </div>
+          </TableCell>
+        )
+      })}
+    </TableRow>
+  )
+}
+
 function InformeTable({
   groups,
   dayHeaders,
-  onToggleIntent,
-  pending,
+  yesterday,
+  totals,
 }: {
   groups: InformeCampaignGroup[]
   dayHeaders: string[]
-  onToggleIntent: (entityId: string, value: boolean) => void
-  pending: boolean
+  yesterday: string
+  totals: InformeTableTotals
 }) {
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
     () => new Set()
@@ -286,15 +480,23 @@ function InformeTable({
       <TableHeader>
         <TableRow>
           <TableHead className="min-w-[220px]">Nombre</TableHead>
-          <TableHead className="text-center">Activé</TableHead>
           <TableHead className="text-center">Meta</TableHead>
           <TableHead className="text-center">Estado</TableHead>
-          <TableHead className="text-right">Gasto</TableHead>
-          <TableHead className="text-right">Compras</TableHead>
-          <TableHead className="text-right">CPA</TableHead>
+          <TableHead className="text-center">Puntos</TableHead>
+          <TableHead className="text-center">Conjuntos</TableHead>
+          <TableHead className="text-center">Conj. activos</TableHead>
+          <TableHead className="text-right" title="Hoy; si no hay gasto, muestra ayer">
+            Gasto
+          </TableHead>
+          <TableHead className="text-right" title="Hoy; si no hay ventas, muestra ayer">
+            Compras
+          </TableHead>
+          <TableHead className="text-right" title="Hoy; si no hay ventas, muestra ayer">
+            CPA
+          </TableHead>
           {dayHeaders.map((date) => (
             <TableHead key={date} className="p-1 text-center text-xs">
-              {formatDayLabel(date)}
+              {formatDayHeader(date, yesterday)}
             </TableHead>
           ))}
         </TableRow>
@@ -306,12 +508,17 @@ function InformeTable({
             group={group}
             isExpanded={expandedCampaignIds.has(group.campaign.metaId)}
             onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
-            dayHeaders={dayHeaders}
-            onToggleIntent={onToggleIntent}
-            pending={pending}
+            yesterday={yesterday}
           />
         ))}
       </TableBody>
+      <TableFooter>
+        <InformeTotalsRow
+          totals={totals}
+          yesterday={yesterday}
+          dayHeaders={dayHeaders}
+        />
+      </TableFooter>
     </Table>
   )
 }
@@ -319,6 +526,7 @@ function InformeTable({
 export function InformeIaContent() {
   const queryClient = useQueryClient()
   const [aiText, setAiText] = useState<string | null>(null)
+  const [telegramSent, setTelegramSent] = useState<number | null>(null)
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
@@ -333,30 +541,29 @@ export function InformeIaContent() {
     },
   })
 
-  const intentMutation = useMutation({
-    mutationFn: ({
-      entityId,
-      intentActive,
-    }: {
-      entityId: string
-      intentActive: boolean
-    }) =>
-      runServerAction(setMetaIntentActiveAction({ entityId, intentActive })),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["meta-informe-ia"], data)
+  const previewMutation = useMutation({
+    mutationFn: () => runServerAction(previewMetaInformeHourlyAction()),
+    onSuccess: (result) => {
+      if (!result) return
+      setAiText(result.text)
+      setTelegramSent(null)
     },
   })
 
-  const aiMutation = useMutation({
-    mutationFn: () => runServerAction(getMetaInformeAiReminderAction()),
+  const sendMutation = useMutation({
+    mutationFn: () => runServerAction(sendMetaInformeHourlyToTelegramAction()),
     onSuccess: (result) => {
-      if (result) setAiText(result.text)
+      if (!result) return
+      setAiText(result.text)
+      setTelegramSent(result.sent)
     },
   })
+
+  const hourlyPending = previewMutation.isPending || sendMutation.isPending
 
   const data = informeQuery.data
   const dayHeaders = data?.groups[0]?.campaign.dayCells.map((d) => d.date) ?? []
-  const pending = syncMutation.isPending || intentMutation.isPending
+  const pending = syncMutation.isPending
 
   const accountCpa =
     data && data.accountPurchasesToday > 0
@@ -371,9 +578,9 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Solo Facebook/Meta. Campañas con gasto hoy; expande para ver
-            conjuntos. Marca lo que activaste; el cron te avisa si olvidaste
-            encenderlos. Verde = vendió; rojo = gastó sin ventas.
+            Cron cada hora a Telegram: resumen de campañas, conjuntos ≥10k sin
+            ventas (apagar) y campañas ≥30k sin ventas. El botón envía el mismo
+            informe manualmente.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -389,31 +596,86 @@ export function InformeIaContent() {
             Sincronizar Meta
           </Button>
           <Button
-            variant="secondary"
+            variant="outline"
             size="sm"
-            onClick={() => aiMutation.mutate()}
-            disabled={aiMutation.isPending}
+            onClick={() => previewMutation.mutate()}
+            disabled={hourlyPending}
           >
             <RiBrainLine className="size-4" />
-            Recordatorio IA
+            Vista previa
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => sendMutation.mutate()}
+            disabled={hourlyPending}
+          >
+            <RiBrainLine className="size-4" />
+            Enviar a Telegram
           </Button>
         </div>
       </div>
 
-      {data && data.forgotten.length > 0 ? (
+      {data && data.olvidoAlerts.length > 0 ? (
         <div className="flex gap-2 rounded-lg border border-orange-200 bg-orange-50/80 px-4 py-3 text-sm dark:border-orange-500/30 dark:bg-orange-500/10">
           <RiAlertLine className="mt-0.5 size-4 shrink-0 text-orange-600" />
           <div>
             <p className="font-medium text-orange-800 dark:text-orange-300">
-              {data.forgotten.length} pendiente
-              {data.forgotten.length === 1 ? "" : "s"} de activar en Meta
+              {data.olvidoAlerts.length} olvido
+              {data.olvidoAlerts.length === 1 ? "" : "s"} — no activaste ayer
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Marcaste el check «Activé» pero Meta muestra OFF. Enciéndelos en
-              Ads Manager.
+              Ayer hubo gasto pero Meta estaba apagado. Enciéndelos en Ads
+              Manager. Con ≤ −3 puntos acumulados no se envían avisos.
             </p>
           </div>
         </div>
+      ) : null}
+
+      {data && data.sinVentasAlerts.length > 0 ? (
+        <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
+          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
+          <div>
+            <p className="font-medium text-red-800 dark:text-red-300">
+              {data.sinVentasAlerts.length} con gasto alto sin ventas (−1)
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {data && data.cpaAltoAlerts.length > 0 ? (
+        <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm dark:border-red-500/30 dark:bg-red-500/10">
+          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
+          <div>
+            <p className="font-medium text-red-800 dark:text-red-300">
+              {data.cpaAltoAlerts.length} con CPA &gt; 15k (−1)
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {data ? (
+        <PauseAlertsBanner
+          variant="amber"
+          title={`${data.adsetsToPause.length} conjunto${data.adsetsToPause.length === 1 ? "" : "s"} ≥10k COP hoy sin ventas — considera apagar`}
+          items={data.adsetsToPause}
+        />
+      ) : null}
+
+      {data ? (
+        <PauseAlertsBanner
+          variant="red"
+          title={`${data.campaignsToPause.length} campaña${data.campaignsToPause.length === 1 ? "" : "s"} ≥30k COP hoy sin ventas — considera apagar`}
+          items={data.campaignsToPause}
+        />
+      ) : null}
+
+      {telegramSent !== null ? (
+        <p className="text-muted-foreground text-xs">
+          {telegramSent > 0
+            ? `Informe enviado a ${telegramSent} chat(s) de Telegram.`
+            : "No se envió a Telegram (revisa TELEGRAM_BOT_TOKEN y TELEGRAM_ALLOWED_USER_IDS)."}
+        </p>
       ) : null}
 
       {aiText ? (
@@ -438,8 +700,8 @@ export function InformeIaContent() {
             en Meta (o aún no sincronizó).
           </p>
           <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-8 text-center text-sm">
-            Cuando una campaña o conjunto gaste hoy, aparecerá aquí para marcar
-            si la activaste.
+            Cuando una campaña o conjunto gaste hoy, aparecerá aquí con puntos
+            y estado automático.
           </p>
         </>
       ) : data ? (
@@ -460,10 +722,8 @@ export function InformeIaContent() {
             <InformeTable
               groups={data.groups}
               dayHeaders={dayHeaders}
-              onToggleIntent={(entityId, intentActive) =>
-                intentMutation.mutate({ entityId, intentActive })
-              }
-              pending={pending}
+              yesterday={data.yesterday}
+              totals={data.totals}
             />
           </div>
         </>
