@@ -26,6 +26,7 @@ export type InformeEntityRow = {
   soldToday: boolean
   purchasesToday: number
   spendToday: number
+  cpaToday: number
   dayCells: {
     date: string
     spend: number
@@ -263,6 +264,10 @@ function toInformeRow(
     soldToday: operative?.sold ?? false,
     purchasesToday: operative?.purchases ?? 0,
     spendToday: operative?.spend ?? 0,
+    cpaToday:
+      (operative?.purchases ?? 0) > 0
+        ? (operative?.spend ?? 0) / (operative?.purchases ?? 1)
+        : 0,
     dayCells,
   }
 }

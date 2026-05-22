@@ -1,11 +1,14 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import { useCallback, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
+  RiArrowDownSLine,
+  RiArrowRightSLine,
   RiBrainLine,
   RiRefreshLine,
+  RiStackLine,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -21,6 +24,10 @@ import {
 import { cn } from "@/lib/utils"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
+import {
+  formatNumber,
+  getCostPerResultCellClassName,
+} from "@/app/(app)/dashboard/_components/campaigns/utils"
 import type { InformeCampaignGroup, InformeEntityRow } from "@/lib/services/meta/meta-operative-service"
 import {
   getMetaInformeAction,
@@ -53,32 +60,41 @@ function DayCell({ cell }: { cell: InformeEntityRow["dayCells"][0] }) {
   )
 }
 
-function EntityRow({
+function MetricsCells({ row }: { row: InformeEntityRow }) {
+  const cpaHighlight = getCostPerResultCellClassName(
+    row.cpaToday,
+    META_DASHBOARD_CURRENCY
+  )
+
+  return (
+    <>
+      <TableCell className="text-right tabular-nums">
+        {formatCurrency(row.spendToday, META_DASHBOARD_CURRENCY)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {row.purchasesToday > 0 ? formatNumber(row.purchasesToday) : "—"}
+      </TableCell>
+      <TableCell className={cn("text-right tabular-nums", cpaHighlight)}>
+        {row.cpaToday > 0
+          ? formatCurrency(row.cpaToday, META_DASHBOARD_CURRENCY)
+          : "—"}
+      </TableCell>
+    </>
+  )
+}
+
+function StatusCells({
   row,
-  indent,
   onToggleIntent,
   pending,
 }: {
   row: InformeEntityRow
-  indent?: boolean
   onToggleIntent: (entityId: string, value: boolean) => void
   pending: boolean
 }) {
   return (
-    <TableRow
-      className={cn(
-        row.forgotActivation && "bg-orange-50/80 dark:bg-orange-500/10"
-      )}
-    >
-      <TableCell className={cn("max-w-[220px]", indent && "pl-8")}>
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium leading-tight">{row.name}</span>
-          <span className="text-muted-foreground text-xs">
-            {row.type === "campaign" ? "Campaña" : "Conjunto"}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell className="w-[100px] text-center">
+    <>
+      <TableCell className="w-[88px] text-center">
         <Checkbox
           checked={row.intentActive}
           disabled={pending}
@@ -88,7 +104,7 @@ function EntityRow({
           aria-label={`Activé ${row.name}`}
         />
       </TableCell>
-      <TableCell className="w-[90px] text-center">
+      <TableCell className="w-[72px] text-center">
         <span
           className={cn(
             "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
@@ -100,7 +116,7 @@ function EntityRow({
           {row.metaWasActive ? "ON" : "OFF"}
         </span>
       </TableCell>
-      <TableCell className="w-[100px] text-center">
+      <TableCell className="w-[88px] text-center">
         {row.forgotActivation ? (
           <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
             ⚠ Olvido
@@ -111,12 +127,130 @@ function EntityRow({
           <span className="text-muted-foreground text-xs">—</span>
         )}
       </TableCell>
+    </>
+  )
+}
+
+function EntityRow({
+  row,
+  indent,
+  onToggleIntent,
+  pending,
+  leadingCell,
+}: {
+  row: InformeEntityRow
+  indent?: boolean
+  onToggleIntent: (entityId: string, value: boolean) => void
+  pending: boolean
+  leadingCell?: React.ReactNode
+}) {
+  return (
+    <TableRow
+      className={cn(
+        row.forgotActivation && "bg-orange-50/80 dark:bg-orange-500/10",
+        indent && "bg-muted/20"
+      )}
+    >
+      <TableCell className={cn("max-w-[260px]", indent && "pl-10")}>
+        <div className="flex items-center gap-2">
+          {leadingCell}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate font-medium leading-tight">{row.name}</span>
+            <span className="text-muted-foreground text-xs">
+              {row.type === "campaign" ? "Campaña" : "Conjunto"}
+            </span>
+          </div>
+        </div>
+      </TableCell>
+      <StatusCells
+        row={row}
+        onToggleIntent={onToggleIntent}
+        pending={pending}
+      />
+      <MetricsCells row={row} />
       {row.dayCells.map((cell) => (
         <TableCell key={cell.date} className="w-[52px] p-1">
           <DayCell cell={cell} />
         </TableCell>
       ))}
     </TableRow>
+  )
+}
+
+function CampaignGroupRows({
+  group,
+  isExpanded,
+  onToggleExpand,
+  dayHeaders,
+  onToggleIntent,
+  pending,
+}: {
+  group: InformeCampaignGroup
+  isExpanded: boolean
+  onToggleExpand: () => void
+  dayHeaders: string[]
+  onToggleIntent: (entityId: string, value: boolean) => void
+  pending: boolean
+}) {
+  const adsetCount = group.adsets.length
+
+  return (
+    <>
+      <EntityRow
+        row={group.campaign}
+        onToggleIntent={onToggleIntent}
+        pending={pending}
+        leadingCell={
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-7 shrink-0"
+              onClick={onToggleExpand}
+              disabled={adsetCount === 0}
+              aria-expanded={isExpanded}
+              aria-label={
+                isExpanded
+                  ? "Ocultar conjuntos de la campaña"
+                  : "Ver conjuntos de la campaña"
+              }
+              title={
+                adsetCount === 0
+                  ? "Sin conjuntos con gasto hoy"
+                  : isExpanded
+                    ? "Ocultar conjuntos"
+                    : `Ver ${adsetCount} conjunto${adsetCount === 1 ? "" : "s"}`
+              }
+            >
+              {adsetCount === 0 ? (
+                <RiStackLine className="size-4 opacity-40" />
+              ) : isExpanded ? (
+                <RiArrowDownSLine className="size-4" />
+              ) : (
+                <RiArrowRightSLine className="size-4" />
+              )}
+            </Button>
+            {adsetCount > 0 ? (
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {adsetCount}
+              </span>
+            ) : null}
+          </div>
+        }
+      />
+      {isExpanded
+        ? group.adsets.map((adset) => (
+            <EntityRow
+              key={adset.entityId}
+              row={adset}
+              indent
+              onToggleIntent={onToggleIntent}
+              pending={pending}
+            />
+          ))
+        : null}
+    </>
   )
 }
 
@@ -131,14 +265,33 @@ function InformeTable({
   onToggleIntent: (entityId: string, value: boolean) => void
   pending: boolean
 }) {
+  const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
+    () => new Set()
+  )
+
+  const handleToggleExpand = useCallback((campaignMetaId: string) => {
+    setExpandedCampaignIds((current) => {
+      const next = new Set(current)
+      if (next.has(campaignMetaId)) {
+        next.delete(campaignMetaId)
+      } else {
+        next.add(campaignMetaId)
+      }
+      return next
+    })
+  }, [])
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Nombre</TableHead>
+          <TableHead className="min-w-[220px]">Nombre</TableHead>
           <TableHead className="text-center">Activé</TableHead>
           <TableHead className="text-center">Meta</TableHead>
           <TableHead className="text-center">Estado</TableHead>
+          <TableHead className="text-right">Gasto</TableHead>
+          <TableHead className="text-right">Compras</TableHead>
+          <TableHead className="text-right">CPA</TableHead>
           {dayHeaders.map((date) => (
             <TableHead key={date} className="p-1 text-center text-xs">
               {formatDayLabel(date)}
@@ -148,22 +301,15 @@ function InformeTable({
       </TableHeader>
       <TableBody>
         {groups.map((group) => (
-          <Fragment key={group.campaign.entityId}>
-            <EntityRow
-              row={group.campaign}
-              onToggleIntent={onToggleIntent}
-              pending={pending}
-            />
-            {group.adsets.map((adset) => (
-              <EntityRow
-                key={adset.entityId}
-                row={adset}
-                indent
-                onToggleIntent={onToggleIntent}
-                pending={pending}
-              />
-            ))}
-          </Fragment>
+          <CampaignGroupRows
+            key={group.campaign.entityId}
+            group={group}
+            isExpanded={expandedCampaignIds.has(group.campaign.metaId)}
+            onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
+            dayHeaders={dayHeaders}
+            onToggleIntent={onToggleIntent}
+            pending={pending}
+          />
         ))}
       </TableBody>
     </Table>
@@ -212,6 +358,11 @@ export function InformeIaContent() {
   const dayHeaders = data?.groups[0]?.campaign.dayCells.map((d) => d.date) ?? []
   const pending = syncMutation.isPending || intentMutation.isPending
 
+  const accountCpa =
+    data && data.accountPurchasesToday > 0
+      ? data.accountSpendToday / data.accountPurchasesToday
+      : 0
+
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -220,10 +371,9 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Solo Facebook/Meta. El historial empieza hoy y crece día a día (sin
-            días anteriores). Marca lo que activaste; el cron (08:00–18:00) te
-            avisa por Telegram si olvidaste encenderlo en Ads Manager. Verde =
-            vendió; rojo = gastó sin ventas.
+            Solo Facebook/Meta. Campañas con gasto hoy; expande para ver
+            conjuntos. Marca lo que activaste; el cron te avisa si olvidaste
+            encenderlos. Verde = vendió; rojo = gastó sin ventas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -295,9 +445,13 @@ export function InformeIaContent() {
       ) : data ? (
         <>
           <p className="text-muted-foreground text-sm">
-            Hoy: gasto {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)}{" "}
-            · {data.accountPurchasesToday} compras · Informe desde{" "}
-            {formatDayLabel(data.informeStartDate)}
+            Hoy: gasto{" "}
+            {formatCurrency(data.accountSpendToday, META_DASHBOARD_CURRENCY)} ·{" "}
+            {formatNumber(data.accountPurchasesToday)} compras
+            {accountCpa > 0
+              ? ` · CPA ${formatCurrency(accountCpa, META_DASHBOARD_CURRENCY)}`
+              : ""}{" "}
+            · Informe desde {formatDayLabel(data.informeStartDate)}
             {data.dateRange.from !== data.dateRange.to
               ? ` (${formatDayLabel(data.dateRange.from)} → ${formatDayLabel(data.dateRange.to)})`
               : " (solo hoy)"}
