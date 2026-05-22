@@ -43,23 +43,43 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 2. Obtén tu ID con @userinfobot → `TELEGRAM_ALLOWED_USER_IDS`.
 3. En la app: **Vista previa** (no envía) o **Enviar a Telegram** (mismo mensaje que el cron).
 
-## Cron en Vercel
+## Cron horario (GitHub Actions — recomendado en Hobby)
 
-`vercel.json` define el schedule (compatible con plan **Hobby**: máximo una ejecución por día por entrada):
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`0 * * * *` UTC).
 
-| Horario (UTC) | Uso aproximado (Lima UTC−5) |
-|---------------|-----------------------------|
-| `0 14 * * *` | ~09:00 — informe operativo a Telegram |
-| `0 4 * * *` | ~23:00 — cierre diario (si la hora del servidor coincide con 23 en Lima) |
+### Configuración (una vez)
 
-En plan **Pro** puedes cambiar a `0 * * * *` para informe **cada hora**.
+1. En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - `CRON_SECRET` — **el mismo valor** que en Vercel (sin espacios al inicio/final).
+2. (Opcional) **Variables → Actions → New repository variable**
+   - `META_CRON_APP_URL` — URL de producción si no es `https://celite-marketing-dashboard.vercel.app`
+3. **Actions** debe estar habilitado en el repo (pestaña Actions → el workflow aparece tras el push).
 
-**Informe cada hora en Hobby:** usa un cron externo (p. ej. [cron-job.org](https://cron-job.org)) que haga `GET` a `/api/cron/meta-telegram-reports` con `Authorization: Bearer <CRON_SECRET>` cada hora.
+Probar sin esperar la hora:
 
-En el proyecto de Vercel:
+- GitHub → **Actions** → **Meta Telegram hourly** → **Run workflow**.
 
-- `CRON_SECRET` — mismo valor que usarás al probar el endpoint.
-- Resto de variables de la tabla anterior.
+El endpoint ejecuta el informe operativo en cada llamada y el **cierre nocturno** solo cuando la hora en **America/Lima** es 23.
+
+### Alternativa: cron-job.org
+
+Si prefieres no usar GitHub Actions:
+
+| Campo | Valor |
+|-------|--------|
+| URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
+| Método | GET |
+| Cabecera | `Authorization: Bearer <CRON_SECRET>` |
+| Intervalo | Cada 1 hora |
+
+### Plan Vercel Pro
+
+Puedes volver a poner en `vercel.json` un cron `0 * * * *` y desactivar el workflow de GitHub si quieres todo en Vercel.
+
+### Variables en Vercel
+
+- `CRON_SECRET` — obligatorio para el endpoint (GitHub Actions y pruebas manuales).
+- Resto de variables de la tabla superior.
 
 Probar manualmente:
 

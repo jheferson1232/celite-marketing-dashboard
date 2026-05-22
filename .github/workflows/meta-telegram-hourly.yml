@@ -1,0 +1,36 @@
+# Informe Meta → Telegram cada hora (plan Vercel Hobby no permite cron horario en vercel.json).
+# Requiere secrets: CRON_SECRET (mismo valor que en Vercel).
+# Opcional: META_CRON_APP_URL (default: producción en Vercel).
+
+name: Meta Telegram hourly
+
+on:
+  schedule:
+    # Cada hora en UTC (la app usa America/Lima para el texto y el cierre 23:00)
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: meta-telegram-hourly
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar cron Meta en producción
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.META_CRON_APP_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en GitHub (Settings → Secrets → Actions)"
+            exit 1
+          fi
+          BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
+          BASE="${BASE%/}"
+          echo "GET ${BASE}/api/cron/meta-telegram-reports"
+          curl -fsS --retry 2 --retry-delay 5 --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${BASE}/api/cron/meta-telegram-reports"
