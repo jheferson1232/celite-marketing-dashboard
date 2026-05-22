@@ -22,7 +22,7 @@ export function isValidCronRequest(authHeader: string | null): boolean {
   const secret = getCronSecret()
   if (!secret) return false
   if (!authHeader?.startsWith("Bearer ")) return false
-  return authHeader.slice(7) === secret
+  return authHeader.slice(7).trim() === secret
 }
 
 async function sendToAllowedUsers(text: string): Promise<number> {

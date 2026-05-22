@@ -28,9 +28,23 @@ jobs:
             echo "::error::Falta el secret CRON_SECRET en GitHub (Settings → Secrets → Actions)"
             exit 1
           fi
+          # Sin espacios/saltos (evita 401 si se pegó mal al crear el secret)
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
           BASE="${BASE%/}"
-          echo "GET ${BASE}/api/cron/meta-telegram-reports"
-          curl -fsS --retry 2 --retry-delay 5 --max-time 120 \
+          URL="${BASE}/api/cron/meta-telegram-reports"
+          echo "GET ${URL}"
+          HTTP_CODE=$(curl -sS --retry 2 --retry-delay 5 --max-time 120 \
+            -o /tmp/meta-cron-response.json -w "%{http_code}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${BASE}/api/cron/meta-telegram-reports"
+            "${URL}")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/meta-cron-response.json || true
+          if [ "$HTTP_CODE" = "401" ]; then
+            echo "::error::401 Unauthorized — CRON_SECRET de GitHub no coincide con Vercel (o falta en Vercel). Copia el mismo valor en ambos y redeploy."
+            exit 1
+          fi
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::El cron respondió HTTP ${HTTP_CODE}"
+            exit 1
+          fi
