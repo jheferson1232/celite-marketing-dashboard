@@ -7,6 +7,7 @@ import { getTikTokAccountKpisSummary } from "../_actions/account-kpis"
 import { getTikTokCampaignsListAction } from "../_actions/campaigns-list"
 import { getTikTokAdInsightsList } from "../_actions/ad-insights"
 import { clearTikTokCacheAction } from "../_actions/clear-tiktok-cache"
+import { getTikTokAllCampaignAdGroupsAction } from "../_actions/all-campaign-adgroups"
 import { getTikTokCampaignAdGroups } from "../_actions/campaign-adgroups"
 import { useDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -50,6 +51,7 @@ export function TikTokContent() {
             key.startsWith("tiktok-campaigns") ||
             key.startsWith("tiktok-ad-insights") ||
             key.startsWith("tiktok-campaign-adgroups") ||
+            key.startsWith("tiktok-all-campaign-adgroups") ||
             key.startsWith("tiktok-campaign-daily-insights")
           )
         },
@@ -68,6 +70,12 @@ export function TikTokContent() {
   const { data: campaigns, isLoading: isLoadingCampaigns } = useQuery({
     queryKey: ["tiktok-campaigns", dateRange],
     queryFn: () => runServerAction(getTikTokCampaignsListAction(dateRange)),
+    ...dashboardQueryOptions,
+  })
+
+  const { data: adSetsByCampaignId } = useQuery({
+    queryKey: ["tiktok-all-campaign-adgroups", dateRange],
+    queryFn: () => runServerAction(getTikTokAllCampaignAdGroupsAction(dateRange)),
     ...dashboardQueryOptions,
   })
 
@@ -141,6 +149,7 @@ export function TikTokContent() {
               adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
               fetchCampaignAdSets={getTikTokCampaignAdGroups}
               enableTikTokManage
+              tikTokAdSetsByCampaignId={adSetsByCampaignId}
               columnVisibilityStorageKey={TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
               defaultColumnVisibility={TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
             />

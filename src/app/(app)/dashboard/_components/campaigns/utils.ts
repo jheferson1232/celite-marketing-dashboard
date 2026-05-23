@@ -1,4 +1,4 @@
-import type { CampaignRow } from "@/lib/services/meta/types"
+import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
 import type { CurrencyCode } from "@/lib/format"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import type { CampaignPerformanceStatus } from "./types"
@@ -17,18 +17,23 @@ export function formatPercent(value: number): string {
 function getPerformanceThresholds(currency: CurrencyCode) {
   if (currency === TIKTOK_DASHBOARD_CURRENCY) {
     return {
-      criticoMinSpend: 40,
+      /** CPA &lt; esto con venta → Excelente (equiv. 10k COP Informe IA). */
+      excelenteMaxCpa: 10,
+      /** CPA &gt; esto con venta → Crítico (equiv. 20k COP). */
       criticoMinCpa: 20,
-      excelenteMinSpend: 25,
-      excelenteMaxCpa: 12,
+      /** Gasto sin compras ≥ esto → Crítico (equiv. 10k COP conjuntos). */
+      criticoSinComprasMinSpend: 20,
+      criticoMinSpend: 30_000,
+      excelenteMinSpend: 20_000,
     }
   }
 
   return {
-    criticoMinSpend: 30_000,
-    criticoMinCpa: 15_000,
-    excelenteMinSpend: 20_000,
     excelenteMaxCpa: 10_000,
+    criticoMinCpa: 20_000,
+    criticoSinComprasMinSpend: 10_000,
+    criticoMinSpend: 30_000,
+    excelenteMinSpend: 20_000,
   }
 }
 
@@ -49,6 +54,41 @@ export function hasTikTokCampaignActivityInPeriod(row: CampaignRow): boolean {
   return row.spend > 0 || row.impressions > 0
 }
 
+export function hasTikTokAdSetActivityInPeriod(row: CampaignAdSetRow): boolean {
+  return row.spend > 0 || row.impressions > 0
+}
+
+export function isTikTokAdSetActive(row: CampaignAdSetRow): boolean {
+  return row.status === "ACTIVE"
+}
+
+/**
+ * Rendimiento TikTok (excelente / en curso / crítico), alineado a Informe IA:
+ * con ventas → por CPA (&lt;10 excelente, 10–20 en curso, &gt;20 crítico);
+ * sin compras → crítico si gasto ≥ umbral.
+ */
+function getTikTokPerformanceStatusFromMetrics(
+  spend: number,
+  costPerResult: number,
+  results: number,
+  currency: CurrencyCode
+): CampaignPerformanceStatus {
+  const { excelenteMaxCpa, criticoMinCpa, criticoSinComprasMinSpend } =
+    getPerformanceThresholds(currency)
+
+  if (results > 0 && costPerResult > 0) {
+    if (costPerResult < excelenteMaxCpa) return "EXCELENTE"
+    if (costPerResult <= criticoMinCpa) return "EN_CURSO"
+    return "CRITICO"
+  }
+
+  if (results === 0 && spend >= criticoSinComprasMinSpend) {
+    return "CRITICO"
+  }
+
+  return "EN_CURSO"
+}
+
 /**
  * Rendimiento TikTok (excelente / en curso / crítico).
  * Sin clasificar "apagado" por gasto cero: eso va al chip operativo (interruptor OFF).
@@ -58,31 +98,56 @@ export function getTikTokCampaignPerformanceStatus(
   currency: CurrencyCode = TIKTOK_DASHBOARD_CURRENCY
 ): CampaignPerformanceStatus | null {
   if (!hasTikTokCampaignActivityInPeriod(row)) return null
+  return getTikTokPerformanceStatusFromMetrics(
+    row.spend,
+    row.costPerResult,
+    row.results,
+    currency
+  )
+}
 
-  const { spend, costPerResult, results } = row
-  const {
-    criticoMinSpend,
-    criticoMinCpa,
-    excelenteMinSpend,
-    excelenteMaxCpa,
-  } = getPerformanceThresholds(currency)
+/** Rendimiento del conjunto TikTok (misma escala que Informe IA, en PEN). */
+export function getTikTokAdSetPerformanceStatus(
+  row: CampaignAdSetRow,
+  currency: CurrencyCode = TIKTOK_DASHBOARD_CURRENCY
+): CampaignPerformanceStatus | null {
+  if (!hasTikTokAdSetActivityInPeriod(row)) return null
+  return getTikTokPerformanceStatusFromMetrics(
+    row.spend,
+    row.costPerResult,
+    row.results,
+    currency
+  )
+}
 
-  if (
-    (spend >= criticoMinSpend && costPerResult >= criticoMinCpa) ||
-    (spend >= criticoMinSpend && results === 0)
-  ) {
-    return "CRITICO"
+const TIKTOK_ESTADO_LABEL: Record<
+  Exclude<CampaignPerformanceStatus, "APAGADO">,
+  string
+> = {
+  EXCELENTE: "Excelente",
+  EN_CURSO: "En curso",
+  CRITICO: "Crítico",
+}
+
+const TIKTOK_ESTADO_TONE_CLASS: Record<
+  Exclude<CampaignPerformanceStatus, "APAGADO">,
+  string
+> = {
+  EXCELENTE: "font-medium text-green-600 dark:text-green-400",
+  EN_CURSO: "font-medium text-orange-600 dark:text-orange-400",
+  CRITICO: "font-medium text-red-600 dark:text-red-400",
+}
+
+export function getTikTokAdSetEstadoDisplay(
+  row: CampaignAdSetRow,
+  currency: CurrencyCode = TIKTOK_DASHBOARD_CURRENCY
+): { label: string; className: string } | null {
+  const status = getTikTokAdSetPerformanceStatus(row, currency)
+  if (!status || status === "APAGADO") return null
+  return {
+    label: TIKTOK_ESTADO_LABEL[status],
+    className: TIKTOK_ESTADO_TONE_CLASS[status],
   }
-
-  if (
-    spend >= excelenteMinSpend &&
-    costPerResult > 0 &&
-    costPerResult < excelenteMaxCpa
-  ) {
-    return "EXCELENTE"
-  }
-
-  return "EN_CURSO"
 }
 
 export function getCampaignPerformanceStatus(

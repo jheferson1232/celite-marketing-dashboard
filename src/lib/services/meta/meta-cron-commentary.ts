@@ -4,26 +4,11 @@ import type { InformeCriticoActivoItem } from "./meta-informe-alerts"
 import type { MetaHourlyReportPayload } from "./meta-hourly-report"
 import { formatCop } from "./meta-operative-service"
 
+/** @deprecated El mensaje horario se arma en meta-hourly-report (solo ON + Crítico). */
 export async function generateHourlyOperativeCommentary(
   payload: MetaHourlyReportPayload
 ): Promise<string> {
-  if (!process.env.OPENAI_API_KEY?.trim()) {
-    return buildTemplateHourly(payload)
-  }
-
-  try {
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
-      system: `Asistente operativo Meta Ads (Colombia, COP, español).
-Resumen horario para Telegram: campañas activas hoy; conjuntos ON en estado Crítico (activos con mal rendimiento hoy); conjuntos/campañas a APAGAR (solo ON: ≥10k/≥30k sin compras).
-No sugieras apagar lo que ya está OFF. Máximo 16 líneas. **negrita** en nombres.`,
-      prompt: JSON.stringify(payload, null, 2),
-    })
-    return text.trim() || buildTemplateHourly(payload)
-  } catch (error) {
-    console.error("Meta hourly OpenAI:", error)
-    return buildTemplateHourly(payload)
-  }
+  return buildTemplateHourly(payload)
 }
 
 export async function generateNightlyCommentary(payload: {
@@ -62,7 +47,7 @@ Sugiere qué revisar mañana si aplica. No ejecutes cambios. Máximo 12 líneas.
 }
 
 function formatCriticoActivoLine(item: InformeCriticoActivoItem): string {
-  const base = `• **${item.name}** (${item.campaignName}): **ON** · **Crítico**`
+  const base = `• **${item.name}** (${item.campaignName})`
   if (item.purchases > 0 && item.cpa > 0) {
     return `${base} · ${formatCop(item.spend)} hoy · ${item.purchases} compra(s) · CPA ${formatCop(item.cpa)}`
   }
@@ -70,48 +55,11 @@ function formatCriticoActivoLine(item: InformeCriticoActivoItem): string {
 }
 
 function buildTemplateHourly(payload: MetaHourlyReportPayload): string {
-  const criticoActivos =
-    payload.adsetsCriticoActivos.length > 0
-      ? payload.adsetsCriticoActivos.map(formatCriticoActivoLine).join("\n")
-      : "• Ninguno"
+  if (payload.adsetsCriticoActivos.length === 0) {
+    return "✅ Nada que revisar ahora."
+  }
 
-  const campañas =
-    payload.campaigns.length > 0
-      ? payload.campaigns
-          .slice(0, 12)
-          .map(
-            (c) =>
-              `• **${c.name}** ${c.metaWasActive ? "ON" : "OFF"}: ${c.spend.toLocaleString("es-CO")} COP, ${c.purchases} compras, pts ${c.pointsTotal}`
-          )
-          .join("\n")
-      : "• Sin campañas con gasto hoy"
-
-  const conjuntos =
-    payload.adsetsToPause.length > 0
-      ? payload.adsetsToPause
-          .map(
-            (a) =>
-              `• **${a.name}** (${a.campaignName || "—"}): ${a.spend.toLocaleString("es-CO")} COP, 0 compras → apagar`
-          )
-          .join("\n")
-      : "• Ninguno"
-
-  const campañasApagar =
-    payload.campaignsToPause.length > 0
-      ? payload.campaignsToPause
-          .map(
-            (c) =>
-              `• **${c.name}**: ${c.spend.toLocaleString("es-CO")} COP, 0 compras → apagar campaña`
-          )
-          .join("\n")
-      : "• Ninguna"
-
-  return (
-    `**Campañas hoy:**\n${campañas}\n\n` +
-    `⚠️ **Conjuntos activos (ON) en Crítico:**\n${criticoActivos}\n\n` +
-    `🔴 **Conjuntos a apagar** (≥10k sin ventas):\n${conjuntos}\n\n` +
-    `🔴 **Campañas a apagar** (≥30k sin ventas):\n${campañasApagar}`
-  )
+  return payload.adsetsCriticoActivos.map(formatCriticoActivoLine).join("\n")
 }
 
 function buildTemplateNightly(payload: {

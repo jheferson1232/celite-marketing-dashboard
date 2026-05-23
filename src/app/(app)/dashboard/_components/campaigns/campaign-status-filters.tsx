@@ -55,6 +55,8 @@ interface CampaignStatusFiltersProps {
   totalCampaignCount?: number
   /** TikTok: chip "apagado" = interruptor OFF, no "sin gasto en el periodo". */
   apagadoMeansSwitchOff?: boolean
+  /** Los chips excelente / en curso / crítico cuentan conjuntos, no campañas. */
+  performanceCountsAtAdSetLevel?: boolean
 }
 
 export function CampaignStatusFilters({
@@ -66,6 +68,7 @@ export function CampaignStatusFilters({
   showActiveFilter = false,
   totalCampaignCount,
   apagadoMeansSwitchOff = false,
+  performanceCountsAtAdSetLevel = false,
 }: CampaignStatusFiltersProps) {
   const totalCount =
     totalCampaignCount ?? Object.values(counts).reduce((sum, n) => sum + n, 0)
@@ -121,9 +124,11 @@ export function CampaignStatusFilters({
                 ? "Campañas con interruptor Act. apagado"
                 : status === "APAGADO"
                   ? "Sin gasto en el periodo (siguen en la tabla con «todas»)"
-                  : status === "EN_CURSO"
-                    ? "Con gasto en el periodo y CPA en rango normal"
-                    : undefined
+                  : performanceCountsAtAdSetLevel
+                    ? "Conjuntos con gasto en el periodo y CPA en ese rango"
+                    : status === "EN_CURSO"
+                      ? "Con gasto en el periodo y CPA en rango normal"
+                      : undefined
             }
             className={cn(
               "cursor-pointer px-3 text-sm font-semibold",

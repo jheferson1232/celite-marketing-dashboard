@@ -9,7 +9,7 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 3. **Cron** — Cada hora (GitHub Actions → `/api/cron/meta-telegram-reports`): resumen + sugerencias de apagar conjuntos/campañas sin ventas.
 4. **Cierre 23:00** (America/Lima) — Informe nocturno adicional con sin ventas y CPA alto.
 
-OpenAI (`gpt-4o-mini`) solo redacta el texto de Telegram si existe `OPENAI_API_KEY`; los puntos y umbrales son reglas fijas en código.
+OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`; el informe horario y los umbrales son reglas fijas en código.
 
 ## Variables de entorno
 
@@ -104,11 +104,9 @@ curl -s -H "Authorization: Bearer $CRON_SECRET" \
 
 ## Mensaje horario Telegram
 
-- **Conjuntos activos (ON) en Crítico** — Mismo criterio que la columa Estado del informe (CPA &gt; 20k o ≥ 10k sin compras hoy). Ej.: `cost 12 · ON · Crítico · CPA $24,043`.
-- **Conjuntos a apagar** — ON, gasto ≥ 10k y 0 compras.
-- **Campañas a apagar** — ON, gasto ≥ 30k y 0 compras.
+Solo lista conjuntos a revisar (mismo criterio que la columna Estado: CPA &gt; 20k o ≥ 10k sin compras hoy, interruptor ON). Ej.: `cost 12 (21-10 cost cap…) · $24,043 · 1 compra(s) · CPA $24,043`.
 
-Solo entidades **ON**; si ya están OFF no se listan.
+No incluye resumen de cuenta, campañas activas ni listas “a apagar”. Si no hay ninguno en Crítico, el mensaje lo indica.
 
 ## Archivos clave
 

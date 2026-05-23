@@ -14,7 +14,6 @@ import {
   getMetaInformePayload,
   type MetaInformePayload,
 } from "./meta-operative-service"
-import { generateHourlyOperativeCommentary } from "./meta-cron-commentary"
 import { claimMetaOnce } from "./meta-cache"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
 import { getAllowedTelegramUserIds } from "@/lib/telegram/config"
@@ -54,16 +53,33 @@ export async function buildMetaHourlyReportPayload(
   }
 }
 
+function formatCriticoActivoLine(item: InformeCriticoActivoItem): string {
+  const base = `• **${item.name}** (${item.campaignName})`
+  if (item.purchases > 0 && item.cpa > 0) {
+    return `${base} · ${formatCop(item.spend)} · ${item.purchases} compra(s) · CPA ${formatCop(item.cpa)}`
+  }
+  return `${base} · ${formatCop(item.spend)} · 0 compras`
+}
+
+/** Solo conjuntos ON en Crítico (para revisar / desactivar). */
+function buildHourlyCriticoTelegramBody(
+  adsetsCriticoActivos: InformeCriticoActivoItem[]
+): string {
+  if (adsetsCriticoActivos.length === 0) {
+    return "✅ Nada que revisar ahora."
+  }
+
+  return adsetsCriticoActivos.map(formatCriticoActivoLine).join("\n")
+}
+
 export async function buildMetaHourlyTelegramMessage(
   payload?: MetaHourlyReportPayload
 ): Promise<string> {
   const data = payload ?? (await buildMetaHourlyReportPayload())
-  const body = await generateHourlyOperativeCommentary(data)
 
   return (
     `📊 **Informe Meta ${data.hour}:00** (${data.date})\n\n` +
-    `💰 Cuenta hoy: **${formatCop(data.accountSpend)}** · **${data.accountPurchases}** compras\n\n` +
-    body
+    buildHourlyCriticoTelegramBody(data.adsetsCriticoActivos)
   )
 }
 

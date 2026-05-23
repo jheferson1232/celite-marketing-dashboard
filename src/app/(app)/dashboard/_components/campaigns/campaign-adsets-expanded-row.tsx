@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { VisibilityState } from "@tanstack/react-table"
 import { RiRefreshLine } from "@remixicon/react"
@@ -34,8 +35,14 @@ import {
   getTikTokAdSetDisplayColumns,
   type TikTokAdSetDisplayColumnId,
 } from "@/app/(app)/tiktok/_components/tiktok-ad-set-columns"
+import type { CampaignPerformanceFilter } from "./types"
+import {
+  getTikTokAdSetPerformanceStatus,
+  hasTikTokAdSetActivityInPeriod,
+} from "./utils"
 import { MetaAdSetsSubtable } from "./meta-ad-sets-subtable"
 import { TikTokAdSetsSubtable } from "@/app/(app)/tiktok/_components/tiktok-ad-sets-subtable"
+import type { CampaignAdSetRow } from "@/lib/services/meta/types"
 
 type FetchCampaignAdSetsAction = typeof getCampaignAdSets
 
@@ -51,6 +58,8 @@ interface CampaignAdSetsExpandedRowProps {
   currency?: CurrencyCode
   enableTikTokManage?: boolean
   enableMetaExtendedMetrics?: boolean
+  prefetchedAdSets?: CampaignAdSetRow[]
+  adSetPerformanceFilter?: CampaignPerformanceFilter
 }
 
 const SKELETON_ROWS = 3
@@ -93,6 +102,8 @@ export function CampaignAdSetsExpandedRow({
   currency = META_DASHBOARD_CURRENCY,
   enableTikTokManage = false,
   enableMetaExtendedMetrics = false,
+  prefetchedAdSets,
+  adSetPerformanceFilter,
 }: CampaignAdSetsExpandedRowProps) {
   const usePurchaseLabels = enableTikTokManage || enableMetaExtendedMetrics
   const { dateRange } = useDateRange()
@@ -107,14 +118,35 @@ export function CampaignAdSetsExpandedRow({
     tiktokDisplayColumns ??
     getAdSetSubtableColumnsWithTikTokManage(visibleSubtableColumns, false)
 
+  const usePrefetched = prefetchedAdSets !== undefined
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: [queryKeyPrefix, campaignId, dateRange, campaignObjective],
     queryFn: () =>
       runServerAction(
         fetchAdSets({ campaignId, dateRange, objective: campaignObjective })
       ),
-    enabled: Boolean(campaignId),
+    enabled: Boolean(campaignId) && !usePrefetched,
   })
+
+  const rawAdSets = usePrefetched ? prefetchedAdSets : data
+
+  const displayAdSets = useMemo(() => {
+    if (!rawAdSets?.length) return rawAdSets ?? []
+    if (
+      !adSetPerformanceFilter ||
+      adSetPerformanceFilter === "ALL" ||
+      adSetPerformanceFilter === "ACTIVOS" ||
+      adSetPerformanceFilter === "APAGADO"
+    ) {
+      return rawAdSets
+    }
+    return rawAdSets.filter(
+      (adSet) =>
+        getTikTokAdSetPerformanceStatus(adSet, currency) ===
+          adSetPerformanceFilter && hasTikTokAdSetActivityInPeriod(adSet)
+    )
+  }, [adSetPerformanceFilter, currency, rawAdSets])
 
   if (displayColumns.length === 0) {
     return (
@@ -153,7 +185,7 @@ export function CampaignAdSetsExpandedRow({
         )
       : getSubtableCellClassName(columnId as DisplayColumnId, currency)
 
-  if (isLoading) {
+  if (!usePrefetched && isLoading) {
     return (
       <div className="py-1">
         <Table>
@@ -224,10 +256,15 @@ export function CampaignAdSetsExpandedRow({
     )
   }
 
-  if (!data?.length) {
+  if (!displayAdSets.length) {
     return (
       <p className="px-4 py-3 text-sm text-muted-foreground">
-        No hay conjuntos asociados.
+        {adSetPerformanceFilter &&
+        adSetPerformanceFilter !== "ALL" &&
+        adSetPerformanceFilter !== "ACTIVOS" &&
+        adSetPerformanceFilter !== "APAGADO"
+          ? "Ningún conjunto con ese estado en el periodo."
+          : "No hay conjuntos asociados."}
       </p>
     )
   }
@@ -235,7 +272,7 @@ export function CampaignAdSetsExpandedRow({
   if (enableTikTokManage && tiktokDisplayColumns) {
     return (
       <TikTokAdSetsSubtable
-        data={data}
+        data={displayAdSets}
         displayColumns={tiktokDisplayColumns}
         currency={currency}
       />
@@ -244,7 +281,7 @@ export function CampaignAdSetsExpandedRow({
 
   return (
     <MetaAdSetsSubtable
-      data={data}
+      data={displayAdSets}
       displayColumns={displayColumns as AdSetSubtableColumnId[]}
       currency={currency}
     />

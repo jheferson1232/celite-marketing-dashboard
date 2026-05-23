@@ -21,7 +21,7 @@ import {
   META_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
-import type { CampaignRow } from "@/lib/services/meta/types"
+import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
 import { CampaignAdSetsExpandedRow } from "./campaign-adsets-expanded-row"
 import { CampaignDetailsSheet } from "./campaign-details-sheet"
@@ -44,7 +44,9 @@ import {
 import type { VisibilityState } from "@tanstack/react-table"
 import {
   getCampaignPerformanceStatus,
+  getTikTokAdSetPerformanceStatus,
   getTikTokCampaignPerformanceStatus,
+  hasTikTokAdSetActivityInPeriod,
   isMetaCampaignActive,
   isTikTokCampaignActiveToday,
 } from "./utils"
@@ -68,6 +70,8 @@ interface CampaignsTableProps {
   extendedMetricsError?: Error | null
   columnVisibilityStorageKey?: string
   defaultColumnVisibility?: VisibilityState
+  /** TikTok: chips excelente/en curso/crítico por conjunto; activos/apagadas por campaña. */
+  tikTokAdSetsByCampaignId?: Record<string, CampaignAdSetRow[]>
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -97,6 +101,7 @@ export function CampaignsTable({
   defaultColumnVisibility = enableMetaExtendedMetrics
     ? META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
     : {},
+  tikTokAdSetsByCampaignId,
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -133,6 +138,15 @@ export function CampaignsTable({
     setIsDetailsOpen(true)
   }, [])
 
+  const performanceCountsAtAdSetLevel =
+    enableTikTokManage && Boolean(tikTokAdSetsByCampaignId)
+
+  const PERFORMANCE_ADSET_FILTERS: CampaignPerformanceStatus[] = [
+    "EXCELENTE",
+    "EN_CURSO",
+    "CRITICO",
+  ]
+
   const { statusCounts, activeCampaignCount, totalCampaignCount, filteredTableData } =
     React.useMemo(() => {
     const counts: Record<CampaignPerformanceStatus, number> = {
@@ -159,7 +173,21 @@ export function CampaignsTable({
       }
     })
 
-    if (useOperationalFilters) {
+    if (performanceCountsAtAdSetLevel && tikTokAdSetsByCampaignId) {
+      for (const adSets of Object.values(tikTokAdSetsByCampaignId)) {
+        for (const adSet of adSets) {
+          const status = getTikTokAdSetPerformanceStatus(adSet, currency)
+          if (status) {
+            counts[status] += 1
+          }
+        }
+      }
+      for (const { isActiveToday } of rowsWithStatus) {
+        if (!isActiveToday) {
+          counts.APAGADO += 1
+        }
+      }
+    } else if (useOperationalFilters) {
       for (const { isActiveToday, performanceStatus } of rowsWithStatus) {
         if (!isActiveToday) {
           counts.APAGADO += 1
@@ -179,6 +207,15 @@ export function CampaignsTable({
       ? rowsWithStatus.filter(({ isActiveToday }) => isActiveToday).length
       : 0
 
+    const campaignHasMatchingAdSet = (campaignId: string, filter: CampaignPerformanceStatus) => {
+      const adSets = tikTokAdSetsByCampaignId?.[campaignId] ?? []
+      return adSets.some(
+        (adSet) =>
+          getTikTokAdSetPerformanceStatus(adSet, currency) === filter &&
+          hasTikTokAdSetActivityInPeriod(adSet)
+      )
+    }
+
     const filteredRows =
       selectedPerformanceFilter === "ALL"
         ? tableData
@@ -190,12 +227,22 @@ export function CampaignsTable({
             ? rowsWithStatus
                 .filter(({ isActiveToday }) => !isActiveToday)
                 .map(({ row }) => row)
-            : rowsWithStatus
-                .filter(
-                  ({ performanceStatus }) =>
-                    performanceStatus === selectedPerformanceFilter
+            : performanceCountsAtAdSetLevel &&
+                PERFORMANCE_ADSET_FILTERS.includes(
+                  selectedPerformanceFilter as CampaignPerformanceStatus
                 )
-                .map(({ row }) => row)
+              ? tableData.filter((row) =>
+                  campaignHasMatchingAdSet(
+                    row.id,
+                    selectedPerformanceFilter as CampaignPerformanceStatus
+                  )
+                )
+              : rowsWithStatus
+                  .filter(
+                    ({ performanceStatus }) =>
+                      performanceStatus === selectedPerformanceFilter
+                  )
+                  .map(({ row }) => row)
 
     return {
       statusCounts: counts,
@@ -206,9 +253,11 @@ export function CampaignsTable({
   }, [
     currency,
     enableTikTokManage,
+    performanceCountsAtAdSetLevel,
     showMetaActiveCampaignFilter,
     selectedPerformanceFilter,
     tableData,
+    tikTokAdSetsByCampaignId,
   ])
 
   const visibleCampaignIds = React.useMemo(
@@ -224,6 +273,31 @@ export function CampaignsTable({
       return next.size === current.size ? current : next
     })
   }, [visibleCampaignIds])
+
+  React.useEffect(() => {
+    if (
+      !performanceCountsAtAdSetLevel ||
+      !PERFORMANCE_ADSET_FILTERS.includes(
+        selectedPerformanceFilter as CampaignPerformanceStatus
+      )
+    ) {
+      return
+    }
+
+    setExpandedCampaignIds((current) => {
+      const next = new Set(current)
+      for (const row of filteredTableData) {
+        if (row.id) {
+          next.add(row.id)
+        }
+      }
+      return next
+    })
+  }, [
+    filteredTableData,
+    performanceCountsAtAdSetLevel,
+    selectedPerformanceFilter,
+  ])
 
   const columns = React.useMemo(
     () =>
@@ -285,6 +359,7 @@ export function CampaignsTable({
           apagadoMeansSwitchOff={
             enableTikTokManage || showMetaActiveCampaignFilter
           }
+          performanceCountsAtAdSetLevel={performanceCountsAtAdSetLevel}
         />
         <ColumnVisibilityToggle table={table} />
       </div>
@@ -366,6 +441,14 @@ export function CampaignsTable({
                             currency={currency}
                             enableTikTokManage={enableTikTokManage}
                             enableMetaExtendedMetrics={enableMetaExtendedMetrics}
+                            prefetchedAdSets={
+                              tikTokAdSetsByCampaignId?.[row.original.id]
+                            }
+                            adSetPerformanceFilter={
+                              performanceCountsAtAdSetLevel
+                                ? selectedPerformanceFilter
+                                : undefined
+                            }
                           />
                         </TableCell>
                       </TableRow>

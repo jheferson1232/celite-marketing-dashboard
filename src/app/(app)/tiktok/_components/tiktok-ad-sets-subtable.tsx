@@ -31,7 +31,9 @@ import { TikTokBudgetCell } from "./tiktok-budget-cell"
 import { TikTokStatusSwitch } from "./tiktok-status-switch"
 import {
   getTikTokAdSetColumnMeta,
+  isTikTokAdSetEstadoColumnId,
   isTikTokAdSetMetricColumnId,
+  renderTikTokAdSetEstadoCell,
   renderTikTokAdSetMetricCell,
   type TikTokAdSetDisplayColumnId,
   type TikTokAdSetMetricColumnId,
@@ -46,7 +48,11 @@ function getSubtableHeadClassName(
   return cn(
     columnId === "name" && "w-[300px] pl-5",
     columnId === "active" && "w-[52px]",
-    columnId !== "name" && columnId !== "active" && "text-right",
+    columnId === "estado" && "w-[88px]",
+    columnId !== "name" &&
+      columnId !== "active" &&
+      columnId !== "estado" &&
+      "text-right",
     meta.align === "left" && "text-left"
   )
 }
@@ -59,8 +65,11 @@ function getSubtableCellClassName(
 
   return cn(
     columnId === "name" && "pl-5",
-    columnId === "active" && "text-center",
-    columnId !== "name" && columnId !== "active" && "text-right",
+    (columnId === "active" || columnId === "estado") && "text-center",
+    columnId !== "name" &&
+      columnId !== "active" &&
+      columnId !== "estado" &&
+      "text-right",
     meta.align === "left" && "text-left"
   )
 }
@@ -140,6 +149,14 @@ function buildColumnDef(
       ),
       cell: ({ row }) =>
         renderTikTokAdSetMetricCell(columnId, row.original, currency),
+    }
+  }
+
+  if (isTikTokAdSetEstadoColumnId(columnId)) {
+    return {
+      id: columnId,
+      header: () => <span className="text-sm font-semibold">{meta.label}</span>,
+      cell: ({ row }) => renderTikTokAdSetEstadoCell(row.original, currency),
     }
   }
 

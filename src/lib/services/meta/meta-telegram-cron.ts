@@ -40,7 +40,7 @@ async function sendToAllowedUsers(text: string): Promise<number> {
   return sent
 }
 
-/** Cada hora: resumen + conjuntos ≥10k sin ventas + campañas ≥30k sin ventas. */
+/** Cada hora: conjuntos ON en estado Crítico (para desactivar). */
 export async function runMetaHourlyOperativeReport(): Promise<{
   skipped: boolean
   hour: number

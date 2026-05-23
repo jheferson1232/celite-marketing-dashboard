@@ -835,11 +835,16 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cron cada hora a Telegram (GitHub Actions). Filtra por estado de hoy
-            (CPA):{" "}
-            <span className="text-green-700 dark:text-green-400">Excelente</span>,{" "}
-            <span className="text-orange-700 dark:text-orange-400">En curso</span> o{" "}
-            <span className="text-red-700 dark:text-red-400">Crítico</span>.
+            Cron cada hora a Telegram (GitHub Actions): solo conjuntos{" "}
+            <span className="font-medium text-green-700 dark:text-green-400">
+              ON
+            </span>{" "}
+            en{" "}
+            <span className="font-medium text-red-700 dark:text-red-400">
+              Crítico
+            </span>{" "}
+            para revisar o desactivar. La tabla filtra por Excelente / En curso /
+            Crítico.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

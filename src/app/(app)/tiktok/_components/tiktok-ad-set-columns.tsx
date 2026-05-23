@@ -12,7 +12,11 @@ import {
   type AdSetSubtableColumnId,
   type TikTokAdSetManageColumnId,
 } from "@/app/(app)/dashboard/_components/campaigns/ad-set-subtable-columns"
-import { formatNumber, getCostPerResultCellClassName } from "@/app/(app)/dashboard/_components/campaigns/utils"
+import {
+  formatNumber,
+  getCostPerResultCellClassName,
+  getTikTokAdSetEstadoDisplay,
+} from "@/app/(app)/dashboard/_components/campaigns/utils"
 
 export const TIKTOK_AD_SET_METRIC_COLUMN_IDS = [
   "purchases7d",
@@ -24,10 +28,15 @@ export const TIKTOK_AD_SET_METRIC_COLUMN_IDS = [
 export type TikTokAdSetMetricColumnId =
   (typeof TIKTOK_AD_SET_METRIC_COLUMN_IDS)[number]
 
+export const TIKTOK_AD_SET_ESTADO_COLUMN_ID = "estado" as const
+
+export type TikTokAdSetEstadoColumnId = typeof TIKTOK_AD_SET_ESTADO_COLUMN_ID
+
 export type TikTokAdSetDisplayColumnId =
   | AdSetSubtableColumnId
   | TikTokAdSetManageColumnId
   | TikTokAdSetMetricColumnId
+  | TikTokAdSetEstadoColumnId
 
 const TIKTOK_AD_SET_METRIC_COLUMN_META: Record<
   TikTokAdSetMetricColumnId,
@@ -47,6 +56,12 @@ export function isTikTokAdSetMetricColumnId(
   )
 }
 
+export function isTikTokAdSetEstadoColumnId(
+  columnId: string
+): columnId is TikTokAdSetEstadoColumnId {
+  return columnId === TIKTOK_AD_SET_ESTADO_COLUMN_ID
+}
+
 /** Sin Agreg. carrito; añade métricas 7d y totales tras Costo/Res. */
 export function getTikTokAdSetDisplayColumns(
   visibleSubtableColumns: AdSetSubtableColumnId[]
@@ -57,6 +72,9 @@ export function getTikTokAdSetDisplayColumns(
 
   for (const columnId of base) {
     out.push(columnId)
+    if (columnId === "active") {
+      out.push(TIKTOK_AD_SET_ESTADO_COLUMN_ID)
+    }
     if (columnId === "costPerResult") {
       out.push(
         "purchases7d",
@@ -78,6 +96,10 @@ export function getTikTokAdSetColumnMeta(
     return TIKTOK_AD_SET_METRIC_COLUMN_META[columnId]
   }
 
+  if (isTikTokAdSetEstadoColumnId(columnId)) {
+    return { label: "Estado" }
+  }
+
   if (columnId === "results") {
     return { label: "Compras", align: "right" }
   }
@@ -86,6 +108,19 @@ export function getTikTokAdSetColumnMeta(
   }
 
   return getAdSetSubtableColumnMeta(columnId, currency)
+}
+
+export function renderTikTokAdSetEstadoCell(
+  row: CampaignAdSetRow,
+  currency: CurrencyCode = TIKTOK_DASHBOARD_CURRENCY
+) {
+  const estado = getTikTokAdSetEstadoDisplay(row, currency)
+  if (!estado) {
+    return <span className="text-muted-foreground">—</span>
+  }
+  return (
+    <span className={cn("text-xs", estado.className)}>{estado.label}</span>
+  )
 }
 
 export function renderTikTokAdSetMetricCell(
