@@ -108,7 +108,15 @@ function filterInformeGroupsByKey(
         (adset) => match(adset) === filter
       )
       if (!campaignMatches && matchingAdsets.length === 0) return null
-      return { ...group, adsets: matchingAdsets }
+      // Si la campaña coincide (ej. Crítico hoy) pero el conjunto no (ej. Excelente),
+      // seguir mostrando todos los conjuntos al expandir.
+      const adsets =
+        matchingAdsets.length > 0
+          ? matchingAdsets
+          : campaignMatches
+            ? group.adsets
+            : []
+      return { ...group, adsets }
     })
     .filter((group): group is InformeCampaignGroup => group !== null)
 }
@@ -500,6 +508,7 @@ function CampaignGroupRows({
   informeStartDate: string
 }) {
   const adsetCount = group.adsets.length
+  const catalogAdsetCount = group.adSetsCount ?? 0
 
   return (
     <>
@@ -525,10 +534,12 @@ function CampaignGroupRows({
               }
               title={
                 adsetCount === 0
-                  ? "Sin conjuntos con gasto en el informe"
+                  ? catalogAdsetCount > 0
+                    ? `${catalogAdsetCount} conjuntos en Meta; ninguno con gasto en el periodo del informe. Quita filtros o sincroniza.`
+                    : "Sin conjuntos con gasto en el informe"
                   : isExpanded
                     ? "Ocultar conjuntos"
-                    : `Ver ${adsetCount} conjunto${adsetCount === 1 ? "" : "s"}`
+                    : `Ver ${adsetCount} conjunto${adsetCount === 1 ? "" : "s"} con gasto en el informe`
               }
             >
               <RiStackLine data-icon="inline-start" />

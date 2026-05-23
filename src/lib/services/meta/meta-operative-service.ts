@@ -191,23 +191,28 @@ function collectSpendingInRange(
   const campaignRows = daily.campaigns.filter((c) =>
     hasSpendOnAnyDate(c, dateKeys)
   )
-  const spendingCampaignIds = new Set(campaignRows.map((c) => c.metaId))
+  const spendingCampaignIds = new Set(
+    campaignRows.map((c) => normalizeMetaId(c.metaId))
+  )
 
   for (const adset of daily.adsets) {
-    if (hasSpendOnAnyDate(adset, dateKeys) && adset.campaignMetaId) {
-      spendingCampaignIds.add(adset.campaignMetaId)
+    const parentId = normalizeMetaId(adset.campaignMetaId ?? "")
+    if (hasSpendOnAnyDate(adset, dateKeys) && parentId) {
+      spendingCampaignIds.add(parentId)
     }
   }
 
   const campaignRowsAll = daily.campaigns.filter((c) =>
-    spendingCampaignIds.has(c.metaId)
+    spendingCampaignIds.has(normalizeMetaId(c.metaId))
   )
-  const adsetRows = daily.adsets.filter(
-    (a) =>
-      hasSpendOnAnyDate(a, dateKeys) &&
-      a.campaignMetaId &&
-      spendingCampaignIds.has(a.campaignMetaId)
-  )
+  const adsetRows = daily.adsets.filter((a) => {
+    const parentId = normalizeMetaId(a.campaignMetaId ?? "")
+    return (
+      parentId &&
+      spendingCampaignIds.has(parentId) &&
+      hasSpendOnAnyDate(a, dateKeys)
+    )
+  })
 
   const trackInputs: TrackEntityInput[] = [
     ...campaignRowsAll.map((c) => ({
@@ -713,8 +718,11 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       adsetDaily
     )
 
+    const campaignId = normalizeMetaId(cRow.metaId)
     const adsets = adsetRows
-      .filter((a) => a.campaignMetaId === cRow.metaId)
+      .filter(
+        (a) => normalizeMetaId(a.campaignMetaId ?? "") === campaignId
+      )
       .sort((a, b) => spendOnDate(b, today) - spendOnDate(a, today))
       .map((aRow) => {
         const adset = entityByKey.get(`adset:${aRow.metaId}`)
