@@ -1,0 +1,122 @@
+"use client"
+
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { RiAddLine, RiShoppingBag2Line } from "@remixicon/react"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { runServerAction } from "@/lib/server-action"
+import type { ProductRecord } from "@/lib/services/product"
+import {
+  createProductAction,
+  listProductsAction,
+} from "../../_actions/products"
+import { ProductoCard } from "./producto-card"
+import { ProductoForm } from "../product/producto-form"
+
+export function ProductoContent() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const [formOpen, setFormOpen] = useState(false)
+
+  const { data: products = [], isLoading, isError, error } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => runServerAction(listProductsAction()),
+    staleTime: 30 * 1000,
+  })
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["products"] })
+  }
+
+  const createMutation = useMutation({
+    mutationFn: async (values: {
+      name: string
+      imageUrl: string
+      notes: string
+    }) => {
+      const created = await runServerAction(
+        createProductAction({
+          name: values.name,
+          imageUrl: values.imageUrl || null,
+          notes: values.notes || null,
+        })
+      )
+      if (!created) throw new Error("No se pudo crear el producto")
+      return created
+    },
+    onSuccess: (created: ProductRecord) => {
+      invalidate()
+      router.push(`/producto/${created.id}`)
+    },
+  })
+
+  const openCreate = () => {
+    setFormOpen(true)
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-muted-foreground">
+            <RiShoppingBag2Line className="size-5" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Catálogo
+            </span>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Gestiona nombre e imagen de cada producto. Al hacer clic verás el
+            historial de ventas y las campañas TikTok o Meta vinculadas.
+          </p>
+        </div>
+        <Button type="button" onClick={openCreate}>
+          <RiAddLine className="size-4" />
+          Nuevo producto
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-[4/5] w-full rounded-xl" />
+          ))}
+        </div>
+      ) : isError ? (
+        <p className="text-sm text-destructive">
+          {error?.message ?? "No se pudieron cargar los productos."}
+        </p>
+      ) : products.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+          <RiShoppingBag2Line className="mb-3 size-10 text-muted-foreground/50" />
+          <p className="text-sm font-medium">Aún no hay productos</p>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Crea el primero con nombre e imagen y vincula campañas de TikTok o
+            Meta.
+          </p>
+          <Button type="button" className="mt-4" onClick={openCreate}>
+            <RiAddLine className="size-4" />
+            Crear producto
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {products.map((product) => (
+            <ProductoCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
+
+      <ProductoForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        isPending={createMutation.isPending}
+        onSubmit={async (values) => {
+          await createMutation.mutateAsync(values)
+        }}
+      />
+    </div>
+  )
+}

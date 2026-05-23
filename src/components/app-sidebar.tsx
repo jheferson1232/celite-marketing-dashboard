@@ -7,6 +7,7 @@ import {
   RiBrainLine,
   RiMegaphoneLine,
   RiMetaLine,
+  RiShoppingBag2Line,
   RiTiktokLine,
 } from "@remixicon/react"
 import {
@@ -46,6 +47,12 @@ const navItems = [
     title: "TikTok",
     href: "/tiktok",
     icon: RiTiktokLine,
+  },
+  {
+    id: "producto",
+    title: "Productos TikTok",
+    href: "/producto",
+    icon: RiShoppingBag2Line,
   },
 ] as const
 
@@ -92,8 +99,11 @@ export function AppSidebar() {
                           : item.id === "tiktok"
                             ? pathname === "/tiktok" ||
                               pathname.startsWith("/tiktok/")
-                            : pathname === "/dashboard" ||
-                              pathname.startsWith("/dashboard/")
+                            : item.id === "producto"
+                              ? pathname === "/producto" ||
+                                pathname.startsWith("/producto/")
+                              : pathname === "/dashboard" ||
+                                pathname.startsWith("/dashboard/")
                     }
                     tooltip={item.title}
                   >

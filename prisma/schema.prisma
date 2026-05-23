@@ -79,3 +79,46 @@ model MetaInformeAccountDay {
   accountPurchases Int      @default(0)
   syncedAt         DateTime @updatedAt
 }
+
+/** Producto del catálogo (multi-plataforma). */
+model Product {
+  id        String   @id @default(cuid())
+  name      String
+  imageUrl  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  variants  ProductVariant[]
+  campaigns ProductCampaign[]
+
+  @@map("TikTokProduct")
+}
+
+/** Variante de color con URL de landing del producto. */
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color     String
+  imageUrl  String?
+  url       String
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@map("TikTokProductVariant")
+}
+
+/** Campaña vinculada a un producto para historial de ventas. */
+model ProductCampaign {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  campaignId   String
+  campaignName String?
+  platform     String   @default("tiktok")
+  createdAt    DateTime @default(now())
+
+  @@unique([productId, campaignId, platform])
+  @@index([productId])
+  @@map("TikTokProductCampaign")
+}

@@ -16,6 +16,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { cn } from "@/lib/utils"
 import {
   formatCurrency,
   TIKTOK_DASHBOARD_CURRENCY,
@@ -37,11 +38,13 @@ const chartConfig = {
 interface TikTokCampaignDetailsChartProps {
   days: Array<Pick<TikTokCampaignDailyInsight, "date" | "spend" | "purchases">>
   currency?: CurrencyCode
+  className?: string
 }
 
 export function TikTokCampaignDetailsChart({
   days,
   currency = TIKTOK_DASHBOARD_CURRENCY,
+  className,
 }: TikTokCampaignDetailsChartProps) {
   const data = days.map((day) => ({
     ...day,
@@ -49,7 +52,10 @@ export function TikTokCampaignDetailsChart({
   }))
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-[16/9] w-full">
+    <ChartContainer
+      config={chartConfig}
+      className={cn("w-full", className ?? "aspect-[16/9]")}
+    >
       <ComposedChart data={data} margin={{ left: 4, right: 4, top: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
