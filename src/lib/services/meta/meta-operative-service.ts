@@ -52,10 +52,7 @@ export type InformeEntityRow = {
   estadoLabel: string
   notifyOlvido: boolean
   rowHighlight: "none" | "red"
-  /**
-   * Campaña: suma desde inicio del informe (todas las fechas del rango).
-   * Conjunto: suma ayer + hoy.
-   */
+  /** Suma desde inicio del informe (todas las fechas del rango). */
   spendInformeTotal: number
   purchasesInformeTotal: number
   cpaInformeTotal: number
@@ -121,6 +118,8 @@ export type MetaInformePayload = {
   date: string
   informeStartDate: string
   dateRange: { from: string; to: string }
+  /** Columnas diarias en la tabla (desde informeStartDate hasta hoy). */
+  dateKeys: string[]
   groups: InformeCampaignGroup[]
   /** Compat cron: filas con ⚠ Olvido (no activaste ayer). */
   forgotten: InformeEntityRow[]
@@ -501,10 +500,7 @@ function buildInformeRow(
   }
 
   pointsTotal = finalizePointsTotal(dayCells, pointsTotal)
-  const informePeriod =
-    type === "campaign"
-      ? sumInformePeriodFromDayCells(dayCells)
-      : sumInformePeriodFromDayCells(dayCells, [yesterday, today])
+  const informePeriod = sumInformePeriodFromDayCells(dayCells)
 
   const todayDay =
     storedByEntityDate.get(`${entity.id}:${today}`) ??
@@ -630,6 +626,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       date: today,
       informeStartDate,
       dateRange,
+      dateKeys,
       groups: [],
       forgotten: [],
       olvidoAlerts: [],
@@ -760,6 +757,7 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     date: today,
     informeStartDate,
     dateRange,
+    dateKeys,
     groups,
     forgotten: olvidoAlerts,
     olvidoAlerts,

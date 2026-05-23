@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
@@ -37,12 +37,16 @@ import type {
   InformeTableTotals,
 } from "@/lib/services/meta/meta-operative-service"
 import {
+  countInformeActivateAdsets,
+  countInformePeriodFilters,
   getInformeEntityEstadoDisplay,
   informeEstadoFilterForEntity,
+  informePeriodFilterForEntity,
+  shouldInformeActivateAdset,
   type InformeEstadoFilter,
   type InformeEstadoFilterKey,
 } from "@/lib/services/meta/meta-informe-scoring"
-import { InformeEstadoFilters } from "./informe-estado-filters"
+import { InformeFilterBars } from "./informe-estado-filters"
 import {
   getMetaInformeAction,
   previewMetaInformeHourlyAction,
@@ -90,7 +94,34 @@ function countInformeEstadoFilters(
   return counts
 }
 
+function filterInformeGroupsByKey(
+  groups: InformeCampaignGroup[],
+  filter: InformeEstadoFilter,
+  match: (row: InformeEntityRow) => InformeEstadoFilterKey | null
+): InformeCampaignGroup[] {
+  if (filter === "ALL") return groups
+
+  return groups
+    .map((group) => {
+      const campaignMatches = match(group.campaign) === filter
+      const matchingAdsets = group.adsets.filter(
+        (adset) => match(adset) === filter
+      )
+      if (!campaignMatches && matchingAdsets.length === 0) return null
+      return { ...group, adsets: matchingAdsets }
+    })
+    .filter((group): group is InformeCampaignGroup => group !== null)
+}
+
 function filterInformeGroups(
+  groups: InformeCampaignGroup[],
+  filter: InformeEstadoFilter
+): InformeCampaignGroup[] {
+  return filterInformeGroupsByKey(groups, filter, informeEstadoFilterForEntity)
+}
+
+/** t/: solo conjuntos que califican; la campaña aparece si tiene al menos uno. */
+function filterInformeGroupsByPeriod(
   groups: InformeCampaignGroup[],
   filter: InformeEstadoFilter
 ): InformeCampaignGroup[] {
@@ -98,15 +129,44 @@ function filterInformeGroups(
 
   return groups
     .map((group) => {
-      const campaignMatches =
-        informeEstadoFilterForEntity(group.campaign) === filter
-      const matchingAdsets = group.adsets.filter(
-        (adset) => informeEstadoFilterForEntity(adset) === filter
-      )
-      if (!campaignMatches && matchingAdsets.length === 0) return null
+      const matchingAdsets = group.adsets.filter((adset) => {
+        if (adset.spendInformeTotal <= 0) return false
+        return informePeriodFilterForEntity(adset) === filter
+      })
+      if (matchingAdsets.length === 0) return null
       return { ...group, adsets: matchingAdsets }
     })
     .filter((group): group is InformeCampaignGroup => group !== null)
+}
+
+function filterInformeGroupsByActivar(
+  groups: InformeCampaignGroup[]
+): InformeCampaignGroup[] {
+  return groups
+    .map((group) => {
+      const matchingAdsets = group.adsets.filter((adset) =>
+        shouldInformeActivateAdset(adset)
+      )
+      if (matchingAdsets.length === 0) return null
+      return { ...group, adsets: matchingAdsets }
+    })
+    .filter((group): group is InformeCampaignGroup => group !== null)
+}
+
+function filterInformeGroupsCombined(
+  groups: InformeCampaignGroup[],
+  estadoFilter: InformeEstadoFilter,
+  periodFilter: InformeEstadoFilter,
+  activarFilter: boolean
+): InformeCampaignGroup[] {
+  let result = filterInformeGroups(groups, estadoFilter)
+  if (periodFilter !== "ALL") {
+    result = filterInformeGroupsByPeriod(result, periodFilter)
+  }
+  if (activarFilter) {
+    result = filterInformeGroupsByActivar(result)
+  }
+  return result
 }
 
 type PeriodMetrics = {
@@ -115,25 +175,17 @@ type PeriodMetrics = {
   cpa: number
 }
 
-function getYesterdayMetrics(
+function getMetricsForDate(
   row: InformeEntityRow,
-  yesterday: string
+  date: string
 ): PeriodMetrics {
-  const yCell = row.dayCells.find((d) => d.date === yesterday)
-  const spend = yCell?.spend ?? 0
-  const purchases = yCell?.purchases ?? 0
+  const cell = row.dayCells.find((d) => d.date === date)
+  const spend = cell?.spend ?? 0
+  const purchases = cell?.purchases ?? 0
   return {
     spend,
     purchases,
     cpa: purchases > 0 ? spend / purchases : 0,
-  }
-}
-
-function getTodayMetrics(row: InformeEntityRow): PeriodMetrics {
-  return {
-    spend: row.spendToday,
-    purchases: row.purchasesToday,
-    cpa: row.cpaToday,
   }
 }
 
@@ -193,48 +245,41 @@ function PeriodMetricsCells({
   )
 }
 
-/** Gasto y CPA total: campaña (desde inicio informe) · conjunto (ayer + hoy). */
+/** Gasto, compras y CPA total acumulados desde informeStartDate. */
 function InformeTotalCells({
   row,
   informeStartDate,
-  yesterday,
-  today,
 }: {
   row: InformeEntityRow
   informeStartDate: string
-  yesterday: string
-  today: string
 }) {
   const cpaClass = getCostPerResultCellClassName(
     row.cpaInformeTotal,
     META_DASHBOARD_CURRENCY
   )
-  const spendTitle =
-    row.type === "campaign"
-      ? `Gasto desde ${formatInformeDate(informeStartDate)} (todas las fechas del informe)`
-      : `Gasto ayer (${formatInformeDate(yesterday)}) + hoy (${formatInformeDate(today)})`
-  const cpaTitle =
-    row.type === "campaign"
-      ? row.purchasesInformeTotal > 0
-        ? `CPA total informe · ${formatNumber(row.purchasesInformeTotal)} compras`
-        : "CPA total del informe"
-      : row.purchasesInformeTotal > 0
-        ? `CPA ayer+hoy · ${formatNumber(row.purchasesInformeTotal)} compras`
-        : "CPA ayer+hoy (sin compras en el periodo)"
+  const periodTitle = `Periodo desde ${formatInformeDate(informeStartDate)}`
 
   return (
     <>
       <TableCell
         className="text-right tabular-nums font-medium"
-        title={spendTitle}
+        title={`${periodTitle} · gasto`}
       >
         {row.spendInformeTotal > 0
           ? formatCurrency(row.spendInformeTotal, META_DASHBOARD_CURRENCY)
           : "—"}
       </TableCell>
       <TableCell
+        className="text-right tabular-nums font-medium"
+        title={`${periodTitle} · compras`}
+      >
+        {row.purchasesInformeTotal > 0
+          ? formatNumber(row.purchasesInformeTotal)
+          : "—"}
+      </TableCell>
+      <TableCell
         className={cn("text-right tabular-nums font-medium", cpaClass)}
-        title={cpaTitle}
+        title={`${periodTitle} · CPA`}
       >
         {row.cpaInformeTotal > 0
           ? formatCurrency(row.cpaInformeTotal, META_DASHBOARD_CURRENCY)
@@ -246,65 +291,63 @@ function InformeTotalCells({
 
 function MetricsCells({
   row,
-  yesterday,
-  today,
+  dateKeys,
 }: {
   row: InformeEntityRow
-  yesterday: string
-  today: string
+  dateKeys: string[]
 }) {
   return (
     <>
-      <PeriodMetricsCells
-        metrics={getYesterdayMetrics(row, yesterday)}
-        periodLabel={formatInformeDate(yesterday)}
-      />
-      <PeriodMetricsCells
-        metrics={getTodayMetrics(row)}
-        periodLabel={formatInformeDate(today)}
-      />
+      {dateKeys.map((date) => (
+        <PeriodMetricsCells
+          key={date}
+          metrics={getMetricsForDate(row, date)}
+          periodLabel={formatInformeDate(date)}
+        />
+      ))}
     </>
   )
 }
 
+function dayColumnHeaderClass(date: string, today: string): string {
+  return cn(
+    "border-border text-center text-xs font-semibold tabular-nums",
+    date === today ? "bg-muted/20" : "bg-muted/40"
+  )
+}
+
+function dayColumnSubHeaderClass(date: string, today: string): string {
+  return cn("text-right text-xs", date === today ? "bg-muted/20" : "bg-muted/40")
+}
+
 function InformeAccountSummary({
   totals,
-  yesterday,
-  today,
+  dateKeys,
   informeStartDate,
   dateRange,
 }: {
   totals: InformeTableTotals
-  yesterday: string
-  today: string
+  dateKeys: string[]
   informeStartDate: string
   dateRange: { from: string; to: string }
 }) {
-  const ayer = getDayTotalsMetrics(totals, yesterday)
-  const hoy = getTodayMetricsFromTotals(totals)
-
   return (
     <div className="text-muted-foreground flex flex-col gap-1 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6">
-      <p>
-        <strong className="text-foreground font-medium">
-          {formatInformeDate(yesterday)}:
-        </strong>{" "}
-        gasto {formatCurrency(ayer.spend, META_DASHBOARD_CURRENCY)} ·{" "}
-        {formatNumber(ayer.purchases)} compras
-        {ayer.cpa > 0
-          ? ` · CPA ${formatCurrency(ayer.cpa, META_DASHBOARD_CURRENCY)}`
-          : ""}
-      </p>
-      <p>
-        <strong className="text-foreground font-medium">
-          {formatInformeDate(today)}:
-        </strong>{" "}
-        gasto {formatCurrency(hoy.spend, META_DASHBOARD_CURRENCY)} ·{" "}
-        {formatNumber(hoy.purchases)} compras
-        {hoy.cpa > 0
-          ? ` · CPA ${formatCurrency(hoy.cpa, META_DASHBOARD_CURRENCY)}`
-          : ""}
-      </p>
+      {dateKeys.map((date) => {
+        const day = getDayTotalsMetrics(totals, date)
+        return (
+          <p key={date}>
+            <strong className="text-foreground font-medium">
+              {formatInformeDate(date)}:
+            </strong>{" "}
+            gasto {formatCurrency(day.spend, META_DASHBOARD_CURRENCY)} ·{" "}
+            {formatNumber(day.purchases)} compras
+            {day.cpa > 0
+              ? ` · CPA ${formatCurrency(day.cpa, META_DASHBOARD_CURRENCY)}`
+              : ""}
+          </p>
+        )
+      })}
       <p className="text-xs sm:basis-full">
         Informe desde {formatDayLabel(informeStartDate)}
         {dateRange.from !== dateRange.to
@@ -313,14 +356,6 @@ function InformeAccountSummary({
       </p>
     </div>
   )
-}
-
-function getTodayMetricsFromTotals(totals: InformeTableTotals): PeriodMetrics {
-  return {
-    spend: totals.spendToday,
-    purchases: totals.purchasesToday,
-    cpa: totals.cpaToday,
-  }
 }
 
 function AdsetCountCells({
@@ -409,8 +444,7 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
 
 function EntityRow({
   row,
-  yesterday,
-  today,
+  dateKeys,
   informeStartDate,
   indent,
   campaignActions,
@@ -418,8 +452,7 @@ function EntityRow({
   activeAdSetsCount,
 }: {
   row: InformeEntityRow
-  yesterday: string
-  today: string
+  dateKeys: string[]
   informeStartDate: string
   indent?: boolean
   /** Solo filas de campaña: conjuntos + links (como dashboard Meta). */
@@ -447,13 +480,8 @@ function EntityRow({
         adSetsCount={adSetsCount}
         activeAdSetsCount={activeAdSetsCount}
       />
-      <InformeTotalCells
-        row={row}
-        informeStartDate={informeStartDate}
-        yesterday={yesterday}
-        today={today}
-      />
-      <MetricsCells row={row} yesterday={yesterday} today={today} />
+      <InformeTotalCells row={row} informeStartDate={informeStartDate} />
+      <MetricsCells row={row} dateKeys={dateKeys} />
     </TableRow>
   )
 }
@@ -462,15 +490,13 @@ function CampaignGroupRows({
   group,
   isExpanded,
   onToggleExpand,
-  yesterday,
-  today,
+  dateKeys,
   informeStartDate,
 }: {
   group: InformeCampaignGroup
   isExpanded: boolean
   onToggleExpand: () => void
-  yesterday: string
-  today: string
+  dateKeys: string[]
   informeStartDate: string
 }) {
   const adsetCount = group.adsets.length
@@ -479,8 +505,7 @@ function CampaignGroupRows({
     <>
       <EntityRow
         row={group.campaign}
-        yesterday={yesterday}
-        today={today}
+        dateKeys={dateKeys}
         informeStartDate={informeStartDate}
         adSetsCount={group.adSetsCount}
         activeAdSetsCount={group.activeAdSetsCount}
@@ -521,8 +546,7 @@ function CampaignGroupRows({
             <EntityRow
               key={adset.entityId}
               row={adset}
-              yesterday={yesterday}
-              today={today}
+              dateKeys={dateKeys}
               informeStartDate={informeStartDate}
               indent
             />
@@ -535,17 +559,12 @@ function CampaignGroupRows({
 function InformeTotalsRow({
   groups,
   totals,
-  yesterday,
-  today,
+  dateKeys,
 }: {
   groups: InformeCampaignGroup[]
   totals: InformeTableTotals
-  yesterday: string
-  today: string
+  dateKeys: string[]
 }) {
-  const ayer = getDayTotalsMetrics(totals, yesterday)
-  const hoy = getTodayMetricsFromTotals(totals)
-
   let adsetSpendTotal = 0
   let adsetPurchasesTotal = 0
   for (const group of groups) {
@@ -564,7 +583,7 @@ function InformeTotalsRow({
       </TableCell>
       <TableCell
         className="text-right tabular-nums"
-        title="Suma gasto conjuntos (ayer + hoy)"
+        title="Suma gasto conjuntos (periodo del informe)"
       >
         {adsetSpendTotal > 0
           ? formatCurrency(adsetSpendTotal, META_DASHBOARD_CURRENCY)
@@ -572,59 +591,46 @@ function InformeTotalsRow({
       </TableCell>
       <TableCell
         className="text-right tabular-nums"
-        title="CPA total conjuntos (ayer + hoy)"
+        title="Suma compras conjuntos (periodo del informe)"
+      >
+        {adsetPurchasesTotal > 0 ? formatNumber(adsetPurchasesTotal) : "—"}
+      </TableCell>
+      <TableCell
+        className="text-right tabular-nums"
+        title="CPA total conjuntos (periodo del informe)"
       >
         {adsetCpaTotal > 0
           ? formatCurrency(adsetCpaTotal, META_DASHBOARD_CURRENCY)
           : "—"}
       </TableCell>
-      <PeriodMetricsCells
-        metrics={ayer}
-        periodLabel={formatInformeDate(yesterday)}
-        highlightCpa={false}
-      />
-      <PeriodMetricsCells
-        metrics={hoy}
-        periodLabel={formatInformeDate(today)}
-        highlightCpa={false}
-      />
+      {dateKeys.map((date) => (
+        <PeriodMetricsCells
+          key={date}
+          metrics={getDayTotalsMetrics(totals, date)}
+          periodLabel={formatInformeDate(date)}
+          highlightCpa={false}
+        />
+      ))}
     </TableRow>
   )
 }
 
 function InformeTable({
   groups,
-  yesterday,
+  dateKeys,
   today,
   totals,
   informeStartDate,
-  estadoFilter,
 }: {
   groups: InformeCampaignGroup[]
-  yesterday: string
+  dateKeys: string[]
   today: string
   totals: InformeTableTotals
   informeStartDate: string
-  estadoFilter: InformeEstadoFilter
 }) {
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(
     () => new Set()
   )
-
-  useEffect(() => {
-    if (estadoFilter === "ALL") return
-    setExpandedCampaignIds((current) => {
-      const next = new Set(current)
-      for (const group of groups) {
-        const campaignMatches =
-          informeEstadoFilterForEntity(group.campaign) === estadoFilter
-        if (!campaignMatches && group.adsets.length > 0) {
-          next.add(group.campaign.metaId)
-        }
-      }
-      return next
-    })
-  }, [estadoFilter, groups])
 
   const handleToggleExpand = useCallback((campaignMetaId: string) => {
     setExpandedCampaignIds((current) => {
@@ -667,32 +673,38 @@ function InformeTable({
             className="border-border bg-muted/30 text-center text-xs font-semibold"
             rowSpan={2}
           >
+            Compras total
+          </TableHead>
+          <TableHead
+            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            rowSpan={2}
+          >
             CPA total
           </TableHead>
-          <TableHead
-            colSpan={3}
-            className="border-border bg-muted/40 text-center text-xs font-semibold tabular-nums"
-          >
-            {formatInformeDate(yesterday)}
-          </TableHead>
-          <TableHead
-            colSpan={3}
-            className="border-border bg-muted/20 text-center text-xs font-semibold tabular-nums"
-          >
-            {formatInformeDate(today)}
-          </TableHead>
+          {dateKeys.map((date) => (
+            <TableHead
+              key={date}
+              colSpan={3}
+              className={dayColumnHeaderClass(date, today)}
+            >
+              {formatInformeDate(date)}
+            </TableHead>
+          ))}
         </TableRow>
         <TableRow>
-          <TableHead className="bg-muted/40 text-right text-xs">Gasto</TableHead>
-          <TableHead className="bg-muted/40 text-right text-xs">
-            Compras
-          </TableHead>
-          <TableHead className="bg-muted/40 text-right text-xs">CPA</TableHead>
-          <TableHead className="bg-muted/20 text-right text-xs">Gasto</TableHead>
-          <TableHead className="bg-muted/20 text-right text-xs">
-            Compras
-          </TableHead>
-          <TableHead className="bg-muted/20 text-right text-xs">CPA</TableHead>
+          {dateKeys.map((date) => (
+            <Fragment key={date}>
+              <TableHead className={dayColumnSubHeaderClass(date, today)}>
+                Gasto
+              </TableHead>
+              <TableHead className={dayColumnSubHeaderClass(date, today)}>
+                Compras
+              </TableHead>
+              <TableHead className={dayColumnSubHeaderClass(date, today)}>
+                CPA
+              </TableHead>
+            </Fragment>
+          ))}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -702,8 +714,7 @@ function InformeTable({
             group={group}
             isExpanded={expandedCampaignIds.has(group.campaign.metaId)}
             onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
-            yesterday={yesterday}
-            today={today}
+            dateKeys={dateKeys}
             informeStartDate={informeStartDate}
           />
         ))}
@@ -712,8 +723,7 @@ function InformeTable({
         <InformeTotalsRow
           groups={groups}
           totals={totals}
-          yesterday={yesterday}
-          today={today}
+          dateKeys={dateKeys}
         />
       </TableFooter>
     </Table>
@@ -733,6 +743,8 @@ export function InformeIaContent() {
   const [telegramSent, setTelegramSent] = useState<number | null>(null)
   const [hourlyError, setHourlyError] = useState<string | null>(null)
   const [estadoFilter, setEstadoFilter] = useState<InformeEstadoFilter>("ALL")
+  const [periodFilter, setPeriodFilter] = useState<InformeEstadoFilter>("ALL")
+  const [activarFilter, setActivarFilter] = useState(false)
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
@@ -794,9 +806,27 @@ export function InformeIaContent() {
     [data]
   )
 
+  const periodCounts = useMemo(
+    () => (data ? countInformePeriodFilters(data.groups) : null),
+    [data]
+  )
+
+  const activarCount = useMemo(
+    () => (data ? countInformeActivateAdsets(data.groups) : 0),
+    [data]
+  )
+
   const filteredGroups = useMemo(
-    () => (data ? filterInformeGroups(data.groups, estadoFilter) : []),
-    [data, estadoFilter]
+    () =>
+      data
+        ? filterInformeGroupsCombined(
+            data.groups,
+            estadoFilter,
+            periodFilter,
+            activarFilter
+          )
+        : [],
+    [data, estadoFilter, periodFilter, activarFilter]
   )
 
   const metaApiStatus = useMemo(
@@ -843,8 +873,23 @@ export function InformeIaContent() {
             <span className="font-medium text-red-700 dark:text-red-400">
               Crítico
             </span>{" "}
-            para revisar o desactivar. La tabla filtra por Excelente / En curso /
-            Crítico.
+            para revisar o desactivar. Los botones{" "}
+            <span className="font-medium text-green-700 dark:text-green-400">
+              t/exelente
+            </span>
+            ,{" "}
+            <span className="font-medium text-orange-600 dark:text-orange-400">
+              t/curso
+            </span>{" "}
+            ,{" "}
+            <span className="font-medium text-red-700 dark:text-red-400">
+              t/critico
+            </span>{" "}
+            y{" "}
+            <span className="font-medium text-yellow-700 dark:text-yellow-300">
+              activar
+            </span>{" "}
+            (conjuntos OFF con buen CPA total) filtran la misma tabla.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -946,8 +991,7 @@ export function InformeIaContent() {
         <>
           <InformeAccountSummary
             totals={data.totals}
-            yesterday={data.yesterday}
-            today={data.date}
+            dateKeys={data.dateKeys}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
@@ -960,37 +1004,36 @@ export function InformeIaContent() {
         <>
           <InformeAccountSummary
             totals={data.totals}
-            yesterday={data.yesterday}
-            today={data.date}
+            dateKeys={data.dateKeys}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
-          {estadoCounts ? (
-            <InformeEstadoFilters
-              counts={estadoCounts}
-              selectedFilter={estadoFilter}
-              onFilterChange={setEstadoFilter}
+          {estadoCounts && periodCounts ? (
+            <InformeFilterBars
+              estadoCounts={estadoCounts}
+              periodCounts={periodCounts}
+              activarCount={activarCount}
+              estadoFilter={estadoFilter}
+              periodFilter={periodFilter}
+              activarFilter={activarFilter}
+              onEstadoFilterChange={setEstadoFilter}
+              onPeriodFilterChange={setPeriodFilter}
+              onActivarFilterChange={setActivarFilter}
             />
           ) : null}
           {filteredGroups.length === 0 ? (
             <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
-              Ninguna campaña ni conjunto con estado{" "}
-              {estadoFilter === "EXCELENTE"
-                ? "Excelente"
-                : estadoFilter === "EN_CURSO"
-                  ? "En curso"
-                  : "Crítico"}{" "}
-              hoy. Prueba otro filtro o «todas».
+              Ningún resultado con los filtros actuales. Prueba «todas», otro
+              botón t/ o desactiva «activar».
             </p>
           ) : (
             <div className="min-w-0 overflow-x-auto rounded-lg border">
               <InformeTable
                 groups={filteredGroups}
-                yesterday={data.yesterday}
+                dateKeys={data.dateKeys}
                 today={data.date}
                 totals={data.totals}
                 informeStartDate={data.informeStartDate}
-                estadoFilter={estadoFilter}
               />
             </div>
           )}

@@ -22,7 +22,7 @@ OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe
 | `TELEGRAM_BOT_TOKEN` | Sí (alertas) | Bot de @BotFather |
 | `TELEGRAM_ALLOWED_USER_IDS` | Sí (alertas) | IDs separados por coma |
 | `OPENAI_API_KEY` | No | Texto más natural en Telegram |
-| `META_INFORME_START_DATE` | No | Primer día del historial (`YYYY-MM-DD`). No puede ser anterior a ayer (Lima). |
+| `META_INFORME_START_DATE` | No | Primer día del historial (`YYYY-MM-DD`, Lima). La tabla muestra una columna por cada día desde esa fecha hasta hoy. |
 
 Copia `.env.example` y rellena los valores.
 

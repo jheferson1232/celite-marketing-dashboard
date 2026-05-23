@@ -5,8 +5,8 @@ import {
 } from "@/lib/date"
 
 /**
- * Historial desde ayer (Lima) hacia adelante.
- * META_INFORME_START_DATE solo puede retrasar el arranque, nunca ir antes de ayer.
+ * Historial del informe (America/Lima).
+ * Sin env: desde ayer. Con META_INFORME_START_DATE: desde esa fecha (puede ser anterior a ayer).
  */
 export function getMetaInformeStartDate(): string {
   const yesterday = getDashboardYesterday()
@@ -14,8 +14,7 @@ export function getMetaInformeStartDate(): string {
   const fromEnv = process.env.META_INFORME_START_DATE?.trim()
 
   if (fromEnv && /^\d{4}-\d{2}-\d{2}$/.test(fromEnv)) {
-    const effective = fromEnv < yesterday ? yesterday : fromEnv
-    return effective > today ? today : effective
+    return fromEnv > today ? today : fromEnv
   }
 
   return yesterday
