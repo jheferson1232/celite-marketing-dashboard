@@ -27,7 +27,8 @@ export function getMetaInformeDateRange(): { from: string; to: string } {
   return { from: start > today ? today : start, to: today }
 }
 
+/** Más reciente primero (hoy a la izquierda): 23, 22, 21… */
 export function getMetaInformeDateKeys(): string[] {
   const range = getMetaInformeDateRange()
-  return buildDateKeys(range.from, range.to)
+  return buildDateKeys(range.from, range.to).toReversed()
 }
