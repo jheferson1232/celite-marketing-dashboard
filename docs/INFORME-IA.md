@@ -45,9 +45,9 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 
 ## Cron horario (GitHub Actions — recomendado en Hobby)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`17 * * * *` UTC, minuto 17 para evitar el pico de carga de GitHub al inicio de cada hora).
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`17` y `47` de cada hora UTC; si ambos corren en la misma hora Lima, el segundo se omite para no duplicar Telegram).
 
-> **Fiabilidad:** GitHub Actions **no garantiza** una ejecución exacta cada hora (puede haber huecos de varias horas). Si necesitas horario estricto, usa [cron-job.org](#alternativa-cron-joborg) contra el mismo endpoint.
+> **Fiabilidad:** GitHub Actions **no garantiza** una ejecución cada hora (a menudo **salta horas**). Revisa **Actions → Meta Telegram hourly** en el repo: si ves huecos, el cron no falló tu app — no se disparó. Para horario estricto, usa [cron-job.org](#alternativa-cron-joborg) cada hora (`0 * * * *`).
 
 ### Configuración (una vez)
 
@@ -102,12 +102,13 @@ curl -s -H "Authorization: Bearer $CRON_SECRET" \
 
 **Conjuntos:** reglas operativas del día (Gasto alto ayer, Sin ventas, CPA alto, OK, —).
 
-## Sugerencias de apagar (Telegram)
+## Mensaje horario Telegram
 
-Solo entidades **activas en Meta (ON)**; si ya están apagadas no se repiten en el mensaje.
+- **Conjuntos activos (ON) en Crítico** — Mismo criterio que la columa Estado del informe (CPA &gt; 20k o ≥ 10k sin compras hoy). Ej.: `cost 12 · ON · Crítico · CPA $24,043`.
+- **Conjuntos a apagar** — ON, gasto ≥ 10k y 0 compras.
+- **Campañas a apagar** — ON, gasto ≥ 30k y 0 compras.
 
-- **Conjunto** — Gasto hoy ≥ 10k COP y 0 compras.
-- **Campaña** — Gasto hoy ≥ 30k COP y 0 compras.
+Solo entidades **ON**; si ya están OFF no se listan.
 
 ## Archivos clave
 

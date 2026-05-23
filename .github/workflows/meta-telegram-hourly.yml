@@ -6,9 +6,10 @@ name: Meta Telegram hourly
 
 on:
   schedule:
-    # Cada hora en UTC. Minuto 17 (no :00): GitHub retrasa/descarta muchos crons en el
-    # inicio de hora por alta carga — ver docs.github.com/en/actions/.../schedule
+    # GitHub Actions no garantiza ejecución cada hora (a veces salta horas).
+    # Dos disparos por hora aumentan la probabilidad de al menos un informe.
     - cron: "17 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch:
 
 jobs:

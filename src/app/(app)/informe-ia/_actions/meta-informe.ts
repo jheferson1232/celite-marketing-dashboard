@@ -47,7 +47,9 @@ export const sendMetaInformeHourlyToTelegramAction = createServerAction(
   async () => {
     const informe = await getMetaInformePayload()
     const payload = await buildMetaHourlyReportPayload(informe)
-    const result = await sendMetaHourlyReportToTelegram(payload)
+    const result = await sendMetaHourlyReportToTelegram(payload, {
+      skipDedup: true,
+    })
     return {
       text: result.message,
       sent: result.sent,

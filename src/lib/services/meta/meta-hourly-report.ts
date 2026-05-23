@@ -1,9 +1,11 @@
 import { getDashboardHour, getDashboardToday, getTodayDateRange } from "@/lib/date"
 import {
   buildInformeCampaignSummaries,
+  collectAdsetsCriticoActivos,
   collectAdsetsToPause,
   collectCampaignsToPause,
   type InformeCampaignSummary,
+  type InformeCriticoActivoItem,
   type InformePauseItem,
 } from "./meta-informe-alerts"
 import { getAccountKpis } from "./account-kpis"
@@ -13,6 +15,7 @@ import {
   type MetaInformePayload,
 } from "./meta-operative-service"
 import { generateHourlyOperativeCommentary } from "./meta-cron-commentary"
+import { claimMetaOnce } from "./meta-cache"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
 import { getAllowedTelegramUserIds } from "@/lib/telegram/config"
 
@@ -24,6 +27,8 @@ export type MetaHourlyReportPayload = {
   accountSpend: number
   accountPurchases: number
   campaigns: InformeCampaignSummary[]
+  /** Conjuntos ON con estado Crítico hoy (CPA &gt;20k o ≥10k sin compras). */
+  adsetsCriticoActivos: InformeCriticoActivoItem[]
   adsetsToPause: InformePauseItem[]
   campaignsToPause: InformePauseItem[]
 }
@@ -43,6 +48,7 @@ export async function buildMetaHourlyReportPayload(
     accountSpend: kpis.totalSpend,
     accountPurchases: kpis.purchases,
     campaigns: buildInformeCampaignSummaries(informe.groups),
+    adsetsCriticoActivos: collectAdsetsCriticoActivos(informe.groups),
     adsetsToPause: collectAdsetsToPause(informe.groups),
     campaignsToPause: collectCampaignsToPause(informe.groups),
   }
@@ -62,15 +68,35 @@ export async function buildMetaHourlyTelegramMessage(
 }
 
 export async function sendMetaHourlyReportToTelegram(
-  payload?: MetaHourlyReportPayload
+  payload?: MetaHourlyReportPayload,
+  options?: { skipDedup?: boolean }
 ): Promise<{
   message: string
   sent: number
+  skippedDuplicate: boolean
+  adsetsCriticoActivos: number
   adsetsToPause: number
   campaignsToPause: number
 }> {
   const data = payload ?? (await buildMetaHourlyReportPayload())
   const message = await buildMetaHourlyTelegramMessage(data)
+
+  const dedupKey = `meta-hourly-telegram:${data.date}:${data.hour}`
+  if (
+    !options?.skipDedup &&
+    !claimMetaOnce(dedupKey, 55 * 60 * 1000)
+  ) {
+    console.info(`Meta hourly: ya enviado para ${data.date} h${data.hour}, omitiendo duplicado`)
+    return {
+      message,
+      sent: 0,
+      skippedDuplicate: true,
+      adsetsCriticoActivos: data.adsetsCriticoActivos.length,
+      adsetsToPause: data.adsetsToPause.length,
+      campaignsToPause: data.campaignsToPause.length,
+    }
+  }
+
   const ids = getAllowedTelegramUserIds()
 
   if (ids.size === 0) {
@@ -78,6 +104,8 @@ export async function sendMetaHourlyReportToTelegram(
     return {
       message,
       sent: 0,
+      skippedDuplicate: false,
+      adsetsCriticoActivos: data.adsetsCriticoActivos.length,
       adsetsToPause: data.adsetsToPause.length,
       campaignsToPause: data.campaignsToPause.length,
     }
@@ -96,6 +124,8 @@ export async function sendMetaHourlyReportToTelegram(
   return {
     message,
     sent,
+    skippedDuplicate: false,
+    adsetsCriticoActivos: data.adsetsCriticoActivos.length,
     adsetsToPause: data.adsetsToPause.length,
     campaignsToPause: data.campaignsToPause.length,
   }

@@ -1,6 +1,8 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
+import type { InformeCriticoActivoItem } from "./meta-informe-alerts"
 import type { MetaHourlyReportPayload } from "./meta-hourly-report"
+import { formatCop } from "./meta-operative-service"
 
 export async function generateHourlyOperativeCommentary(
   payload: MetaHourlyReportPayload
@@ -13,8 +15,8 @@ export async function generateHourlyOperativeCommentary(
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
       system: `Asistente operativo Meta Ads (Colombia, COP, español).
-Resumen horario para Telegram: campañas activas hoy, qué conjuntos APAGAR (solo si están ON en Meta: gasto ≥10k sin compras), qué campañas APAGAR (solo ON: gasto ≥30k sin compras).
-No sugieras apagar campañas/conjuntos que ya están OFF. Máximo 14 líneas. **negrita** en nombres.`,
+Resumen horario para Telegram: campañas activas hoy; conjuntos ON en estado Crítico (activos con mal rendimiento hoy); conjuntos/campañas a APAGAR (solo ON: ≥10k/≥30k sin compras).
+No sugieras apagar lo que ya está OFF. Máximo 16 líneas. **negrita** en nombres.`,
       prompt: JSON.stringify(payload, null, 2),
     })
     return text.trim() || buildTemplateHourly(payload)
@@ -59,7 +61,20 @@ Sugiere qué revisar mañana si aplica. No ejecutes cambios. Máximo 12 líneas.
   }
 }
 
+function formatCriticoActivoLine(item: InformeCriticoActivoItem): string {
+  const base = `• **${item.name}** (${item.campaignName}): **ON** · **Crítico**`
+  if (item.purchases > 0 && item.cpa > 0) {
+    return `${base} · ${formatCop(item.spend)} hoy · ${item.purchases} compra(s) · CPA ${formatCop(item.cpa)}`
+  }
+  return `${base} · ${formatCop(item.spend)} hoy · 0 compras`
+}
+
 function buildTemplateHourly(payload: MetaHourlyReportPayload): string {
+  const criticoActivos =
+    payload.adsetsCriticoActivos.length > 0
+      ? payload.adsetsCriticoActivos.map(formatCriticoActivoLine).join("\n")
+      : "• Ninguno"
+
   const campañas =
     payload.campaigns.length > 0
       ? payload.campaigns
@@ -93,6 +108,7 @@ function buildTemplateHourly(payload: MetaHourlyReportPayload): string {
 
   return (
     `**Campañas hoy:**\n${campañas}\n\n` +
+    `⚠️ **Conjuntos activos (ON) en Crítico:**\n${criticoActivos}\n\n` +
     `🔴 **Conjuntos a apagar** (≥10k sin ventas):\n${conjuntos}\n\n` +
     `🔴 **Campañas a apagar** (≥30k sin ventas):\n${campañasApagar}`
   )

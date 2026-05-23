@@ -19,6 +19,16 @@ export async function withMetaCache<T>(
   return value
 }
 
+/** Una sola ejecución por clave en esta instancia (p. ej. evitar 2 Telegram si corren :17 y :47). */
+export function claimMetaOnce(key: string, ttlMs: number): boolean {
+  const hit = cache.get(key)
+  if (hit && hit.expiresAt > Date.now()) {
+    return false
+  }
+  cache.set(key, { value: true, expiresAt: Date.now() + ttlMs })
+  return true
+}
+
 export function clearMetaCache(prefix?: string) {
   if (!prefix) {
     cache.clear()

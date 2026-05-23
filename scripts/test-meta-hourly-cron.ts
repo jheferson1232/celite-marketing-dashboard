@@ -23,9 +23,13 @@ async function main() {
     accountSpend: payload.accountSpend,
     accountPurchases: payload.accountPurchases,
     campaigns: payload.campaigns.length,
+    adsetsCriticoActivos: payload.adsetsCriticoActivos.length,
     adsetsToPause: payload.adsetsToPause.length,
     campaignsToPause: payload.campaignsToPause.length,
   })
+  if (payload.adsetsCriticoActivos.length > 0) {
+    console.log("Critico activos:", payload.adsetsCriticoActivos)
+  }
 
   console.log("\n--- Mensaje Telegram ---\n")
   console.log(message)
