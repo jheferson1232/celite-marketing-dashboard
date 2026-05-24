@@ -14,6 +14,7 @@ interface ProductTikTokLaunchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onLaunched?: () => void
+  variant?: "kanban" | "edit"
 }
 
 export function ProductTikTokLaunchDialog({
@@ -21,6 +22,7 @@ export function ProductTikTokLaunchDialog({
   open,
   onOpenChange,
   onLaunched,
+  variant = "edit",
 }: ProductTikTokLaunchDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,6 +33,7 @@ export function ProductTikTokLaunchDialog({
         {product ? (
           <ProductTikTokLaunchPanel
             product={product}
+            variant={variant}
             onClose={() => onOpenChange(false)}
             onLaunched={() => {
               onLaunched?.()

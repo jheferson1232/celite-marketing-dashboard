@@ -116,6 +116,7 @@ export function ProductsKanbanCard({
 
       <ProductTikTokLaunchDialog
         product={product}
+        variant="kanban"
         open={launchOpen}
         onOpenChange={setLaunchOpen}
         onLaunched={onLaunched}

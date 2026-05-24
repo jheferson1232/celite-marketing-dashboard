@@ -42,16 +42,33 @@ function storeVideosDir(dir: string) {
   }
 }
 
+function clearStoredVideosDir() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(VIDEOS_DIR_STORAGE_KEY)
+  }
+}
+
+/** Errores técnicos que no se muestran en el Kanban (ya hay aviso de subir videos). */
+const KANBAN_HIDDEN_CHECK_LABELS = new Set([
+  "Carpeta local",
+  "Carpeta de videos",
+  "Carpeta accesible",
+  "Listo para publicar",
+])
+
 interface ProductTikTokLaunchPanelProps {
   product: ProductRecord
   onClose: () => void
   onLaunched?: () => void
+  /** Desde Products Kanban: sin lista roja de preflight técnico. */
+  variant?: "kanban" | "edit"
 }
 
 export function ProductTikTokLaunchPanel({
   product,
   onClose,
   onLaunched,
+  variant = "edit",
 }: ProductTikTokLaunchPanelProps) {
   const [phase, setPhase] = useState<Phase>("prepare")
   const [videosDir, setVideosDir] = useState("")
@@ -65,16 +82,27 @@ export function ProductTikTokLaunchPanel({
   const hasBlobVideos = blobVideoCount > 0
   const cloudHosted = isCloudHosted()
   const localFolderAllowed = !cloudHosted
+  const fromKanban = variant === "kanban"
+
+  const resolveVideosDirForRequest = useCallback(
+    (dir: string) => {
+      if (hasBlobVideos) return dir.trim()
+      if (cloudHosted || fromKanban) return ""
+      return dir.trim()
+    },
+    [hasBlobVideos, cloudHosted, fromKanban]
+  )
 
   const runPreflight = useCallback(
     async (dir: string) => {
+      const effectiveDir = resolveVideosDirForRequest(dir)
       setChecking(true)
       setError("")
       try {
         const preview = await runServerAction(
           previewLaunchFromProductAction({
             productId: product.id,
-            videosDir: dir,
+            videosDir: effectiveDir,
           })
         )
         if (!preview) throw new Error("Sin respuesta del servidor")
@@ -86,8 +114,16 @@ export function ProductTikTokLaunchPanel({
         setChecking(false)
       }
     },
-    [product.id]
+    [product.id, resolveVideosDirForRequest]
   )
+
+  useEffect(() => {
+    if (fromKanban && cloudHosted) {
+      clearStoredVideosDir()
+      setVideosDir("")
+      setShowLocalFolder(false)
+    }
+  }, [fromKanban, cloudHosted])
 
   useEffect(() => {
     async function init() {
@@ -140,14 +176,15 @@ export function ProductTikTokLaunchPanel({
 
   async function launch() {
     if (!preflight?.ready) return
-    storeVideosDir(videosDir)
+    const effectiveDir = resolveVideosDirForRequest(videosDir)
+    if (effectiveDir) storeVideosDir(effectiveDir)
     setPhase("launching")
     setError("")
     try {
       const launchResult = await runServerAction(
         launchFromProductAction({
           productId: product.id,
-          videosDir,
+          videosDir: effectiveDir,
         })
       )
       if (!launchResult) throw new Error("Sin respuesta del servidor")
@@ -219,6 +256,14 @@ export function ProductTikTokLaunchPanel({
 
   const landingCount = product.landingPages.length
   const usingBlob = hasBlobVideos && !videosDir.trim()
+
+  const failedChecks = (preflight?.checks ?? []).filter((c) => !c.ok)
+  const visibleFailedChecks =
+    fromKanban && !hasBlobVideos
+      ? []
+      : fromKanban
+        ? failedChecks.filter((c) => !KANBAN_HIDDEN_CHECK_LABELS.has(c.label))
+        : failedChecks
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -353,11 +398,9 @@ export function ProductTikTokLaunchPanel({
         </div>
       ) : preflight ? (
         <>
-          {preflight.checks.some((c) => !c.ok) ? (
+          {visibleFailedChecks.length > 0 ? (
             <ul className="flex flex-col gap-1 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-sm">
-              {preflight.checks
-                .filter((c) => !c.ok)
-                .map((c) => (
+              {visibleFailedChecks.map((c) => (
                   <li key={c.label} className="flex items-start gap-2">
                     <RiCloseCircleLine className="mt-0.5 size-4 shrink-0 text-destructive" />
                     <span>
