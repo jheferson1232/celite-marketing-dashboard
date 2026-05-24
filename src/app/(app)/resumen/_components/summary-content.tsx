@@ -23,6 +23,7 @@ import {
   formatSummarySpendCop,
 } from "./summary-pin-card"
 import { SummaryMobileThemeToggle } from "./summary-mobile-theme-toggle"
+import { SummaryProductsTableSection } from "./summary-products-table"
 
 function SummarySection({
   title,
@@ -72,7 +73,10 @@ export function SummaryContent() {
     try {
       await runServerAction(clearSummaryCacheAction())
       await queryClient.invalidateQueries({
-        predicate: (query) => String(query.queryKey[0]) === "summary-kpis",
+        predicate: (query) => {
+          const key = String(query.queryKey[0])
+          return key === "summary-kpis" || key === "summary-products-table"
+        },
       })
     } finally {
       setIsReloading(false)
@@ -219,6 +223,8 @@ export function SummaryContent() {
           </SummarySection>
         </div>
       ) : null}
+
+      <SummaryProductsTableSection dateRange={dateRange} />
     </div>
   )
 }
