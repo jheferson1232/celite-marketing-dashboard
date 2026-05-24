@@ -130,9 +130,8 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
 
   const isReady = product.status === "ready"
   const canLaunch = product.status === "ready" || product.status === "draft"
-  const needsVideoUpload = product.videos.length === 0
-  const showSave =
-    !isReady || needsVideoUpload || localItems.length > 0
+  const hasPendingUploads = localItems.length > 0
+  const showSave = !isReady || hasPendingUploads
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8 p-6 lg:p-8">
@@ -151,9 +150,9 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
             <h1 className="text-2xl font-semibold tracking-tight">Editar producto</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isReady
-                ? needsVideoUpload
-                  ? "Sube videos y pulsa Guardar (Vercel Blob). Luego lanza en TikTok."
-                  : "Listo para lanzar en TikTok. Guardar solo si cambias videos o datos."
+                ? hasPendingUploads
+                  ? "Tienes videos nuevos sin guardar. Pulsa Guardar y luego Lanzar en TikTok."
+                  : "Listo para lanzar. Sube videos abajo si faltan; al añadirlos aparece Guardar."
                 : "Al guardar, si está en Draft y cumple las comprobaciones del lanzamiento, pasa a Ready."}
             </p>
           </div>
@@ -166,7 +165,7 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
               onClick={() => void save()}
               disabled={busy || !name.trim()}
             >
-              {isReady && needsVideoUpload ? "Guardar videos" : saveLabel}
+              {saveLabel}
             </Button>
           ) : null}
           {canLaunch ? (

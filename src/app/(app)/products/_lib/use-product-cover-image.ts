@@ -8,22 +8,28 @@ import { resolveProductCoverImageAction } from "../_actions/product-cover"
 
 export function useProductCoverImage(product: ProductRecord) {
   const directCover = getProductCoverImage(product)
+  const fallbackVideo = product.videos[0] ?? null
   const hasLandingPages = product.landingPages.length > 0
+  const shouldResolveLanding = !directCover && !fallbackVideo && hasLandingPages
 
   const { data: resolvedCover, isLoading } = useQuery({
     queryKey: [
       "product-cover",
       product.id,
       directCover,
+      fallbackVideo,
       product.landingPages.map((page) => page.url).join("|"),
     ],
     queryFn: () => runServerAction(resolveProductCoverImageAction(product.id)),
-    enabled: !directCover && hasLandingPages,
+    enabled: shouldResolveLanding,
     staleTime: 60 * 60 * 1000,
   })
 
+  const coverImage = directCover ?? resolvedCover ?? null
+
   return {
-    coverImage: directCover ?? resolvedCover ?? null,
-    isLoadingCover: !directCover && hasLandingPages && isLoading,
+    coverImage,
+    coverVideo: coverImage ? null : fallbackVideo,
+    isLoadingCover: shouldResolveLanding && isLoading,
   }
 }

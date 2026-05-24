@@ -1,14 +1,14 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
-import { RiExternalLinkLine, RiImageLine, RiRocketLine } from "@remixicon/react"
+import { RiExternalLinkLine, RiRocketLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useProductCoverImage } from "@/app/(app)/products/_lib/use-product-cover-image"
+import { ProductCoverVisual } from "@/app/(app)/products/_components/product/product-cover-visual"
 import type { ProductRecord } from "@/lib/services/product"
 import { ProductTikTokLaunchDialog } from "@/app/(app)/products/_components/launch/product-tiktok-launch-dialog"
 
@@ -24,7 +24,7 @@ export function ProductsKanbanCard({
   onLaunched,
 }: ProductsKanbanCardProps) {
   const [launchOpen, setLaunchOpen] = useState(false)
-  const { coverImage, isLoadingCover } = useProductCoverImage(product)
+  const { coverImage, coverVideo, isLoadingCover } = useProductCoverImage(product)
   const campaignCount = product.campaigns.length
   const canLaunch = product.status === "ready" || product.status === "draft"
 
@@ -56,22 +56,13 @@ export function ProductsKanbanCard({
         aria-label={`Arrastrar ${product.name}`}
       >
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-muted">
-          {coverImage ? (
-            <Image
-              src={coverImage}
-              alt={product.name}
-              fill
-              className="object-cover"
-              sizes="240px"
-              unoptimized
-            />
-          ) : isLoadingCover ? (
-            <div className="h-full w-full animate-pulse bg-muted-foreground/10" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <RiImageLine className="size-8 opacity-40" />
-            </div>
-          )}
+          <ProductCoverVisual
+            coverImage={coverImage}
+            coverVideo={coverVideo}
+            isLoading={isLoadingCover}
+            alt={product.name}
+            sizes="240px"
+          />
         </div>
       </div>
 

@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma"
+import { getProductCoverImage } from "@/lib/products/cover-image"
 import { deleteProductMedia } from "@/lib/services/blob/product-media"
+import { fetchLandingPagePreviewImage } from "@/lib/services/landing-page-preview"
 import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
 import type { DateRange } from "@/lib/services/meta/types"
 import {
@@ -295,6 +297,28 @@ export async function updateProduct(
   return updated
 }
 
+/** Si no hay imagen, intenta guardar og:image de la primera landing como portada. */
+async function persistProductCoverFromLandings(
+  product: ProductRecord
+): Promise<ProductRecord> {
+  if (getProductCoverImage(product) || product.landingPages.length === 0) {
+    return product
+  }
+
+  for (const landingPage of product.landingPages) {
+    const preview = await fetchLandingPagePreviewImage(landingPage.url)
+    if (!preview) continue
+
+    return updateProduct({
+      id: product.id,
+      imageUrl: preview,
+      images: [preview],
+    })
+  }
+
+  return product
+}
+
 export type SaveProductEditResult = {
   product: ProductRecord
   readiness: ProductReadinessResult
@@ -311,7 +335,8 @@ export async function saveProductEdit(
   })
   if (!before) throw new Error("Producto no encontrado")
 
-  const updated = await updateProduct(input)
+  let updated = await updateProduct(input)
+  updated = await persistProductCoverFromLandings(updated)
   const readiness = evaluateProductReadiness(updated)
 
   let product = updated

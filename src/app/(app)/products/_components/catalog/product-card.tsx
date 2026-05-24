@@ -1,10 +1,10 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
-import { RiImageLine, RiPlayCircleLine } from "@remixicon/react"
+import { RiPlayCircleLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import { useProductCoverImage } from "@/app/(app)/products/_lib/use-product-cover-image"
+import { ProductCoverVisual } from "@/app/(app)/products/_components/product/product-cover-visual"
 import { getProductMediaCounts } from "@/lib/products/cover-image"
 import type { ProductRecord } from "@/lib/services/product"
 
@@ -17,7 +17,7 @@ export function ProductCard({
   product,
   basePath = "/products",
 }: ProductCardProps) {
-  const { coverImage, isLoadingCover } = useProductCoverImage(product)
+  const { coverImage, coverVideo, isLoadingCover } = useProductCoverImage(product)
   const { imageCount, videoCount } = getProductMediaCounts(product)
   const campaignCount = product.campaigns.length
 
@@ -30,22 +30,14 @@ export function ProductCard({
       )}
     >
       <div className="relative aspect-square w-full overflow-hidden bg-muted">
-        {coverImage ? (
-          <Image
-            src={coverImage}
-            alt={product.name}
-            fill
-            className="object-cover transition group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            unoptimized
-          />
-        ) : isLoadingCover ? (
-          <div className="h-full w-full animate-pulse bg-muted-foreground/10" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <RiImageLine className="size-10 opacity-40" />
-          </div>
-        )}
+        <ProductCoverVisual
+          coverImage={coverImage}
+          coverVideo={coverVideo}
+          isLoading={isLoadingCover}
+          alt={product.name}
+          className="transition group-hover:scale-[1.02]"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        />
 
         {(imageCount > 1 || videoCount > 0) && (
           <div className="absolute bottom-2 right-2 flex gap-1">
