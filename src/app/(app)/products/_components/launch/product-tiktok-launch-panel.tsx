@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
   RiCheckboxCircleLine,
@@ -9,9 +10,11 @@ import {
   RiInformationLine,
   RiLoader4Line,
   RiRocketLine,
+  RiUploadCloud2Line,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { isCloudHosted } from "@/lib/deployment/cloud-host"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import type { LaunchPreflightResult } from "@/lib/services/tiktok/launch-preflight"
@@ -23,7 +26,8 @@ import {
 } from "../../_actions/launch-tiktok"
 
 const VIDEOS_DIR_STORAGE_KEY = "tiktok-product-videos-dir"
-const VIDEOS_DIR_PLACEHOLDER = "Ej: D:\\calzados\\tesla (opcional si hay videos en el producto)"
+const VIDEOS_DIR_PLACEHOLDER =
+  "Ej: D:\\calzados\\tesla (solo desarrollo local con servidor en tu PC)"
 
 type Phase = "prepare" | "launching" | "done" | "error"
 
@@ -59,6 +63,8 @@ export function ProductTikTokLaunchPanel({
 
   const blobVideoCount = product.videos.length
   const hasBlobVideos = blobVideoCount > 0
+  const cloudHosted = isCloudHosted()
+  const localFolderAllowed = !cloudHosted
 
   const runPreflight = useCallback(
     async (dir: string) => {
@@ -92,6 +98,13 @@ export function ProductTikTokLaunchPanel({
         return
       }
 
+      if (cloudHosted) {
+        setVideosDir("")
+        setShowLocalFolder(false)
+        void runPreflight("")
+        return
+      }
+
       const stored = getStoredVideosDir()
       if (stored) {
         setVideosDir(stored)
@@ -112,7 +125,7 @@ export function ProductTikTokLaunchPanel({
       }
     }
     void init()
-  }, [runPreflight, hasBlobVideos])
+  }, [runPreflight, hasBlobVideos, cloudHosted])
 
   function handleVideosDirChange(value: string) {
     setVideosDir(value)
@@ -227,9 +240,38 @@ export function ProductTikTokLaunchPanel({
           {landingCount > 0 ? landingCount : "Ninguna (se usan URLs del JSON)"}
         </p>
         <p>
-          <span className="font-medium">Videos en producto:</span> {blobVideoCount}
+          <span className="font-medium">Videos en producto:</span>{" "}
+          {blobVideoCount > 0
+            ? `${blobVideoCount} en Vercel Blob`
+            : cloudHosted
+              ? "Ninguno — súbelos en Editar producto"
+              : "0"}
         </p>
       </div>
+
+      {cloudHosted && !hasBlobVideos ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+          <div className="flex items-start gap-2">
+            <RiUploadCloud2Line className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">Sube videos al producto</p>
+              <p className="text-muted-foreground text-xs">
+                En Vercel no se puede usar una carpeta de tu PC. Los .mp4 se
+                guardan en Vercel Blob al subirlos en la edición del producto
+                (máx. 100 MB por video). Asegúrate de tener{" "}
+                <code className="text-[11px]">BLOB_READ_WRITE_TOKEN</code> en el
+                proyecto de Vercel.
+              </p>
+            </div>
+          </div>
+          <Button type="button" size="sm" className="w-fit gap-2" asChild>
+            <Link href={`/products/${product.id}`} onClick={onClose}>
+              <RiUploadCloud2Line className="size-4" />
+              Ir a Editar producto → Videos
+            </Link>
+          </Button>
+        </div>
+      ) : null}
 
       {hasBlobVideos ? (
         <div
@@ -270,7 +312,7 @@ export function ProductTikTokLaunchPanel({
             >
               Volver a usar videos del producto
             </Button>
-          ) : !showLocalFolder ? (
+          ) : localFolderAllowed && !showLocalFolder ? (
             <Button
               type="button"
               variant="ghost"
@@ -285,7 +327,7 @@ export function ProductTikTokLaunchPanel({
         </div>
       ) : null}
 
-      {(!hasBlobVideos || showLocalFolder) && (
+      {localFolderAllowed && (!hasBlobVideos || showLocalFolder) ? (
         <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/30 p-3">
           <label className="text-sm font-medium" htmlFor="product-videos-dir">
             {hasBlobVideos
@@ -302,11 +344,11 @@ export function ProductTikTokLaunchPanel({
           />
           <p className="text-muted-foreground text-xs">
             {hasBlobVideos
-              ? "Solo si prefieres archivos .mp4 en disco en lugar de los subidos al producto."
-              : "Sube videos al producto o indica una carpeta con archivos .mp4."}
+              ? "Solo en desarrollo local: archivos .mp4 en disco en lugar de Blob."
+              : "Desarrollo local: ruta con .mp4, o sube videos al producto para Vercel."}
           </p>
         </div>
-      )}
+      ) : null}
 
       {checking ? (
         <div className="text-muted-foreground flex items-center gap-2 text-sm">

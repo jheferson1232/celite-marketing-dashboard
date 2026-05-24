@@ -1,4 +1,5 @@
 import fs from "fs"
+import { isCloudHosted } from "@/lib/deployment/cloud-host"
 import type { TikTokLaunchDraft } from "./launch-draft"
 import {
   loadCampaignConfigByName,
@@ -136,6 +137,9 @@ export function buildLaunchPreflight(
     })
   }
 
+  const onCloud = isCloudHosted()
+  const productOnCloud = onCloud && draft.source === "product"
+
   if (hasBlobVideos && !normalizedDir) {
     const videoCount = draft.blobVideoUrls!.length
     const urlCount = draft.urls.length
@@ -144,29 +148,45 @@ export function buildLaunchPreflight(
       label: "Videos del producto",
       detail:
         urlCount > 0
-          ? `${videoCount} video(s) en Blob → ${videoCount} conjunto(s) (1 por video, misma landing si hay 1 URL)`
-          : `${videoCount} video(s) en Blob (se usarán al lanzar)`,
+          ? `${videoCount} video(s) en Vercel Blob → ${videoCount} conjunto(s) (1 por video, misma landing si hay 1 URL)`
+          : `${videoCount} video(s) en Vercel Blob (se usarán al lanzar)`,
+    })
+  } else if (productOnCloud && !hasBlobVideos) {
+    checks.push({
+      ok: false,
+      label: "Videos del producto",
+      detail:
+        "Sube archivos .mp4 en Editar producto (sección Videos). Vercel Blob; la carpeta del PC no funciona en la web.",
     })
   }
 
-  checks.push({
-    ok: Boolean(normalizedDir) || hasBlobVideos,
-    label: "Carpeta de videos",
-    detail: normalizedDir
-      ? normalizedDir
-      : hasBlobVideos
-        ? "Opcional: videos desde Blob"
-        : "Indica la carpeta o sube videos al producto",
-  })
-
-  if (normalizedDir) {
+  if (productOnCloud && normalizedDir) {
     checks.push({
-      ok: fs.existsSync(normalizedDir),
-      label: "Carpeta accesible",
-      detail: fs.existsSync(normalizedDir)
-        ? normalizedDir
-        : "No visible desde el servidor (WSL: /mnt/d/...)",
+      ok: false,
+      label: "Carpeta local",
+      detail:
+        "En Vercel no se puede leer una ruta de tu PC. Quita la carpeta y usa videos subidos al producto.",
     })
+  } else if (!productOnCloud) {
+    checks.push({
+      ok: Boolean(normalizedDir) || hasBlobVideos,
+      label: "Carpeta de videos",
+      detail: normalizedDir
+        ? normalizedDir
+        : hasBlobVideos
+          ? "Opcional: videos desde Blob"
+          : "Indica la carpeta o sube videos al producto",
+    })
+
+    if (normalizedDir) {
+      checks.push({
+        ok: fs.existsSync(normalizedDir),
+        label: "Carpeta accesible",
+        detail: fs.existsSync(normalizedDir)
+          ? normalizedDir
+          : "No visible desde el servidor (WSL: /mnt/d/...)",
+      })
+    }
   }
 
   const variants = buildVariantFolderSummary(draftUrls, normalizedDir)
@@ -203,8 +223,10 @@ export function buildLaunchPreflight(
     launchableAds > 0
       ? `${launchableAds} conjunto(s) (= ${launchableAds} video(s), 1 por conjunto)${skippedAds > 0 ? ` · ${skippedAds} URL(s) sin video` : ""}`
       : hasBlobVideos && draft.urls.length > 0
-        ? "Los videos de Blob se emparejarán al lanzar"
-        : "Ningún video en carpeta para las URLs"
+        ? "Los videos de Vercel Blob se emparejarán al lanzar"
+        : productOnCloud
+          ? "Sube videos .mp4 al producto antes de publicar"
+          : "Ningún video en carpeta para las URLs"
 
   checks.push({
     ok: launchableAds > 0 || (hasBlobVideos && draft.urls.length > 0),

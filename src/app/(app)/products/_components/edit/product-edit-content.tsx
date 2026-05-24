@@ -130,6 +130,9 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
 
   const isReady = product.status === "ready"
   const canLaunch = product.status === "ready" || product.status === "draft"
+  const needsVideoUpload = product.videos.length === 0
+  const showSave =
+    !isReady || needsVideoUpload || localItems.length > 0
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8 p-6 lg:p-8">
@@ -148,20 +151,22 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
             <h1 className="text-2xl font-semibold tracking-tight">Editar producto</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isReady
-                ? "Listo para lanzar: usa Lanzar en TikTok. Al publicar volverás al Kanban y el producto pasará a Running."
-                : "Al guardar, si está en Draft y cumple las comprobaciones del lanzamiento, pasa a Ready. Lanzar en TikTok lo mueve a Running."}
+                ? needsVideoUpload
+                  ? "Sube videos y pulsa Guardar (Vercel Blob). Luego lanza en TikTok."
+                  : "Listo para lanzar en TikTok. Guardar solo si cambias videos o datos."
+                : "Al guardar, si está en Draft y cumple las comprobaciones del lanzamiento, pasa a Ready."}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {!isReady ? (
+          {showSave ? (
             <Button
               type="button"
               onClick={() => void save()}
               disabled={busy || !name.trim()}
             >
-              {saveLabel}
+              {isReady && needsVideoUpload ? "Guardar videos" : saveLabel}
             </Button>
           ) : null}
           {canLaunch ? (

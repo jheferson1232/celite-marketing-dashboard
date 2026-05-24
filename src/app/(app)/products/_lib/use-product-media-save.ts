@@ -138,8 +138,12 @@ export function useProductMediaSave(product: ProductRecord | undefined) {
             console.error("No se pudieron limpiar blobs tras error:", cleanupError)
           }
         }
-        setFormError(
+        const message =
           error instanceof Error ? error.message : "No se pudo guardar el producto"
+        setFormError(
+          message.includes("BLOB_READ_WRITE_TOKEN")
+            ? `${message} En Vercel: Storage → Blob → conectar al proyecto y redeploy.`
+            : message
         )
       } finally {
         setSubmitPhase("idle")
