@@ -256,7 +256,7 @@ export async function unlinkProductCampaign(
   return product
 }
 
-function mergeTikTokDailyInsights(
+export function mergeTikTokDailyInsights(
   summaries: TikTokCampaignDailyInsightsSummary[]
 ): ProductDailyInsight[] {
   const byDate = new Map<string, ProductDailyInsight>()
@@ -284,7 +284,7 @@ function mergeTikTokDailyInsights(
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
-function mergeMetaDailyInsights(
+export function mergeMetaDailyInsights(
   summaries: Array<{ days: ProductDailyInsight[] }>
 ): ProductDailyInsight[] {
   const byDate = new Map<string, ProductDailyInsight>()
@@ -310,7 +310,7 @@ function mergeMetaDailyInsights(
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
-function buildTotals(days: ProductDailyInsight[]): ProductSalesTotals {
+export function buildTotals(days: ProductDailyInsight[]): ProductSalesTotals {
   const spend = days.reduce((sum, d) => sum + d.spend, 0)
   const purchases = days.reduce((sum, d) => sum + d.purchases, 0)
   return {

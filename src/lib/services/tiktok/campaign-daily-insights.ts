@@ -7,6 +7,7 @@ import {
   getPurchases,
 } from "./report"
 import { withTikTokCache } from "./tiktok-cache"
+import { pacedTikTokRequest } from "./tiktok-request-pacing"
 
 const DAILY_INSIGHTS_TTL_MS = 2 * 60 * 1000
 
@@ -66,7 +67,7 @@ export async function getTikTokCampaignDailyInsights(
 ): Promise<TikTokCampaignDailyInsightsSummary> {
   const cacheKey = `tiktok-campaign-daily:${campaignId}:${dateRange.from}:${dateRange.to}`
   return withTikTokCache(cacheKey, DAILY_INSIGHTS_TTL_MS, () =>
-    fetchTikTokCampaignDailyInsights(campaignId, dateRange)
+    pacedTikTokRequest(() => fetchTikTokCampaignDailyInsights(campaignId, dateRange))
   )
 }
 

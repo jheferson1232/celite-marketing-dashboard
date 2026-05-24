@@ -2,9 +2,20 @@ import { addDaysToDateString, getDashboardToday } from "@/lib/date"
 import { OBJECTIVE_TO_ACTION_TYPE } from "./objective"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
+import {
+  isMetaRateLimitAxiosError,
+  isMetaRateLimitMessage,
+} from "./meta-errors"
+import { pacedMetaRequest } from "./meta-request-pacing"
 import type { DateRange, MetaInsightRow, MetaInsightsResponse } from "./types"
 
 const DAILY_INSIGHTS_TTL_MS = 2 * 60 * 1000
+const MAX_RETRIES = 4
+const RETRY_DELAY_MS = 1_500
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export interface MetaCampaignDailyInsight {
   date: string
@@ -55,8 +66,35 @@ export async function getMetaCampaignDailyInsights(
 ): Promise<MetaCampaignDailyInsightsSummary> {
   const cacheKey = `meta-campaign-daily:${campaignId}:${dateRange.from}:${dateRange.to}:${objective}`
   return withMetaCache(cacheKey, DAILY_INSIGHTS_TTL_MS, () =>
-    fetchMetaCampaignDailyInsights(campaignId, dateRange, objective)
+    pacedMetaRequest(() =>
+      fetchMetaCampaignDailyInsightsWithRetry(campaignId, dateRange, objective)
+    )
   )
+}
+
+async function fetchMetaCampaignDailyInsightsWithRetry(
+  campaignId: string,
+  dateRange: DateRange,
+  objective: string
+): Promise<MetaCampaignDailyInsightsSummary> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fetchMetaCampaignDailyInsights(
+        campaignId,
+        dateRange,
+        objective
+      )
+    } catch (error) {
+      lastError = error
+      const message = error instanceof Error ? error.message : ""
+      const rateLimited =
+        isMetaRateLimitAxiosError(error) || isMetaRateLimitMessage(message)
+      if (!rateLimited || attempt >= MAX_RETRIES) throw error
+      await sleep(RETRY_DELAY_MS * (attempt + 1))
+    }
+  }
+  throw lastError
 }
 
 async function fetchMetaCampaignDailyInsights(

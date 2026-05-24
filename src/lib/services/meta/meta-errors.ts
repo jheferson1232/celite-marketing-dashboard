@@ -48,6 +48,8 @@ export function isMetaRateLimitMessage(message: string): boolean {
     normalized.includes("too many calls") ||
     normalized.includes("user request limit") ||
     normalized.includes("rate limit") ||
+    normalized.includes("qps limit") ||
+    normalized.includes("reaches the qps") ||
     normalized.includes("reduce the amount of data")
   )
 }

@@ -59,23 +59,57 @@ function formatPlatformCpa(
 function MetricCells({
   metrics,
   currency,
+  emphasized = false,
 }: {
   metrics: SummaryProductPlatformMetrics | null
   currency: "COP" | "PEN"
+  emphasized?: boolean
 }) {
+  const cellClass = emphasized
+    ? "py-3 text-right text-sm font-semibold tabular-nums"
+    : "text-right text-xs tabular-nums sm:text-sm"
+
   return (
     <>
-      <TableCell className="text-right text-xs tabular-nums sm:text-sm">
+      <TableCell className={cellClass}>
         {formatPlatformSpend(metrics, currency)}
       </TableCell>
-      <TableCell className="text-right text-xs tabular-nums sm:text-sm">
+      <TableCell
+        className={cn(
+          cellClass,
+          emphasized &&
+            metrics &&
+            metrics.purchases > 0 &&
+            "text-emerald-700 dark:text-emerald-400"
+        )}
+      >
         {formatPlatformPurchases(metrics)}
       </TableCell>
-      <TableCell className="text-right text-xs tabular-nums sm:text-sm">
+      <TableCell className={cellClass}>
         {formatPlatformCpa(metrics, currency)}
       </TableCell>
     </>
   )
+}
+
+function sumPlatformMetrics(
+  rows: SummaryProductTableRow[],
+  platform: "meta" | "tiktok"
+): SummaryProductPlatformMetrics | null {
+  let spend = 0
+  let purchases = 0
+  for (const row of rows) {
+    const block = row[platform]
+    if (!block) continue
+    spend += block.spend
+    purchases += block.purchases
+  }
+  if (spend <= 0 && purchases <= 0) return null
+  return {
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : 0,
+  }
 }
 
 function ProductRow({ row }: { row: SummaryProductTableRow }) {
@@ -162,6 +196,8 @@ export function SummaryProductsTableSection({
   const rowsWithCampaigns =
     data?.rows.filter((row) => row.campaignCount > 0) ?? []
 
+  const footerMeta = sumPlatformMetrics(rowsWithCampaigns, "meta")
+  const footerTiktok = sumPlatformMetrics(rowsWithCampaigns, "tiktok")
   const totalVentas = rowsWithCampaigns.reduce(
     (sum, row) => sum + row.total.purchases,
     0
@@ -260,12 +296,19 @@ export function SummaryProductsTableSection({
               </TableBody>
               <TableFooter>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableCell
-                    colSpan={7}
-                    className="py-3 text-sm font-semibold"
-                  >
+                  <TableCell className="py-3 text-sm font-semibold">
                     Total
                   </TableCell>
+                  <MetricCells
+                    metrics={footerMeta}
+                    currency="COP"
+                    emphasized
+                  />
+                  <MetricCells
+                    metrics={footerTiktok}
+                    currency="PEN"
+                    emphasized
+                  />
                   <TableCell className="py-3 text-right text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
                     {totalVentas > 0
                       ? formatSummaryOrders(totalVentas)
