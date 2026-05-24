@@ -257,7 +257,7 @@ export async function launchTikTokCampaign(
     const agData = await tiktokPost<{ adgroup_id: string }>("/adgroup/create/", {
       advertiser_id: advertiserId,
       campaign_id: campaignId,
-      adgroup_name: `${campaignName} - ${ag.name}`,
+      adgroup_name: ag.name,
       objective_type: cfg.campaign.objective ?? "WEB_CONVERSIONS",
       promotion_type: "WEBSITE",
       landing_page_url: landingUrl,
@@ -294,7 +294,7 @@ export async function launchTikTokCampaign(
       adgroup_id: agData.adgroup_id,
       creatives: [
         {
-          ad_name: `${campaignName} - ${ag.name}`,
+          ad_name: ag.name,
           ad_format: "SINGLE_VIDEO",
           identity_type: "TT_USER",
           identity_id: getIdentityId(cfg),

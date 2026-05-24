@@ -80,17 +80,41 @@ model MetaInformeAccountDay {
   syncedAt         DateTime @updatedAt
 }
 
-/** Producto del catálogo (multi-plataforma). */
-model Product {
+enum ProductStatus {
+  draft
+  ready
+  running
+  archived
+}
+
+/** Landing page reutilizable (asociable a varios productos). */
+model LandingPage {
   id        String   @id @default(cuid())
-  name      String
-  imageUrl  String?
-  notes     String?
+  url       String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  variants  ProductVariant[]
-  campaigns ProductCampaign[]
+  products  Product[]
 
+  @@map("LandingPage")
+}
+
+/** Producto del catálogo (multi-plataforma). */
+model Product {
+  id           String        @id @default(cuid())
+  name         String
+  status       ProductStatus @default(draft)
+  imageUrl     String?
+  images       String[]      @default([])
+  videos       String[]      @default([])
+  budget       Float         @default(0)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  variants     ProductVariant[]
+  campaigns    ProductCampaign[]
+  landingPages LandingPage[]
+
+  @@index([status])
   @@map("TikTokProduct")
 }
 
@@ -106,6 +130,17 @@ model ProductVariant {
 
   @@index([productId])
   @@map("TikTokProductVariant")
+}
+
+/** URL de landing guardada en catálogo global (reutilizable en productos). */
+model LandingUrlCatalog {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("LandingUrlCatalog")
 }
 
 /** Campaña vinculada a un producto para historial de ventas. */

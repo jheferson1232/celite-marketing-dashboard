@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   RiBarChartGroupedLine,
   RiBrainLine,
+  RiLayoutColumnLine,
   RiMegaphoneLine,
   RiMetaLine,
   RiShoppingBag2Line,
@@ -49,8 +50,14 @@ const navItems = [
     icon: RiTiktokLine,
   },
   {
+    id: "products-kanban",
+    title: "Products Kanban",
+    href: "/products-kanban",
+    icon: RiLayoutColumnLine,
+  },
+  {
     id: "producto",
-    title: "Productos TikTok",
+    title: "Productos (legacy)",
     href: "/producto",
     icon: RiShoppingBag2Line,
   },
@@ -99,11 +106,16 @@ export function AppSidebar() {
                           : item.id === "tiktok"
                             ? pathname === "/tiktok" ||
                               pathname.startsWith("/tiktok/")
-                            : item.id === "producto"
-                              ? pathname === "/producto" ||
-                                pathname.startsWith("/producto/")
-                              : pathname === "/dashboard" ||
-                                pathname.startsWith("/dashboard/")
+                            : item.id === "products-kanban"
+                              ? pathname === "/products-kanban" ||
+                                pathname.startsWith("/products-kanban/") ||
+                                (pathname.startsWith("/products/") &&
+                                  pathname !== "/products")
+                              : item.id === "producto"
+                                ? pathname === "/producto" ||
+                                  pathname.startsWith("/producto/")
+                                : pathname === "/dashboard" ||
+                                  pathname.startsWith("/dashboard/")
                     }
                     tooltip={item.title}
                   >

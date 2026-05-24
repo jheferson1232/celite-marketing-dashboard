@@ -1,11 +1,23 @@
 import prisma from "@/lib/prisma"
+import { deleteProductMedia } from "@/lib/services/blob/product-media"
 import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
 import type { DateRange } from "@/lib/services/meta/types"
 import {
   getTikTokCampaignDailyInsights,
-  type TikTokCampaignDailyInsight,
   type TikTokCampaignDailyInsightsSummary,
 } from "@/lib/services/tiktok/campaign-daily-insights"
+import {
+  evaluateProductReadiness,
+  type ProductReadinessResult,
+} from "@/lib/products/readiness"
+import {
+  isProductStatus,
+  PRODUCT_STATUS_VALUES,
+  type ProductStatus,
+} from "@/lib/products/status"
+
+export type { ProductStatus } from "@/lib/products/status"
+export { PRODUCT_STATUS_VALUES } from "@/lib/products/status"
 
 export type ProductPlatform = "tiktok" | "meta"
 
@@ -33,12 +45,25 @@ export type ProductPlatformSalesHistory = {
 const productInclude = {
   variants: { orderBy: { color: "asc" as const } },
   campaigns: { orderBy: { createdAt: "desc" as const } },
+  landingPages: { orderBy: { url: "asc" as const } },
 } as const
+
+export type ProductLandingPageRecord = {
+  id: string
+  url: string
+  createdAt: Date
+  updatedAt: Date
+}
 
 export type ProductRecord = {
   id: string
   name: string
+  status: ProductStatus
   imageUrl: string | null
+  images: string[]
+  videos: string[]
+  landingPages: ProductLandingPageRecord[]
+  budget: number
   notes: string | null
   createdAt: Date
   updatedAt: Date
@@ -62,14 +87,24 @@ export type ProductRecord = {
 
 export type CreateProductInput = {
   name: string
+  status?: ProductStatus
   imageUrl?: string | null
+  images?: string[]
+  videos?: string[]
+  landingPageIds?: string[]
+  budget?: number
   notes?: string | null
 }
 
 export type UpdateProductInput = {
   id: string
   name?: string
+  status?: ProductStatus
   imageUrl?: string | null
+  images?: string[]
+  videos?: string[]
+  landingPageIds?: string[]
+  budget?: number
   notes?: string | null
 }
 
@@ -101,6 +136,49 @@ export type ProductSalesHistorySummary = {
   meta: ProductPlatformSalesHistory | null
 }
 
+function sanitizeIdList(ids: string[] | undefined): string[] {
+  if (!ids?.length) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const raw of ids) {
+    const id = raw.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    result.push(id)
+  }
+
+  return result
+}
+
+function sanitizeUrlList(urls: string[] | undefined): string[] {
+  if (!urls?.length) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const raw of urls) {
+    const url = raw.trim()
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    result.push(url)
+  }
+
+  return result
+}
+
+function resolvePrimaryImageUrl(
+  imageUrl: string | null | undefined,
+  images: string[]
+): string | null {
+  return images[0] ?? (imageUrl?.trim() || null)
+}
+
+function normalizeBudget(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, value)
+}
+
 export async function listProducts(): Promise<ProductRecord[]> {
   return prisma.product.findMany({
     include: productInclude,
@@ -118,11 +196,26 @@ export async function getProductById(id: string): Promise<ProductRecord | null> 
 export async function createProduct(
   input: CreateProductInput
 ): Promise<ProductRecord> {
+  const images = sanitizeUrlList(input.images)
+  const videos = sanitizeUrlList(input.videos)
+  const landingPageIds = sanitizeIdList(input.landingPageIds)
+
   return prisma.product.create({
     data: {
       name: input.name.trim(),
-      imageUrl: input.imageUrl?.trim() || null,
+      status: input.status ?? "draft",
+      imageUrl: resolvePrimaryImageUrl(input.imageUrl, images),
+      images,
+      videos,
+      budget: normalizeBudget(input.budget) ?? 0,
       notes: input.notes?.trim() || null,
+      ...(landingPageIds.length > 0
+        ? {
+            landingPages: {
+              connect: landingPageIds.map((id) => ({ id })),
+            },
+          }
+        : {}),
     },
     include: productInclude,
   })
@@ -131,25 +224,143 @@ export async function createProduct(
 export async function updateProduct(
   input: UpdateProductInput
 ): Promise<ProductRecord> {
+  const existing = await prisma.product.findUnique({
+    where: { id: input.id },
+    select: { images: true, videos: true },
+  })
+  if (!existing) throw new Error("Producto no encontrado")
+
   const data: {
     name?: string
+    status?: ProductStatus
     imageUrl?: string | null
+    images?: string[]
+    videos?: string[]
+    budget?: number
     notes?: string | null
+    landingPages?: { set: Array<{ id: string }> }
   } = {}
 
   if (input.name !== undefined) data.name = input.name.trim()
-  if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl?.trim() || null
+  if (input.status !== undefined) {
+    if (!isProductStatus(input.status)) {
+      throw new Error("Estado de producto inválido")
+    }
+    data.status = input.status
+  }
   if (input.notes !== undefined) data.notes = input.notes?.trim() || null
+  if (input.budget !== undefined) data.budget = normalizeBudget(input.budget) ?? 0
 
-  return prisma.product.update({
+  const nextImages =
+    input.images !== undefined ? sanitizeUrlList(input.images) : undefined
+  const nextVideos =
+    input.videos !== undefined ? sanitizeUrlList(input.videos) : undefined
+  const nextLandingPageIds =
+    input.landingPageIds !== undefined
+      ? sanitizeIdList(input.landingPageIds)
+      : undefined
+
+  if (nextImages !== undefined) data.images = nextImages
+  if (nextVideos !== undefined) data.videos = nextVideos
+  if (nextLandingPageIds !== undefined) {
+    data.landingPages = {
+      set: nextLandingPageIds.map((id) => ({ id })),
+    }
+  }
+
+  if (input.imageUrl !== undefined || nextImages !== undefined) {
+    const images = nextImages ?? existing.images
+    data.imageUrl = resolvePrimaryImageUrl(input.imageUrl, images)
+  }
+
+  const removedMedia = [
+    ...(input.images !== undefined
+      ? existing.images.filter((url) => !nextImages!.includes(url))
+      : []),
+    ...(input.videos !== undefined
+      ? existing.videos.filter((url) => !nextVideos!.includes(url))
+      : []),
+  ]
+
+  const updated = await prisma.product.update({
     where: { id: input.id },
     data,
+    include: productInclude,
+  })
+
+  if (removedMedia.length > 0) {
+    await deleteProductMedia(removedMedia)
+  }
+
+  return updated
+}
+
+export type SaveProductEditResult = {
+  product: ProductRecord
+  readiness: ProductReadinessResult
+  promotedToReady: boolean
+}
+
+/** Guardado desde edición: persiste datos y pasa Draft → Ready si cumple preflight. */
+export async function saveProductEdit(
+  input: UpdateProductInput
+): Promise<SaveProductEditResult> {
+  const before = await prisma.product.findUnique({
+    where: { id: input.id },
+    select: { status: true },
+  })
+  if (!before) throw new Error("Producto no encontrado")
+
+  const updated = await updateProduct(input)
+  const readiness = evaluateProductReadiness(updated)
+
+  let product = updated
+  let promotedToReady = false
+
+  if (before.status === "draft" && readiness.ready) {
+    product = await updateProductStatus(updated.id, "ready")
+    promotedToReady = true
+  }
+
+  return { product, readiness, promotedToReady }
+}
+
+export async function updateProductStatus(
+  productId: string,
+  status: ProductStatus
+): Promise<ProductRecord> {
+  if (!isProductStatus(status)) {
+    throw new Error("Estado de producto inválido")
+  }
+
+  const existing = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true },
+  })
+  if (!existing) throw new Error("Producto no encontrado")
+
+  return prisma.product.update({
+    where: { id: productId },
+    data: { status },
     include: productInclude,
   })
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  const existing = await prisma.product.findUnique({
+    where: { id },
+    select: { images: true, videos: true, imageUrl: true },
+  })
+  if (!existing) return
+
   await prisma.product.delete({ where: { id } })
+
+  const mediaUrls = [
+    ...existing.images,
+    ...existing.videos,
+    ...(existing.imageUrl ? [existing.imageUrl] : []),
+  ]
+  await deleteProductMedia(mediaUrls)
 }
 
 export async function createProductVariant(

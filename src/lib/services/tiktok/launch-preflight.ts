@@ -1,5 +1,5 @@
 import fs from "fs"
-import type { NotionCampaignDraft } from "@/lib/services/notion/campaigns"
+import type { TikTokLaunchDraft } from "./launch-draft"
 import {
   loadCampaignConfigByName,
   mergeNotionIntoCampaignConfig,
@@ -42,15 +42,17 @@ function countUniqueUrlGroups(cfg: TikTokLaunchCampaignConfig): number {
 }
 
 export function buildLaunchPreflight(
-  draft: NotionCampaignDraft,
+  draft: TikTokLaunchDraft,
   videosDir: string
 ): LaunchPreflightResult {
   const checks: LaunchCheckItem[] = []
   const normalizedDir = normalizeVideosDirectory(videosDir)
+  const sourceLabel = draft.source === "product" ? "Producto" : "Notion"
+  const hasBlobVideos = (draft.blobVideoUrls?.length ?? 0) > 0
 
   checks.push({
     ok: Boolean(draft.name),
-    label: "Nombre en Notion",
+    label: `Nombre (${sourceLabel})`,
     detail: draft.name || "Sin título",
   })
 
@@ -107,7 +109,9 @@ export function buildLaunchPreflight(
     detail:
       budget != null && budget > 0
         ? `S/ ${budget}`
-        : "Falta en Notion y en el JSON",
+        : draft.source === "product"
+          ? "Falta en el producto y en el JSON"
+          : "Falta en Notion y en el JSON",
   })
 
   checks.push({
@@ -115,27 +119,44 @@ export function buildLaunchPreflight(
     label: "URLs",
     detail:
       draft.urls.length > 0
-        ? `${draft.urls.length} URL(s) en Notion`
+        ? `${draft.urls.length} URL(s) en ${sourceLabel.toLowerCase()}`
         : cfg.campaign.default_url
           ? "URLs del JSON"
           : "Faltan URLs",
   })
 
-  const notionUrls = collectNotionUrlsForSummary(draft.urls, cfg)
-  const useNotionVariants = notionUrls.length > 0
+  const draftUrls = collectNotionUrlsForSummary(draft.urls, cfg)
+  const useUrlVariants = draftUrls.length > 0
 
-  if (!useNotionVariants && draft.urls.length > 0 && draft.urls.length < urlGroupsNeeded) {
+  if (!useUrlVariants && draft.urls.length > 0 && draft.urls.length < urlGroupsNeeded) {
     checks.push({
       ok: false,
       label: "URLs vs conjuntos",
-      detail: `Notion ${draft.urls.length} · config ${urlGroupsNeeded}`,
+      detail: `${sourceLabel} ${draft.urls.length} · config ${urlGroupsNeeded}`,
+    })
+  }
+
+  if (hasBlobVideos && !normalizedDir) {
+    const videoCount = draft.blobVideoUrls!.length
+    const urlCount = draft.urls.length
+    checks.push({
+      ok: true,
+      label: "Videos del producto",
+      detail:
+        urlCount > 0
+          ? `${videoCount} video(s) en Blob → ${videoCount} conjunto(s) (1 por video, misma landing si hay 1 URL)`
+          : `${videoCount} video(s) en Blob (se usarán al lanzar)`,
     })
   }
 
   checks.push({
-    ok: Boolean(normalizedDir),
+    ok: Boolean(normalizedDir) || hasBlobVideos,
     label: "Carpeta de videos",
-    detail: normalizedDir || "Indica la carpeta",
+    detail: normalizedDir
+      ? normalizedDir
+      : hasBlobVideos
+        ? "Opcional: videos desde Blob"
+        : "Indica la carpeta o sube videos al producto",
   })
 
   if (normalizedDir) {
@@ -148,14 +169,14 @@ export function buildLaunchPreflight(
     })
   }
 
-  const variants = buildVariantFolderSummary(notionUrls, normalizedDir)
+  const variants = buildVariantFolderSummary(draftUrls, normalizedDir)
   let launchableAds = 0
   let skippedAds = 0
   let adGroupCount = cfg.adgroups.length
 
-  if (useNotionVariants) {
+  if (useUrlVariants) {
     launchableAds = variants.reduce((n, v) => n + v.videoCount, 0)
-    skippedAds = Math.max(0, notionUrls.length - variants.length)
+    skippedAds = Math.max(0, draftUrls.length - variants.length)
     adGroupCount = launchableAds
     if (normalizedDir && launchableAds > 0) {
       try {
@@ -178,21 +199,25 @@ export function buildLaunchPreflight(
     adGroupCount = cfg.adgroups.length
   }
 
+  const videosDetail =
+    launchableAds > 0
+      ? `${launchableAds} conjunto(s) (= ${launchableAds} video(s), 1 por conjunto)${skippedAds > 0 ? ` · ${skippedAds} URL(s) sin video` : ""}`
+      : hasBlobVideos && draft.urls.length > 0
+        ? "Los videos de Blob se emparejarán al lanzar"
+        : "Ningún video en carpeta para las URLs"
+
   checks.push({
-    ok: launchableAds > 0,
+    ok: launchableAds > 0 || (hasBlobVideos && draft.urls.length > 0),
     label: "Listo para publicar",
-    detail:
-      launchableAds > 0
-        ? `${launchableAds} conjunto(s) (= ${launchableAds} video(s), 1 por conjunto)${skippedAds > 0 ? ` · ${skippedAds} URL(s) sin video` : ""}`
-        : "Ningún video en carpeta para las URLs de Notion",
+    detail: videosDetail,
   })
 
   const blocking = checks.filter(
-    (c) =>
-      !c.ok &&
-      c.label !== "Listo para publicar"
+    (c) => !c.ok && c.label !== "Listo para publicar"
   )
-  const ready = blocking.length === 0 && launchableAds > 0
+  const ready =
+    blocking.length === 0 &&
+    (launchableAds > 0 || (hasBlobVideos && draft.urls.length > 0))
 
   return {
     ready,

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "TikTokProduct" ADD COLUMN "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "TikTokProduct" ADD COLUMN "videos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

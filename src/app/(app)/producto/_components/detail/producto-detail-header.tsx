@@ -13,6 +13,7 @@ interface ProductoDetailHeaderProps {
   onRangeChange: (range: { from: string; to: string }) => void
   platformFilter: ProductoPlatformFilter
   onPlatformFilterChange: (platform: ProductoPlatformFilter) => void
+  backHref?: string
 }
 
 export function ProductoDetailHeader({
@@ -21,11 +22,12 @@ export function ProductoDetailHeader({
   onRangeChange,
   platformFilter,
   onPlatformFilterChange,
+  backHref = "/producto",
 }: ProductoDetailHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <Button type="button" variant="ghost" size="sm" asChild className="w-fit">
-        <Link href="/producto">
+        <Link href={backHref}>
           <RiArrowLeftLine className="size-4" />
           Volver al catálogo
         </Link>
