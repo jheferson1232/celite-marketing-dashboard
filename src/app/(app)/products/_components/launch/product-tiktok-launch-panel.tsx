@@ -98,7 +98,7 @@ export function ProductTikTokLaunchPanel({
         return
       }
 
-      if (cloudHosted) {
+      if (isCloudHosted()) {
         setVideosDir("")
         setShowLocalFolder(false)
         void runPreflight("")
@@ -125,7 +125,7 @@ export function ProductTikTokLaunchPanel({
       }
     }
     void init()
-  }, [runPreflight, hasBlobVideos, cloudHosted])
+  }, [runPreflight, hasBlobVideos])
 
   function handleVideosDirChange(value: string) {
     setVideosDir(value)
@@ -249,7 +249,7 @@ export function ProductTikTokLaunchPanel({
         </p>
       </div>
 
-      {cloudHosted && !hasBlobVideos ? (
+      {!hasBlobVideos ? (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
           <div className="flex items-start gap-2">
             <RiUploadCloud2Line className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
@@ -327,12 +327,10 @@ export function ProductTikTokLaunchPanel({
         </div>
       ) : null}
 
-      {localFolderAllowed && (!hasBlobVideos || showLocalFolder) ? (
+      {localFolderAllowed && hasBlobVideos && showLocalFolder ? (
         <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/30 p-3">
           <label className="text-sm font-medium" htmlFor="product-videos-dir">
-            {hasBlobVideos
-              ? "Carpeta local (alternativa)"
-              : "Carpeta de videos en tu PC"}
+            Carpeta local (alternativa)
           </label>
           <Input
             id="product-videos-dir"
@@ -343,9 +341,7 @@ export function ProductTikTokLaunchPanel({
             className="font-mono text-sm"
           />
           <p className="text-muted-foreground text-xs">
-            {hasBlobVideos
-              ? "Solo en desarrollo local: archivos .mp4 en disco en lugar de Blob."
-              : "Desarrollo local: ruta con .mp4, o sube videos al producto para Vercel."}
+            Solo en desarrollo local: archivos .mp4 en disco en lugar de Blob.
           </p>
         </div>
       ) : null}
