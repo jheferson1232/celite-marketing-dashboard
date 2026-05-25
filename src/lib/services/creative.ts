@@ -147,6 +147,7 @@ export async function createCreativeFromUrl(input: {
       include: creativeInclude,
     })
   } catch {
+    await deleteCreativeMedia(url)
     throw new Error("Ese archivo ya está registrado como creative")
   }
 }

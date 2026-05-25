@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
 import type { CreativeRecord } from "@/lib/services/creative"
+import { uploadCreativeFileClient } from "@/lib/services/blob/creative-client-upload"
 import { listProductsAction } from "@/app/(app)/products/_actions/products"
 import {
   createCreativeAction,
@@ -47,10 +48,14 @@ export function BaulContent() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData()
-      formData.append("file", file)
+      const uploaded = await uploadCreativeFileClient(file)
 
-      const created = await runServerAction(createCreativeAction(formData))
+      const created = await runServerAction(
+        createCreativeAction({
+          url: uploaded.url,
+          type: uploaded.type,
+        })
+      )
       if (!created) throw new Error("No se pudo crear el creative")
       return created
     },

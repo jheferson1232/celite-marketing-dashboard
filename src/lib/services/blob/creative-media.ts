@@ -1,10 +1,10 @@
 import { del, put } from "@vercel/blob"
 import { ServerActionError } from "@/lib/server-action"
 import type { CreativeType } from "@/lib/services/creative"
+import { buildCreativeBlobPath } from "@/lib/services/blob/creative-paths"
 import {
   assertBlobConfigured,
   detectCreativeType,
-  sanitizeFilename,
   validateMediaFile,
 } from "@/lib/services/blob/media-utils"
 
@@ -12,16 +12,6 @@ export type CreativeMediaUploadInput = {
   creativeId?: string
   type: CreativeType
   files: File[]
-}
-
-function buildCreativeBlobPath(
-  type: CreativeType,
-  creativeId: string | undefined,
-  filename: string
-): string {
-  const prefix = creativeId ? `creatives/${creativeId}` : "creatives/drafts"
-  const kind = type === "image" ? "images" : "videos"
-  return `${prefix}/${kind}/${Date.now()}-${sanitizeFilename(filename)}`
 }
 
 export async function uploadCreativeMedia(

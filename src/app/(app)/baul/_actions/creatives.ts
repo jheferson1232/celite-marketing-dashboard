@@ -1,15 +1,15 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
-import { formDataToCreativeUploadInput } from "@/lib/services/blob/creative-media"
 import {
-  createCreativeFromUpload,
+  createCreativeFromUrl,
   deleteCreative,
   getCreativeById,
   listCreatives,
   setCreativeVariants,
   updateCreative,
   type CreativeRecord,
+  type CreativeType,
 } from "@/lib/services/creative"
 
 export const listCreativesAction = createServerAction(
@@ -17,16 +17,15 @@ export const listCreativesAction = createServerAction(
 )
 
 export const createCreativeAction = createServerAction(
-  async (formData: FormData): Promise<CreativeRecord> => {
-    const input = formDataToCreativeUploadInput(formData)
-
-    if (input.files.length !== 1) {
-      throw new Error("Sube un archivo a la vez")
-    }
-
-    return createCreativeFromUpload({
+  async (input: {
+    url: string
+    type: CreativeType
+    name?: string | null
+  }): Promise<CreativeRecord> => {
+    return createCreativeFromUrl({
+      url: input.url,
       type: input.type,
-      file: input.files[0]!,
+      name: input.name,
     })
   }
 )

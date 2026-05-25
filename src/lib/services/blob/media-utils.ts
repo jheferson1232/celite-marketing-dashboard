@@ -1,21 +1,42 @@
 import { ServerActionError } from "@/lib/server-action"
 import type { CreativeType } from "@/lib/services/creative"
 
-const IMAGE_MIME_TYPES = new Set([
+export const IMAGE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
-])
+] as const
 
-const VIDEO_MIME_TYPES = new Set([
+export const VIDEO_MIME_TYPES = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
-])
+] as const
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+export const CREATIVE_IMAGE_ACCEPT = IMAGE_MIME_TYPES.join(",")
+export const CREATIVE_VIDEO_ACCEPT = VIDEO_MIME_TYPES.join(",")
+export const CREATIVE_MEDIA_ACCEPT = [
+  ...IMAGE_MIME_TYPES,
+  ...VIDEO_MIME_TYPES,
+].join(",")
+
+const IMAGE_MIME_TYPE_SET = new Set<string>(IMAGE_MIME_TYPES)
+const VIDEO_MIME_TYPE_SET = new Set<string>(VIDEO_MIME_TYPES)
+
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+
+export function getCreativeUploadLimits(type: CreativeType): {
+  allowedContentTypes: string[]
+  maximumSizeInBytes: number
+} {
+  return {
+    allowedContentTypes:
+      type === "image" ? [...IMAGE_MIME_TYPES] : [...VIDEO_MIME_TYPES],
+    maximumSizeInBytes: type === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES,
+  }
+}
 
 export function assertBlobConfigured() {
   if (!process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
@@ -34,8 +55,8 @@ export function sanitizeFilename(name: string): string {
 }
 
 export function detectCreativeType(file: File): CreativeType {
-  if (IMAGE_MIME_TYPES.has(file.type)) return "image"
-  if (VIDEO_MIME_TYPES.has(file.type)) return "video"
+  if (IMAGE_MIME_TYPE_SET.has(file.type)) return "image"
+  if (VIDEO_MIME_TYPE_SET.has(file.type)) return "video"
 
   throw new ServerActionError(
     `Tipo de archivo no permitido (${file.name}): ${file.type || "desconocido"}`

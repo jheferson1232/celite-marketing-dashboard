@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { RiAddLine, RiLoader4Line } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
+import { CREATIVE_MEDIA_ACCEPT } from "@/lib/services/blob/media-utils"
 
 interface CreativeUploadFieldProps {
   disabled?: boolean
@@ -64,6 +65,7 @@ export function CreativeUploadField({
       <input
         ref={inputRef}
         type="file"
+        accept={CREATIVE_MEDIA_ACCEPT}
         className="hidden"
         disabled={disabled || uploading}
         onChange={(event) => void handleFileChange(event)}
