@@ -1,6 +1,9 @@
 import fs from "fs"
 import path from "path"
+import { extractUrlSlug, normalizeMatchKey } from "@/lib/url-match"
 import type { TikTokLaunchCampaignConfig } from "./launch-campaign-types"
+
+export { extractUrlSlug, normalizeMatchKey } from "@/lib/url-match"
 
 /** Convierte `D:\calzados\tesla` a ruta usable en WSL (`/mnt/d/calzados/tesla`). */
 export function normalizeVideosDirectory(input: string): string {
@@ -24,29 +27,6 @@ export function getDefaultVideosDirectory(): string {
   const fromEnv = process.env.TIKTOK_VIDEOS_DEFAULT_DIR?.trim()
   if (fromEnv) return normalizeVideosDirectory(fromEnv)
   return ""
-}
-
-export function extractUrlSlug(url: string): string {
-  const trimmed = url.trim()
-  if (!trimmed) return ""
-  try {
-    const u = new URL(
-      trimmed.startsWith("http") ? trimmed : `https://${trimmed}`
-    )
-    const parts = u.pathname.split("/").filter(Boolean)
-    return parts[parts.length - 1] ?? trimmed
-  } catch {
-    return trimmed.split("/").filter(Boolean).pop() ?? trimmed
-  }
-}
-
-/** Clave comparable: sin espacios, guiones ni signos. */
-export function normalizeMatchKey(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "")
 }
 
 function videoBasename(videoPath?: string): string | null {

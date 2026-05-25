@@ -1,8 +1,5 @@
 import type { ProductRecord } from "@/lib/services/product"
-import {
-  extractUrlSlug,
-  normalizeMatchKey,
-} from "@/lib/services/tiktok/video-path"
+import { extractUrlSlug, normalizeMatchKey } from "@/lib/url-match"
 
 type ProductWithVariants = Pick<
   ProductRecord,
