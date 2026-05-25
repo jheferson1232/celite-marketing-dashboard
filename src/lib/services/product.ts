@@ -1,5 +1,8 @@
 import prisma from "@/lib/prisma"
-import { getProductCoverImage } from "@/lib/products/cover-image"
+import {
+  getCoverLandingUrls,
+  getProductCoverImage,
+} from "@/lib/products/cover-image"
 import { deleteProductMedia } from "@/lib/services/blob/product-media"
 import { fetchLandingPagePreviewImage } from "@/lib/services/landing-page-preview"
 import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
@@ -297,16 +300,17 @@ export async function updateProduct(
   return updated
 }
 
-/** Si no hay imagen, intenta guardar og:image de la primera landing como portada. */
+/** Si no hay imagen, guarda og:image de la landing de la variante (sin cambiar el nombre). */
 async function persistProductCoverFromLandings(
   product: ProductRecord
 ): Promise<ProductRecord> {
-  if (getProductCoverImage(product) || product.landingPages.length === 0) {
-    return product
-  }
+  if (getProductCoverImage(product)) return product
 
-  for (const landingPage of product.landingPages) {
-    const preview = await fetchLandingPagePreviewImage(landingPage.url)
+  const landingUrls = getCoverLandingUrls(product)
+  if (landingUrls.length === 0) return product
+
+  for (const url of landingUrls) {
+    const preview = await fetchLandingPagePreviewImage(url)
     if (!preview) continue
 
     return updateProduct({

@@ -1,7 +1,11 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { getProductCoverImage } from "@/lib/products/cover-image"
+import {
+  getCoverLandingUrls,
+  getProductCoverImage,
+  productNeedsCoverResolve,
+} from "@/lib/products/cover-image"
 import { runServerAction } from "@/lib/server-action"
 import type { ProductRecord } from "@/lib/services/product"
 import { resolveProductCoverImageAction } from "../_actions/product-cover"
@@ -9,8 +13,8 @@ import { resolveProductCoverImageAction } from "../_actions/product-cover"
 export function useProductCoverImage(product: ProductRecord) {
   const directCover = getProductCoverImage(product)
   const fallbackVideo = product.videos[0] ?? null
-  const hasLandingPages = product.landingPages.length > 0
-  const shouldResolveLanding = !directCover && !fallbackVideo && hasLandingPages
+  const shouldResolve = productNeedsCoverResolve(product)
+  const landingUrls = getCoverLandingUrls(product)
 
   const { data: resolvedCover, isLoading } = useQuery({
     queryKey: [
@@ -18,10 +22,11 @@ export function useProductCoverImage(product: ProductRecord) {
       product.id,
       directCover,
       fallbackVideo,
-      product.landingPages.map((page) => page.url).join("|"),
+      landingUrls.join("|"),
+      product.variants.map((v) => `${v.id}:${v.imageUrl ?? ""}:${v.url}`).join("|"),
     ],
     queryFn: () => runServerAction(resolveProductCoverImageAction(product.id)),
-    enabled: shouldResolveLanding,
+    enabled: shouldResolve,
     staleTime: 60 * 60 * 1000,
   })
 
@@ -30,6 +35,6 @@ export function useProductCoverImage(product: ProductRecord) {
   return {
     coverImage,
     coverVideo: coverImage ? null : fallbackVideo,
-    isLoadingCover: shouldResolveLanding && isLoading,
+    isLoadingCover: shouldResolve && isLoading,
   }
 }
