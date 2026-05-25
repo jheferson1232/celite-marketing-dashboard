@@ -1,21 +1,12 @@
 import { del, put } from "@vercel/blob"
 import { ServerActionError } from "@/lib/server-action"
+import {
+  assertBlobConfigured,
+  sanitizeFilename,
+  sanitizeMediaUrls,
+  validateMediaFile,
+} from "@/lib/services/blob/media-utils"
 
-const IMAGE_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-])
-
-const VIDEO_MIME_TYPES = new Set([
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-])
-
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 const MAX_IMAGES = 20
 const MAX_VIDEOS = 10
 
@@ -30,22 +21,6 @@ export type ProductMediaUploadResult = {
   videos: string[]
 }
 
-function assertBlobConfigured() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
-    throw new ServerActionError(
-      "BLOB_READ_WRITE_TOKEN no está configurado. Añádelo en Vercel o .env local."
-    )
-  }
-}
-
-function sanitizeFilename(name: string): string {
-  return name
-    .trim()
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 80) || "file"
-}
-
 function buildBlobPath(
   kind: "images" | "videos",
   productId: string | undefined,
@@ -53,43 +28,6 @@ function buildBlobPath(
 ): string {
   const prefix = productId ? `products/${productId}` : "products/drafts"
   return `${prefix}/${kind}/${Date.now()}-${sanitizeFilename(filename)}`
-}
-
-function validateFile(
-  file: File,
-  kind: "image" | "video"
-): void {
-  const allowed =
-    kind === "image" ? IMAGE_MIME_TYPES : VIDEO_MIME_TYPES
-  const maxBytes = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES
-
-  if (!allowed.has(file.type)) {
-    throw new ServerActionError(
-      `Tipo de archivo no permitido (${file.name}): ${file.type || "desconocido"}`
-    )
-  }
-
-  if (file.size > maxBytes) {
-    const limitMb = Math.round(maxBytes / (1024 * 1024))
-    throw new ServerActionError(
-      `${file.name} supera el límite de ${limitMb} MB`
-    )
-  }
-}
-
-export function sanitizeMediaUrls(urls: string[] | undefined): string[] {
-  if (!urls?.length) return []
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const raw of urls) {
-    const url = raw.trim()
-    if (!url || seen.has(url)) continue
-    seen.add(url)
-    result.push(url)
-  }
-
-  return result
 }
 
 export async function uploadProductMedia(
@@ -105,8 +43,8 @@ export async function uploadProductMedia(
     throw new ServerActionError(`Máximo ${MAX_VIDEOS} videos por producto`)
   }
 
-  for (const file of input.imageFiles) validateFile(file, "image")
-  for (const file of input.videoFiles) validateFile(file, "video")
+  for (const file of input.imageFiles) validateMediaFile(file, "image")
+  for (const file of input.videoFiles) validateMediaFile(file, "video")
 
   const token = process.env.BLOB_READ_WRITE_TOKEN!
 
@@ -171,3 +109,5 @@ export function formDataToUploadInput(
 
   return { productId, imageFiles, videoFiles }
 }
+
+export { sanitizeMediaUrls }

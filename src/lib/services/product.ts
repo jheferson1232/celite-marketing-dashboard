@@ -2,8 +2,13 @@ import prisma from "@/lib/prisma"
 import {
   getCoverLandingUrls,
   getProductCoverImage,
+  pickPrimaryVariant,
 } from "@/lib/products/cover-image"
-import { deleteProductMedia } from "@/lib/services/blob/product-media"
+import {
+  attachCreativeToVariants,
+  createCreativeFromUrl,
+  detachCreativeFromVariant,
+} from "@/lib/services/creative"
 import { fetchLandingPagePreviewImage } from "@/lib/services/landing-page-preview"
 import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
 import type { DateRange } from "@/lib/services/meta/types"
@@ -47,11 +52,28 @@ export type ProductPlatformSalesHistory = {
   totals: ProductSalesTotals
 }
 
+const variantCreativeSelect = {
+  id: true,
+  url: true,
+  type: true,
+  name: true,
+  createdAt: true,
+  updatedAt: true,
+} as const
+
 const productInclude = {
-  variants: { orderBy: { color: "asc" as const } },
+  variants: {
+    orderBy: { name: "asc" as const },
+    include: {
+      creatives: {
+        orderBy: { createdAt: "asc" as const },
+        select: variantCreativeSelect,
+      },
+    },
+  },
   campaigns: { orderBy: { createdAt: "desc" as const } },
   landingPages: { orderBy: { url: "asc" as const } },
-} as const
+}
 
 export type ProductLandingPageRecord = {
   id: string
@@ -60,26 +82,33 @@ export type ProductLandingPageRecord = {
   updatedAt: Date
 }
 
+export type ProductVariantCreativeRecord = {
+  id: string
+  url: string
+  type: "image" | "video"
+  name: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type ProductVariantRecord = {
+  id: string
+  productId: string
+  name: string
+  updatedAt: Date
+  creatives: ProductVariantCreativeRecord[]
+}
+
 export type ProductRecord = {
   id: string
   name: string
   status: ProductStatus
-  imageUrl: string | null
-  images: string[]
-  videos: string[]
   landingPages: ProductLandingPageRecord[]
   budget: number
   notes: string | null
   createdAt: Date
   updatedAt: Date
-  variants: Array<{
-    id: string
-    productId: string
-    color: string
-    imageUrl: string | null
-    url: string
-    updatedAt: Date
-  }>
+  variants: ProductVariantRecord[]
   campaigns: Array<{
     id: string
     productId: string
@@ -93,38 +122,32 @@ export type ProductRecord = {
 export type CreateProductInput = {
   name: string
   status?: ProductStatus
-  imageUrl?: string | null
-  images?: string[]
-  videos?: string[]
   landingPageIds?: string[]
   budget?: number
   notes?: string | null
+  /** URL externa de portada (legacy producto): crea/asocia creative de imagen. */
+  coverImageUrl?: string | null
 }
 
 export type UpdateProductInput = {
   id: string
   name?: string
   status?: ProductStatus
-  imageUrl?: string | null
-  images?: string[]
-  videos?: string[]
   landingPageIds?: string[]
   budget?: number
   notes?: string | null
+  /** URL externa de portada (legacy producto): crea/asocia creative de imagen. */
+  coverImageUrl?: string | null
 }
 
 export type CreateProductVariantInput = {
   productId: string
-  color: string
-  imageUrl?: string | null
-  url: string
+  name: string
 }
 
 export type UpdateProductVariantInput = {
   id: string
-  color?: string
-  imageUrl?: string | null
-  url?: string
+  name?: string
 }
 
 export type LinkProductCampaignInput = {
@@ -156,32 +179,36 @@ function sanitizeIdList(ids: string[] | undefined): string[] {
   return result
 }
 
-function sanitizeUrlList(urls: string[] | undefined): string[] {
-  if (!urls?.length) return []
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const raw of urls) {
-    const url = raw.trim()
-    if (!url || seen.has(url)) continue
-    seen.add(url)
-    result.push(url)
-  }
-
-  return result
-}
-
-function resolvePrimaryImageUrl(
-  imageUrl: string | null | undefined,
-  images: string[]
-): string | null {
-  return images[0] ?? (imageUrl?.trim() || null)
-}
-
 function normalizeBudget(value: number | undefined): number | undefined {
   if (value === undefined) return undefined
   if (!Number.isFinite(value)) return 0
   return Math.max(0, value)
+}
+
+async function primaryVariantId(productId: string): Promise<string | null> {
+  const variant = await prisma.productVariant.findFirst({
+    where: { productId },
+    orderBy: { name: "asc" },
+    select: { id: true },
+  })
+  return variant?.id ?? null
+}
+
+async function applyLegacyCoverImageUrl(
+  productId: string,
+  coverImageUrl: string | null | undefined
+): Promise<void> {
+  const url = coverImageUrl?.trim()
+  if (!url) return
+
+  const variantId = await primaryVariantId(productId)
+  if (!variantId) return
+
+  await createCreativeFromUrl({
+    url,
+    type: "image",
+    variantIds: [variantId],
+  })
 }
 
 export async function listProducts(): Promise<ProductRecord[]> {
@@ -201,17 +228,12 @@ export async function getProductById(id: string): Promise<ProductRecord | null> 
 export async function createProduct(
   input: CreateProductInput
 ): Promise<ProductRecord> {
-  const images = sanitizeUrlList(input.images)
-  const videos = sanitizeUrlList(input.videos)
   const landingPageIds = sanitizeIdList(input.landingPageIds)
 
   return prisma.product.create({
     data: {
       name: input.name.trim(),
       status: input.status ?? "draft",
-      imageUrl: resolvePrimaryImageUrl(input.imageUrl, images),
-      images,
-      videos,
       budget: normalizeBudget(input.budget) ?? 0,
       notes: input.notes?.trim() || null,
       ...(landingPageIds.length > 0
@@ -223,6 +245,13 @@ export async function createProduct(
         : {}),
     },
     include: productInclude,
+  }).then(async (created) => {
+    if (input.coverImageUrl) {
+      await applyLegacyCoverImageUrl(created.id, input.coverImageUrl)
+      const next = await getProductById(created.id)
+      return next ?? created
+    }
+    return created
   })
 }
 
@@ -231,16 +260,13 @@ export async function updateProduct(
 ): Promise<ProductRecord> {
   const existing = await prisma.product.findUnique({
     where: { id: input.id },
-    select: { images: true, videos: true },
+    select: { id: true },
   })
   if (!existing) throw new Error("Producto no encontrado")
 
   const data: {
     name?: string
     status?: ProductStatus
-    imageUrl?: string | null
-    images?: string[]
-    videos?: string[]
     budget?: number
     notes?: string | null
     landingPages?: { set: Array<{ id: string }> }
@@ -256,46 +282,31 @@ export async function updateProduct(
   if (input.notes !== undefined) data.notes = input.notes?.trim() || null
   if (input.budget !== undefined) data.budget = normalizeBudget(input.budget) ?? 0
 
-  const nextImages =
-    input.images !== undefined ? sanitizeUrlList(input.images) : undefined
-  const nextVideos =
-    input.videos !== undefined ? sanitizeUrlList(input.videos) : undefined
   const nextLandingPageIds =
     input.landingPageIds !== undefined
       ? sanitizeIdList(input.landingPageIds)
       : undefined
 
-  if (nextImages !== undefined) data.images = nextImages
-  if (nextVideos !== undefined) data.videos = nextVideos
   if (nextLandingPageIds !== undefined) {
     data.landingPages = {
       set: nextLandingPageIds.map((id) => ({ id })),
     }
   }
 
-  if (input.imageUrl !== undefined || nextImages !== undefined) {
-    const images = nextImages ?? existing.images
-    data.imageUrl = resolvePrimaryImageUrl(input.imageUrl, images)
-  }
-
-  const removedMedia = [
-    ...(input.images !== undefined
-      ? existing.images.filter((url) => !nextImages!.includes(url))
-      : []),
-    ...(input.videos !== undefined
-      ? existing.videos.filter((url) => !nextVideos!.includes(url))
-      : []),
-  ]
-
-  const updated = await prisma.product.update({
+  await prisma.product.update({
     where: { id: input.id },
     data,
-    include: productInclude,
   })
 
-  if (removedMedia.length > 0) {
-    await deleteProductMedia(removedMedia)
+  if (input.coverImageUrl !== undefined) {
+    await applyLegacyCoverImageUrl(input.id, input.coverImageUrl)
   }
+
+  const updated = await prisma.product.findUnique({
+    where: { id: input.id },
+    include: productInclude,
+  })
+  if (!updated) throw new Error("Producto no encontrado")
 
   return updated
 }
@@ -313,11 +324,15 @@ async function persistProductCoverFromLandings(
     const preview = await fetchLandingPagePreviewImage(url)
     if (!preview) continue
 
-    return updateProduct({
-      id: product.id,
-      imageUrl: preview,
-      images: [preview],
-    })
+    const variantId =
+      pickPrimaryVariant(product)?.id ?? product.variants[0]?.id ?? null
+    if (!variantId) return product
+
+    return createCreativeFromUrl({
+      url: preview,
+      type: "image",
+      variantIds: [variantId],
+    }).then(() => getProductById(product.id)).then((next) => next ?? product)
   }
 
   return product
@@ -378,35 +393,35 @@ export async function updateProductStatus(
 export async function deleteProduct(id: string): Promise<void> {
   const existing = await prisma.product.findUnique({
     where: { id },
-    select: { images: true, videos: true, imageUrl: true },
+    select: { id: true },
   })
   if (!existing) return
 
   await prisma.product.delete({ where: { id } })
-
-  const mediaUrls = [
-    ...existing.images,
-    ...existing.videos,
-    ...(existing.imageUrl ? [existing.imageUrl] : []),
-  ]
-  await deleteProductMedia(mediaUrls)
 }
 
 export async function createProductVariant(
   input: CreateProductVariantInput
 ): Promise<ProductRecord> {
+  const name = input.name.trim()
+  if (!name) throw new Error("El nombre de la variante es obligatorio")
+
+  const product = await prisma.product.findUnique({
+    where: { id: input.productId },
+    select: { id: true },
+  })
+  if (!product) throw new Error("Producto no encontrado")
+
   await prisma.productVariant.create({
     data: {
       productId: input.productId,
-      color: input.color.trim(),
-      imageUrl: input.imageUrl?.trim() || null,
-      url: input.url.trim(),
+      name,
     },
   })
 
-  const product = await getProductById(input.productId)
-  if (!product) throw new Error("Producto no encontrado")
-  return product
+  const updated = await getProductById(input.productId)
+  if (!updated) throw new Error("Producto no encontrado")
+  return updated
 }
 
 export async function updateProductVariant(
@@ -418,14 +433,8 @@ export async function updateProductVariant(
   })
   if (!existing) throw new Error("Variante no encontrada")
 
-  const data: {
-    color?: string
-    imageUrl?: string | null
-    url?: string
-  } = {}
-  if (input.color !== undefined) data.color = input.color.trim()
-  if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl?.trim() || null
-  if (input.url !== undefined) data.url = input.url.trim()
+  const data: { name?: string } = {}
+  if (input.name !== undefined) data.name = input.name.trim()
 
   await prisma.productVariant.update({
     where: { id: input.id },
@@ -433,6 +442,40 @@ export async function updateProductVariant(
   })
 
   const product = await getProductById(existing.productId)
+  if (!product) throw new Error("Producto no encontrado")
+  return product
+}
+
+export async function attachCreativeToProductVariant(
+  variantId: string,
+  creativeId: string
+): Promise<ProductRecord> {
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: { productId: true },
+  })
+  if (!variant) throw new Error("Variante no encontrada")
+
+  await attachCreativeToVariants(creativeId, [variantId])
+
+  const product = await getProductById(variant.productId)
+  if (!product) throw new Error("Producto no encontrado")
+  return product
+}
+
+export async function detachCreativeFromProductVariant(
+  variantId: string,
+  creativeId: string
+): Promise<ProductRecord> {
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: { productId: true },
+  })
+  if (!variant) throw new Error("Variante no encontrada")
+
+  await detachCreativeFromVariant(creativeId, variantId)
+
+  const product = await getProductById(variant.productId)
   if (!product) throw new Error("Producto no encontrado")
   return product
 }

@@ -10,13 +10,10 @@ import type { ProductRecord } from "@/lib/services/product"
 
 interface ProductCardProps {
   product: ProductRecord
-  basePath?: "/products" | "/producto"
 }
 
-export function ProductCard({
-  product,
-  basePath = "/products",
-}: ProductCardProps) {
+export function ProductCard({ product }: ProductCardProps) {
+  const basePath = "/products"
   const { coverImage, coverVideo, isLoadingCover } = useProductCoverImage(product)
   const { imageCount, videoCount } = getProductMediaCounts(product)
   const campaignCount = product.campaigns.length

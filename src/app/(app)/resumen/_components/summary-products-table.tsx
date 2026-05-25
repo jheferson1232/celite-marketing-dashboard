@@ -117,7 +117,7 @@ function ProductRow({ row }: { row: SummaryProductTableRow }) {
     <TableRow className="hover:bg-muted/40">
       <TableCell className="min-w-[10rem] whitespace-normal py-3">
         <Link
-          href={`/producto/${row.id}`}
+          href={`/product-stats/${row.id}`}
           className="flex items-center gap-3 transition-opacity hover:opacity-90"
         >
           <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border bg-muted sm:size-12">
@@ -221,8 +221,8 @@ export function SummaryProductsTableSection({
         rowsWithCampaigns.length === 0 ? (
           <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
             No hay productos con campañas vinculadas. Configúralas en{" "}
-            <Link href="/producto" className="font-medium text-foreground underline">
-              Producto
+            <Link href="/products" className="font-medium text-foreground underline">
+              Products
             </Link>
             .
           </p>

@@ -2,27 +2,36 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiArrowLeftLine,
+  RiBarChartGroupedLine,
   RiDeleteBinLine,
-  RiRocketLine,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
-import type { ProductLandingPageRecord } from "@/lib/services/product"
+import type { ProductVariantRecord } from "@/lib/services/product"
 import {
+  attachVariantCreativeAction,
+  detachVariantCreativeAction,
+  updateProductVariantAction,
+} from "../../_actions/variants"
+import {
+  createProductVariantAction,
   deleteProductAction,
   getProductByIdAction,
 } from "../../_actions/products"
-import { useProductMediaSave } from "../../_lib/use-product-media-save"
-import { LandingPagesPanel } from "./landing-pages-panel"
-import { ProductTikTokLaunchDialog } from "../launch/product-tiktok-launch-dialog"
+import type { ProductVariantCreateValues } from "./product-variant-create-dialog"
+import {
+  ProductVariantEditDialog,
+  type ProductVariantEditValues,
+} from "./product-variant-edit-dialog"
+import { useProductEditSave } from "../../_lib/use-product-edit-save"
+import { ProductVariantsPanel } from "./product-variants-panel"
 import { ProductDeleteDialog } from "../product/product-delete-dialog"
-import { ProductMediaPicker } from "../product/product-media-picker"
 
 interface ProductEditContentProps {
   productId: string
@@ -32,7 +41,7 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [launchOpen, setLaunchOpen] = useState(false)
+  const [editVariantId, setEditVariantId] = useState<string | null>(null)
 
   const {
     data: product,
@@ -52,30 +61,140 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
   const {
     name,
     setName,
-    landingPages,
-    setLandingPages,
-    budget,
-    setBudget,
-    existingImages,
-    setExistingImages,
-    existingVideos,
-    setExistingVideos,
-    localItems,
-    setLocalItems,
     formError,
     saveNotice,
     busy,
     saveLabel,
     save,
-  } = useProductMediaSave(product)
+    invalidateProduct,
+  } = useProductEditSave(product)
+
+  const editVariant = useMemo(
+    () => product?.variants.find((variant) => variant.id === editVariantId) ?? null,
+    [product?.variants, editVariantId]
+  )
+
+  const invalidate = () => {
+    invalidateProduct(productId)
+    void queryClient.invalidateQueries({ queryKey: ["creatives"] })
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => runServerAction(deleteProductAction(id)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["products"] })
-      router.push("/products-kanban")
+      router.push("/products")
     },
   })
+
+  const createVariantMutation = useMutation({
+    mutationFn: async (values: ProductVariantCreateValues) => {
+      const updated = await runServerAction(
+        createProductVariantAction({
+          productId,
+          name: values.name,
+        })
+      )
+      if (!updated) throw new Error("No se pudo crear la variante")
+      return updated
+    },
+    onSuccess: invalidate,
+  })
+
+  const updateVariantMutation = useMutation({
+    mutationFn: async (input: { id: string } & ProductVariantEditValues) => {
+      const updated = await runServerAction(
+        updateProductVariantAction({
+          id: input.id,
+          name: input.name,
+        })
+      )
+      if (!updated) throw new Error("No se pudo actualizar la variante")
+      return updated
+    },
+    onSuccess: invalidate,
+  })
+
+  const attachVariantCreativeMutation = useMutation({
+    mutationFn: async (input: { variantId: string; creativeIds: string[] }) => {
+      for (const creativeId of input.creativeIds) {
+        const updated = await runServerAction(
+          attachVariantCreativeAction({
+            variantId: input.variantId,
+            creativeId,
+          })
+        )
+        if (!updated) throw new Error("No se pudo vincular el creative")
+      }
+    },
+    onSuccess: invalidate,
+  })
+
+  const detachVariantCreativeMutation = useMutation({
+    mutationFn: async (input: { variantId: string; creativeId: string }) => {
+      const updated = await runServerAction(
+        detachVariantCreativeAction(input)
+      )
+      if (!updated) throw new Error("No se pudo desvincular el creative")
+      return updated
+    },
+    onSuccess: invalidate,
+  })
+
+  const createVariant = async (
+    values: ProductVariantCreateValues
+  ): Promise<string | null> => {
+    try {
+      await createVariantMutation.mutateAsync(values)
+      return null
+    } catch (createError) {
+      return createError instanceof Error
+        ? createError.message
+        : "No se pudo crear la variante"
+    }
+  }
+
+  const saveVariant = async (
+    values: ProductVariantEditValues
+  ): Promise<string | null> => {
+    if (!editVariant) return "Variante no encontrada"
+    try {
+      await updateVariantMutation.mutateAsync({
+        id: editVariant.id,
+        ...values,
+      })
+      return null
+    } catch (saveError) {
+      return saveError instanceof Error
+        ? saveError.message
+        : "No se pudo guardar la variante"
+    }
+  }
+
+  const attachVariantCreatives = async (
+    creativeIds: string[]
+  ): Promise<string | null> => {
+    if (!editVariant) return "Variante no encontrada"
+    try {
+      await attachVariantCreativeMutation.mutateAsync({
+        variantId: editVariant.id,
+        creativeIds,
+      })
+      return null
+    } catch (attachError) {
+      return attachError instanceof Error
+        ? attachError.message
+        : "No se pudieron vincular los creativos"
+    }
+  }
+
+  const detachVariantCreative = async (creativeId: string) => {
+    if (!editVariant) return
+    await detachVariantCreativeMutation.mutateAsync({
+      variantId: editVariant.id,
+      creativeId,
+    })
+  }
 
   if (isLoading) {
     return (
@@ -87,38 +206,13 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
     )
   }
 
-  const activeLandingPages = landingPages
-
-  const addLandingPage = (page: ProductLandingPageRecord) => {
-    if (activeLandingPages.some((entry) => entry.id === page.id)) return
-    setLandingPages([...activeLandingPages, page])
-  }
-
-  const removeLandingPage = (landingPageId: string) => {
-    setLandingPages(activeLandingPages.filter((page) => page.id !== landingPageId))
-  }
-
-  const handleLandingPageCreated = (page: ProductLandingPageRecord) => {
-    addLandingPage(page)
-  }
-
-  const handleLandingPageUpdated = (page: ProductLandingPageRecord) => {
-    setLandingPages((current) =>
-      current.map((entry) => (entry.id === page.id ? page : entry))
-    )
-  }
-
-  const handleLandingPageDeleted = (landingPageId: string) => {
-    removeLandingPage(landingPageId)
-  }
-
   if (isError || !product) {
     return (
       <div className="flex w-full flex-col gap-4 p-6 lg:p-8">
         <Button type="button" variant="ghost" size="sm" asChild className="w-fit">
-          <Link href="/products-kanban">
+          <Link href="/products">
             <RiArrowLeftLine className="size-4" />
-            Volver al Kanban
+            Volver a Products
           </Link>
         </Button>
         <p className="text-sm text-destructive">
@@ -128,58 +222,40 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
     )
   }
 
-  const isReady = product.status === "ready"
-  const canLaunch = product.status === "ready" || product.status === "draft"
-  const hasPendingUploads = localItems.length > 0
-  const showSave = !isReady || hasPendingUploads
-
   return (
     <div className="flex w-full min-w-0 flex-col gap-8 p-6 lg:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <Button type="button" variant="ghost" size="sm" asChild className="w-fit">
-            <Link href="/products-kanban">
-              <RiArrowLeftLine className="size-4" />
-              Volver al Kanban
-            </Link>
-          </Button>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Edición
-            </p>
-            <h1 className="text-2xl font-semibold tracking-tight">Editar producto</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isReady
-                ? hasPendingUploads
-                  ? "Tienes videos nuevos sin guardar. Pulsa Guardar y luego Lanzar en TikTok."
-                  : "Listo para lanzar. Sube videos abajo si faltan; al añadirlos aparece Guardar."
-                : "Al guardar, si está en Draft y cumple las comprobaciones del lanzamiento, pasa a Ready."}
-            </p>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Button type="button" variant="ghost" size="sm" asChild className="w-fit">
+          <Link href="/products">
+            <RiArrowLeftLine className="size-4" />
+            Volver a Products
+          </Link>
+        </Button>
 
         <div className="flex flex-wrap gap-2">
-          {showSave ? (
-            <Button
-              type="button"
-              onClick={() => void save()}
-              disabled={busy || !name.trim()}
-            >
-              {saveLabel}
-            </Button>
-          ) : null}
-          {canLaunch ? (
-            <Button
-              type="button"
-              variant={isReady ? "default" : "secondary"}
-              className="gap-2"
-              onClick={() => setLaunchOpen(true)}
-              disabled={busy}
-            >
-              <RiRocketLine className="size-4" />
-              Lanzar en TikTok
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" size="sm" asChild className="gap-2">
+            <Link href={`/product-stats/${productId}`}>
+              <RiBarChartGroupedLine className="size-4" />
+              Estadísticas
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy || !name.trim()}
+          >
+            {saveLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+            disabled={busy || deleteMutation.isPending}
+          >
+            <RiDeleteBinLine className="size-4" />
+            Eliminar producto
+          </Button>
         </div>
       </div>
 
@@ -188,92 +264,44 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
         <p className="text-sm text-emerald-600 dark:text-emerald-400">{saveNotice}</p>
       ) : null}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="flex min-w-0 flex-col gap-8">
-          <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="text-sm font-semibold">Detalles</h2>
-            <div className="space-y-2">
-              <label htmlFor="edit-product-name" className="text-sm font-medium">
-                Nombre
-              </label>
-              <Input
-                id="edit-product-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Ej. Pantalón wide leg"
-                required
-                disabled={busy}
-              />
-            </div>
-          </section>
-
-          <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="text-sm font-semibold">Operación</h2>
-            <div className="space-y-2">
-              <label htmlFor="edit-product-budget" className="text-sm font-medium">
-                Presupuesto (PEN)
-              </label>
-              <Input
-                id="edit-product-budget"
-                type="number"
-                min={0}
-                step="1"
-                inputMode="decimal"
-                value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                placeholder="Ej. 30"
-                disabled={busy}
-              />
-              <p className="text-xs text-muted-foreground">
-                Presupuesto diario planificado en soles (PEN) para campañas TikTok
-                de este producto.
-              </p>
-            </div>
-          </section>
-
-          <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
-            <div>
-              <h2 className="text-sm font-semibold">Videos</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Clips promocionales o demostraciones del producto.
-              </p>
-            </div>
-            <ProductMediaPicker
-              mode="videos"
-              existingImages={existingImages}
-              existingVideos={existingVideos}
-              localItems={localItems}
-              onLocalItemsChange={setLocalItems}
-              onExistingImagesChange={setExistingImages}
-              onExistingVideosChange={setExistingVideos}
-              disabled={busy}
-            />
-          </section>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+        <div className="space-y-2">
+          <label htmlFor="edit-product-name" className="text-sm font-medium">
+            Nombre
+          </label>
+          <Input
+            id="edit-product-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Ej. Pantalón wide leg"
+            required
+            disabled={busy}
+          />
         </div>
 
-        <LandingPagesPanel
-          productLandingPages={activeLandingPages}
-          onAddToProduct={addLandingPage}
-          onRemoveFromProduct={removeLandingPage}
-          onLandingPageCreated={handleLandingPageCreated}
-          onLandingPageUpdated={handleLandingPageUpdated}
-          onLandingPageDeleted={handleLandingPageDeleted}
-          disabled={busy}
+        <ProductVariantsPanel
+          variants={product.variants}
+          onCreate={createVariant}
+          onSelectVariant={(variant: ProductVariantRecord) =>
+            setEditVariantId(variant.id)
+          }
+          disabled={busy || deleteMutation.isPending}
+          creating={createVariantMutation.isPending}
         />
       </div>
 
-      <div className="border-t pt-6">
-        <Button
-          type="button"
-          variant="outline"
-          className="text-destructive hover:text-destructive"
-          onClick={() => setDeleteOpen(true)}
-          disabled={busy || deleteMutation.isPending}
-        >
-          <RiDeleteBinLine className="size-4" />
-          Eliminar producto
-        </Button>
-      </div>
+      <ProductVariantEditDialog
+        open={editVariantId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditVariantId(null)
+        }}
+        variant={editVariant}
+        onSave={saveVariant}
+        onAttachCreatives={attachVariantCreatives}
+        onDetachCreative={detachVariantCreative}
+        saving={updateVariantMutation.isPending}
+        linking={attachVariantCreativeMutation.isPending}
+      />
 
       <ProductDeleteDialog
         open={deleteOpen}
@@ -281,17 +309,6 @@ export function ProductEditContent({ productId }: ProductEditContentProps) {
         productName={product.name}
         isPending={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate(product.id)}
-      />
-
-      <ProductTikTokLaunchDialog
-        product={product}
-        open={launchOpen}
-        onOpenChange={setLaunchOpen}
-        onLaunched={() => {
-          void queryClient.invalidateQueries({ queryKey: ["product", productId] })
-          void queryClient.invalidateQueries({ queryKey: ["products"] })
-          router.push("/products-kanban")
-        }}
       />
     </div>
   )

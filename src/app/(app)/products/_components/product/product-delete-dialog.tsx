@@ -32,7 +32,7 @@ export function ProductDeleteDialog({
           <DialogTitle>¿Eliminar producto?</DialogTitle>
           <DialogDescription>
             Se eliminará <span className="font-medium text-foreground">{productName}</span>{" "}
-            junto con sus imágenes y videos almacenados. Esta acción no se puede deshacer.
+            junto con sus variantes. Esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

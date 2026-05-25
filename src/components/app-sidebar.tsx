@@ -3,12 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  RiArchiveLine,
   RiBarChartGroupedLine,
   RiBrainLine,
-  RiLayoutColumnLine,
+  RiShoppingBag2Line,
   RiMegaphoneLine,
   RiMetaLine,
-  RiShoppingBag2Line,
   RiTiktokLine,
 } from "@remixicon/react"
 import {
@@ -50,16 +50,22 @@ const navItems = [
     icon: RiTiktokLine,
   },
   {
-    id: "products-kanban",
-    title: "Products Kanban",
-    href: "/products-kanban",
-    icon: RiLayoutColumnLine,
+    id: "campaigns",
+    title: "Campaigns",
+    href: "/campaigns",
+    icon: RiMegaphoneLine,
   },
   {
-    id: "producto",
-    title: "Productos (legacy)",
-    href: "/producto",
+    id: "products",
+    title: "Productos",
+    href: "/products",
     icon: RiShoppingBag2Line,
+  },
+  {
+    id: "baul",
+    title: "Baúl",
+    href: "/baul",
+    icon: RiArchiveLine,
   },
 ] as const
 
@@ -106,14 +112,16 @@ export function AppSidebar() {
                           : item.id === "tiktok"
                             ? pathname === "/tiktok" ||
                               pathname.startsWith("/tiktok/")
-                            : item.id === "products-kanban"
-                              ? pathname === "/products-kanban" ||
-                                pathname.startsWith("/products-kanban/") ||
-                                (pathname.startsWith("/products/") &&
-                                  pathname !== "/products")
-                              : item.id === "producto"
-                                ? pathname === "/producto" ||
-                                  pathname.startsWith("/producto/")
+                            : item.id === "campaigns"
+                              ? pathname === "/campaigns" ||
+                                pathname.startsWith("/campaigns/")
+                            : item.id === "products"
+                              ? pathname === "/products" ||
+                                pathname.startsWith("/products/") ||
+                                pathname.startsWith("/product-stats/")
+                              : item.id === "baul"
+                                ? pathname === "/baul" ||
+                                  pathname.startsWith("/baul/")
                                 : pathname === "/dashboard" ||
                                   pathname.startsWith("/dashboard/")
                     }

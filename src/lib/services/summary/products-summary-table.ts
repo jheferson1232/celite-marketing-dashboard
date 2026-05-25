@@ -15,6 +15,7 @@ import {
   getTikTokCampaignDailyInsights,
   type TikTokCampaignDailyInsightsSummary,
 } from "@/lib/services/tiktok/campaign-daily-insights"
+import { getProductCoverImage } from "@/lib/products/cover-image"
 import { computeBlendedCpaCop, safeNum } from "./safe-number"
 
 const SUMMARY_PRODUCTS_TTL_MS = 2 * 60 * 1000
@@ -111,7 +112,7 @@ function buildRow(
   return {
     id: product.id,
     name: product.name,
-    imageUrl: product.imageUrl,
+    imageUrl: getProductCoverImage(product),
     notes: product.notes,
     campaignCount: product.campaigns.length,
     meta,

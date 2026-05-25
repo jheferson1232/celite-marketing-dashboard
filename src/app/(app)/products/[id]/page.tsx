@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: ProductIdPageProps) {
   const { id } = await params
   return {
     title: `Editar producto ${id.slice(0, 8)}… | Marketing`,
-    description: "Editar detalles, imágenes y videos del producto",
+    description: "Editar detalles del producto",
   }
 }
 

@@ -4,6 +4,7 @@ import { createServerAction } from "@/lib/server-action"
 import type { DateRange } from "@/lib/services/meta/types"
 import {
   createProduct,
+  createProductVariant,
   deleteProduct,
   getProductById,
   getProductSalesHistory,
@@ -12,6 +13,7 @@ import {
   updateProduct,
   updateProductStatus,
   type CreateProductInput,
+  type CreateProductVariantInput,
   type ProductRecord,
   type ProductSalesHistorySummary,
   type SaveProductEditResult,
@@ -50,6 +52,11 @@ export const updateProductStatusAction = createServerAction(
 
 export const deleteProductAction = createServerAction(
   async (id: string): Promise<void> => deleteProduct(id)
+)
+
+export const createProductVariantAction = createServerAction(
+  async (input: CreateProductVariantInput): Promise<ProductRecord> =>
+    createProductVariant(input)
 )
 
 export const getProductSalesHistoryAction = createServerAction(

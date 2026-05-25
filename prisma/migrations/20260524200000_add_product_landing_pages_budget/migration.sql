@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "TikTokProduct" ADD COLUMN "landingPages" TEXT[] DEFAULT ARRAY[]::TEXT[];
-ALTER TABLE "TikTokProduct" ADD COLUMN "budget" DOUBLE PRECISION NOT NULL DEFAULT 0;

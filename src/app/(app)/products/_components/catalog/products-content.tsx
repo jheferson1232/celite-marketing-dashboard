@@ -15,11 +15,7 @@ import {
 import { ProductCard } from "./product-card"
 import { ProductCreateForm } from "../product/product-create-form"
 
-interface ProductsContentProps {
-  basePath?: "/products" | "/producto"
-}
-
-export function ProductsContent({ basePath = "/products" }: ProductsContentProps) {
+export function ProductsContent() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
@@ -47,11 +43,7 @@ export function ProductsContent({ basePath = "/products" }: ProductsContentProps
     },
     onSuccess: (created: ProductRecord) => {
       invalidate()
-      if (basePath === "/products") {
-        router.push(`/products/${created.id}`)
-      } else {
-        router.push(`${basePath}/${created.id}`)
-      }
+      router.push(`/products/${created.id}`)
     },
   })
 
@@ -65,10 +57,10 @@ export function ProductsContent({ basePath = "/products" }: ProductsContentProps
               Catálogo
             </span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Gestiona el catálogo de productos. Crea uno nuevo y completa imágenes
-            y videos en la página de edición.
+            Catálogo de productos. Crea uno nuevo y completa imágenes y videos en
+            la página de edición.
           </p>
         </div>
         <Button type="button" onClick={() => setFormOpen(true)}>
@@ -102,7 +94,7 @@ export function ProductsContent({ basePath = "/products" }: ProductsContentProps
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} basePath={basePath} />
+            <ProductCard key={product.id} product={product} />
           ))}
         </div>
       )}

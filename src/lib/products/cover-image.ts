@@ -1,9 +1,13 @@
+import {
+  getProductCreativesByType,
+  getProductMediaCounts,
+} from "@/lib/products/creatives"
 import type { ProductRecord } from "@/lib/services/product"
-import { extractUrlSlug, normalizeMatchKey } from "@/lib/url-match"
+import { normalizeMatchKey } from "@/lib/url-match"
 
 type ProductWithVariants = Pick<
   ProductRecord,
-  "name" | "images" | "imageUrl" | "videos" | "variants" | "landingPages"
+  "name" | "variants" | "landingPages"
 >
 
 /** Variante que mejor coincide con el nombre del producto (cada producto = una variante). */
@@ -16,39 +20,25 @@ export function pickPrimaryVariant(
   const nameKey = normalizeMatchKey(product.name)
 
   for (const variant of product.variants) {
-    const slugKey = normalizeMatchKey(extractUrlSlug(variant.url))
-    const colorKey = normalizeMatchKey(variant.color)
-    if (slugKey && nameKey.includes(slugKey)) return variant
-    if (colorKey && nameKey.includes(colorKey)) return variant
+    const variantNameKey = normalizeMatchKey(variant.name)
+    if (variantNameKey && nameKey.includes(variantNameKey)) return variant
   }
 
   return product.variants[0]!
 }
 
 export function getProductCoverImage(
-  product: Pick<ProductRecord, "name" | "images" | "imageUrl" | "variants">
+  product: Pick<ProductRecord, "name" | "variants">
 ): string | null {
-  const fromProduct = product.images[0] ?? product.imageUrl ?? null
-  if (fromProduct) return fromProduct
-
-  const primary = pickPrimaryVariant(product)
-  if (primary?.imageUrl) return primary.imageUrl
-
-  for (const variant of product.variants) {
-    if (variant.imageUrl) return variant.imageUrl
-  }
+  const imageCreatives = getProductCreativesByType(product, "image")
+  if (imageCreatives[0]?.url) return imageCreatives[0].url
 
   return null
 }
 
-export function getProductMediaCounts(product: Pick<ProductRecord, "images" | "videos">) {
-  return {
-    imageCount: product.images.length,
-    videoCount: product.videos.length,
-  }
-}
+export { getProductMediaCounts }
 
-/** URLs de landing a probar para portada (variante principal primero). */
+/** URLs de landing a probar para portada (producto). */
 export function getCoverLandingUrls(product: ProductWithVariants): string[] {
   const seen = new Set<string>()
   const urls: string[] = []
@@ -62,10 +52,6 @@ export function getCoverLandingUrls(product: ProductWithVariants): string[] {
     urls.push(url)
   }
 
-  const primary = pickPrimaryVariant(product)
-  if (primary?.url) add(primary.url)
-
-  for (const variant of product.variants) add(variant.url)
   for (const page of product.landingPages) add(page.url)
 
   return urls
@@ -73,6 +59,6 @@ export function getCoverLandingUrls(product: ProductWithVariants): string[] {
 
 export function productNeedsCoverResolve(product: ProductWithVariants): boolean {
   if (getProductCoverImage(product)) return false
-  if (product.videos.length > 0) return false
+  if (getProductCreativesByType(product, "video").length > 0) return false
   return getCoverLandingUrls(product).length > 0
 }

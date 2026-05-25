@@ -1,0 +1,350 @@
+import prisma from "@/lib/prisma"
+import {
+  CAMPAIGN_STATUS_VALUES,
+  isCampaignStatus,
+  type CampaignStatus,
+} from "@/lib/campaigns/status"
+import {
+  isTikTokStrategyId,
+  normalizeABODynamicFields,
+  validateABODynamicFields,
+  type ABODynamicCampaignContext,
+  type ABODynamicCreative,
+  type ABODynamicFields,
+  type ABOStrategyConfig,
+  type CampaignLandingPageRef,
+  type CampaignStrategyConfig,
+  type TikTokStrategyId,
+} from "@/lib/config/tiktok-strategies"
+import {
+  buildEmptyABOStrategyConfig,
+  getABOCampaignContext,
+  parseCampaignStrategyConfig,
+  rebuildABOStrategyConfig,
+} from "@/lib/services/campaign-strategy-builder"
+
+export type { CampaignStatus } from "@/lib/campaigns/status"
+export { CAMPAIGN_STATUS_VALUES } from "@/lib/campaigns/status"
+
+export type CampaignRecord = {
+  id: string
+  name: string
+  status: CampaignStatus
+  strategy: TikTokStrategyId
+  config: CampaignStrategyConfig
+  createdAt: Date
+  updatedAt: Date
+}
+
+function normalizeABOConfig(config: ABOStrategyConfig): ABOStrategyConfig {
+  const context = getABOCampaignContext(config)
+  return {
+    ...config,
+    landingPages: context.landingPages,
+    creatives: context.creatives,
+    dynamic: normalizeABODynamicFields(config.dynamic, context),
+  }
+}
+
+function mapCampaignRecord(row: {
+  id: string
+  name: string
+  status: string
+  strategy: string
+  config: unknown
+  createdAt: Date
+  updatedAt: Date
+}): CampaignRecord {
+  const parsedConfig = parseCampaignStrategyConfig(row.config)
+  if (!parsedConfig) {
+    throw new Error(`Config inválida para campaña ${row.id}`)
+  }
+
+  if (!isTikTokStrategyId(row.strategy)) {
+    throw new Error(`Estrategia inválida para campaña ${row.id}`)
+  }
+
+  if (!isCampaignStatus(row.status)) {
+    throw new Error(`Estado inválido para campaña ${row.id}`)
+  }
+
+  const config =
+    parsedConfig.strategy === "ABO"
+      ? normalizeABOConfig(parsedConfig)
+      : parsedConfig
+
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    strategy: row.strategy as TikTokStrategyId,
+    config,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+export async function listCampaigns(): Promise<CampaignRecord[]> {
+  const rows = await prisma.campaign.findMany({
+    orderBy: [{ updatedAt: "desc" }],
+  })
+
+  return rows.map(mapCampaignRecord)
+}
+
+export async function getCampaignById(id: string): Promise<CampaignRecord | null> {
+  const row = await prisma.campaign.findUnique({
+    where: { id },
+  })
+
+  if (!row) return null
+  return mapCampaignRecord(row)
+}
+
+export async function createCampaign(input: {
+  name: string
+  status?: CampaignStatus
+  strategy: TikTokStrategyId
+  abo?: UpdateCampaignABOInput
+}): Promise<CampaignRecord> {
+  if (!isTikTokStrategyId(input.strategy)) {
+    throw new Error("Estrategia no válida")
+  }
+
+  const trimmedName = input.name.trim()
+  if (!trimmedName) {
+    throw new Error("El nombre de la campaña es obligatorio")
+  }
+
+  if (input.strategy !== "ABO") {
+    throw new Error("Estrategia no soportada todavía")
+  }
+
+  const status = input.status ?? "draft"
+  if (!isCampaignStatus(status)) {
+    throw new Error("Estado no válido")
+  }
+
+  let config: ABOStrategyConfig
+
+  if (input.abo) {
+    const context: ABODynamicCampaignContext = {
+      budget: 0,
+      landingPages: input.abo.landingPages,
+      creatives: input.abo.creatives,
+    }
+
+    const normalizedDynamic = normalizeABODynamicFields(input.abo.dynamic, context)
+    const validation = validateABODynamicFields(normalizedDynamic, context)
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0]
+      throw new Error(firstError ?? "Configuración ABO inválida")
+    }
+
+    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context)
+  } else {
+    config = buildEmptyABOStrategyConfig(trimmedName)
+  }
+
+  const row = await prisma.campaign.create({
+    data: {
+      name: trimmedName,
+      status,
+      strategy: input.strategy,
+      config,
+    },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export async function updateCampaignStatus(
+  campaignId: string,
+  status: CampaignStatus
+): Promise<CampaignRecord> {
+  if (!isCampaignStatus(status)) {
+    throw new Error("Estado no válido")
+  }
+
+  const row = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { status },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export async function updateCampaignStrategy(
+  campaignId: string,
+  strategy: TikTokStrategyId
+): Promise<CampaignRecord> {
+  if (!isTikTokStrategyId(strategy)) {
+    throw new Error("Estrategia no válida")
+  }
+
+  const existing = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, name: true, strategy: true },
+  })
+
+  if (!existing) {
+    throw new Error("Campaña no encontrada")
+  }
+
+  const config =
+    strategy === "ABO"
+      ? buildEmptyABOStrategyConfig(existing.name)
+      : buildEmptyABOStrategyConfig(existing.name)
+
+  const row = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      strategy,
+      config,
+    },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export async function updateCampaignGeneral(
+  campaignId: string,
+  input: {
+    name: string
+    status: CampaignStatus
+  }
+): Promise<CampaignRecord> {
+  const trimmedName = input.name.trim()
+  if (!trimmedName) {
+    throw new Error("El nombre de la campaña es obligatorio")
+  }
+
+  if (!isCampaignStatus(input.status)) {
+    throw new Error("Estado no válido")
+  }
+
+  const row = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      name: trimmedName,
+      status: input.status,
+    },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export type UpdateCampaignABOInput = {
+  dynamic: ABODynamicFields
+  landingPages: CampaignLandingPageRef[]
+  creatives: ABODynamicCreative[]
+}
+
+export async function updateCampaignABOConfig(
+  campaignId: string,
+  input: UpdateCampaignABOInput
+): Promise<CampaignRecord> {
+  const existing = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, name: true, strategy: true, config: true },
+  })
+
+  if (!existing) {
+    throw new Error("Campaña no encontrada")
+  }
+
+  if (existing.strategy !== "ABO") {
+    throw new Error("La campaña no usa estrategia ABO")
+  }
+
+  const context: ABODynamicCampaignContext = {
+    budget: 0,
+    landingPages: input.landingPages,
+    creatives: input.creatives,
+  }
+
+  const normalizedDynamic = normalizeABODynamicFields(input.dynamic, context)
+  const validation = validateABODynamicFields(normalizedDynamic, context)
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0]
+    throw new Error(firstError ?? "Configuración ABO inválida")
+  }
+
+  const config = rebuildABOStrategyConfig(
+    existing.name,
+    normalizedDynamic,
+    context
+  )
+
+  const row = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { config },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export async function updateCampaignDetail(
+  campaignId: string,
+  input: {
+    name: string
+    status: CampaignStatus
+    abo?: UpdateCampaignABOInput
+  }
+): Promise<CampaignRecord> {
+  const existing = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, name: true, strategy: true, config: true },
+  })
+
+  if (!existing) {
+    throw new Error("Campaña no encontrada")
+  }
+
+  const trimmedName = input.name.trim()
+  if (!trimmedName) {
+    throw new Error("El nombre de la campaña es obligatorio")
+  }
+
+  if (!isCampaignStatus(input.status)) {
+    throw new Error("Estado no válido")
+  }
+
+  if (!isTikTokStrategyId(existing.strategy)) {
+    throw new Error("Estrategia inválida")
+  }
+
+  let config: CampaignStrategyConfig | undefined
+
+  if (existing.strategy === "ABO" && input.abo) {
+    const context: ABODynamicCampaignContext = {
+      budget: 0,
+      landingPages: input.abo.landingPages,
+      creatives: input.abo.creatives,
+    }
+
+    const normalizedDynamic = normalizeABODynamicFields(input.abo.dynamic, context)
+    const validation = validateABODynamicFields(normalizedDynamic, context)
+    if (!validation.valid) {
+      const firstError = Object.values(validation.errors)[0]
+      throw new Error(firstError ?? "Configuración ABO inválida")
+    }
+
+    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context)
+  }
+
+  const row = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      name: trimmedName,
+      status: input.status,
+      ...(config ? { config } : {}),
+    },
+  })
+
+  return mapCampaignRecord(row)
+}
+
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  await prisma.campaign.delete({ where: { id: campaignId } })
+}
