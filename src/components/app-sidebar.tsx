@@ -6,6 +6,7 @@ import {
   RiArchiveLine,
   RiBarChartGroupedLine,
   RiBrainLine,
+  RiStarLine,
   RiShoppingBag2Line,
   RiMegaphoneLine,
   RiMetaLine,
@@ -60,6 +61,12 @@ const navItems = [
     title: "Productos",
     href: "/products",
     icon: RiShoppingBag2Line,
+  },
+  {
+    id: "productos-pendientes",
+    title: "Productos pendientes",
+    href: "/productos-pendientes",
+    icon: RiStarLine,
   },
   {
     id: "baul",
@@ -119,7 +126,10 @@ export function AppSidebar() {
                               ? pathname === "/products" ||
                                 pathname.startsWith("/products/") ||
                                 pathname.startsWith("/product-stats/")
-                              : item.id === "baul"
+                              : item.id === "productos-pendientes"
+                                ? pathname === "/productos-pendientes" ||
+                                  pathname.startsWith("/productos-pendientes/")
+                                : item.id === "baul"
                                 ? pathname === "/baul" ||
                                   pathname.startsWith("/baul/")
                                 : pathname === "/dashboard" ||

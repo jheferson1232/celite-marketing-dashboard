@@ -1,13 +1,20 @@
 import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
-})
+/** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev. */
+const PRISMA_CLIENT_VERSION = 2
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient }
+type GlobalPrismaStore = {
+  prisma?: PrismaClient
+  prismaVersion?: number
+}
+
+const globalStore = globalThis as unknown as GlobalPrismaStore
 
 function createPrismaClient() {
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL!,
+  })
   return new PrismaClient({ adapter })
 }
 
@@ -19,14 +26,43 @@ function hasInformeModels(client: PrismaClient) {
   )
 }
 
-let prisma = globalForPrisma.prisma ?? createPrismaClient()
-
-if (!hasInformeModels(prisma)) {
-  prisma = createPrismaClient()
+function hasPendingProductModels(client: PrismaClient) {
+  return Boolean(client.dropiFavoriteProduct && client.pendingSyncRun)
 }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma
+export function getPrismaClient(forceNew = false): PrismaClient {
+  if (
+    !forceNew &&
+    globalStore.prisma &&
+    globalStore.prismaVersion === PRISMA_CLIENT_VERSION &&
+    hasInformeModels(globalStore.prisma) &&
+    hasPendingProductModels(globalStore.prisma)
+  ) {
+    return globalStore.prisma
+  }
+
+  void globalStore.prisma?.$disconnect().catch(() => {})
+
+  const client = createPrismaClient()
+  globalStore.prisma = client
+  globalStore.prismaVersion = PRISMA_CLIENT_VERSION
+  return client
 }
+
+/** Fuerza un cliente nuevo (p. ej. tras `prisma generate` sin reiniciar `pnpm dev`). */
+export function resetPrismaClient(): PrismaClient {
+  return getPrismaClient(true)
+}
+
+/** Siempre delega al singleton actual (evita cliente Prisma obsoleto en dev/HMR). */
+const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient()
+    const value = Reflect.get(client, prop, client) as unknown
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(client)
+      : value
+  },
+})
 
 export default prisma

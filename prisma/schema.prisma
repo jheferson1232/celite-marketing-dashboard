@@ -197,3 +197,65 @@ model ProductCampaign {
   @@index([productId])
   @@map("TikTokProductCampaign")
 }
+
+/** Ejecución manual de sincronización Dropi → SociaVault. */
+model PendingSyncRun {
+  id           String    @id @default(cuid())
+  status       String    @default("running")
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  imported     Int       @default(0)
+  searched     Int       @default(0)
+  matched      Int       @default(0)
+  noMatch      Int       @default(0)
+  errors       Int       @default(0)
+  errorMessage String?
+
+  @@index([startedAt])
+  @@map("PendingSyncRun")
+}
+
+/** Favorito importado desde Dropi (productos pendientes). */
+model DropiFavoriteProduct {
+  id           String   @id @default(cuid())
+  dropiId      String   @unique
+  name         String
+  url          String?
+  imageUrl     String?
+  imageUrls    Json     @default("[]")
+  sku          String?
+  price        Float?
+  status       String   @default("IMPORTED")
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  matches      ProductPendingMatch[]
+
+  @@index([status])
+  @@index([updatedAt])
+  @@map("DropiFavoriteProduct")
+}
+
+/** Resultado de búsqueda SociaVault (campaña Meta o video TikTok). */
+model ProductPendingMatch {
+  id         String               @id @default(cuid())
+  favoriteId String
+  favorite   DropiFavoriteProduct @relation(fields: [favoriteId], references: [id], onDelete: Cascade)
+  matchType  String
+  externalId String?
+  title      String?
+  pageName   String?
+  score      Float                @default(0)
+  previewUrl String?
+  landingUrl String?
+  payload    Json
+  isFavorite Boolean              @default(false)
+  createdAt  DateTime             @default(now())
+
+  @@unique([favoriteId, matchType, externalId])
+  @@index([favoriteId])
+  @@index([favoriteId, isFavorite])
+  @@index([score])
+  @@map("ProductPendingMatch")
+}
