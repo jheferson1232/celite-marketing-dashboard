@@ -130,11 +130,13 @@ function isInstagramReelMatch(match: MatchForRelevanceFilter): boolean {
 export function filterRelevantMatches<T extends MatchForRelevanceFilter>(
   candidates: T[],
   productName: string,
-  imageKeywords: string[] = []
+  imageKeywords: string[] = [],
+  minProductRelevanceOverride?: number
 ): T[] {
   const excludePhrases = getExcludePhrasesForProduct(productName)
   const minProductRelevance =
-    Number(process.env.SOCIAVAULT_MIN_PRODUCT_RELEVANCE) || 0.2
+    minProductRelevanceOverride ??
+    (Number(process.env.SOCIAVAULT_MIN_PRODUCT_RELEVANCE) || 0.2)
 
   return candidates
     .filter((match) => {

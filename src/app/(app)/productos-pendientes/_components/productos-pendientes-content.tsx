@@ -294,6 +294,11 @@ export function ProductosPendientesContent({
     },
   })
 
+  const handleSearchSociaVault = (productId: string) => {
+    if (searchSociaVaultMutation.isPending) return
+    searchSociaVaultMutation.mutate(productId)
+  }
+
   const deleteProductMutation = useMutation({
     mutationFn: (productId: string) =>
       runServerAction(deletePendingProductAction(productId)),
@@ -426,9 +431,7 @@ export function ProductosPendientesContent({
                     deleteProductMutation.isPending &&
                     deleteProductMutation.variables === product.id
                   }
-                  onSearchSociaVault={() =>
-                    searchSociaVaultMutation.mutate(product.id)
-                  }
+                  onSearchSociaVault={() => handleSearchSociaVault(product.id)}
                   onDelete={() => {
                     if (
                       !window.confirm(

@@ -14,12 +14,6 @@ import { parsePendingImageUrls } from "./pending-product-images"
 import { persistPendingMatchCandidatesMedia } from "./persist-pending-match-media"
 import type { PendingProductRecord } from "./types"
 
-const PENDING_TIKTOK_SORT_ROTATION = [
-  "relevance",
-  "most-liked",
-  "create-time",
-] as const
-
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message
   return "Error al buscar en SociaVault"
@@ -44,12 +38,6 @@ export async function searchPendingProductInSociaVault(
   const excludeMatchKeys = [...excluded]
   const hadPreviousResults = previousMatches.length > 0
   const config = getSociaVaultSearchConfig()
-  const tiktokSortBy =
-    excludeMatchKeys.length > 0
-      ? PENDING_TIKTOK_SORT_ROTATION[
-          previousMatches.length % PENDING_TIKTOK_SORT_ROTATION.length
-        ]
-      : "relevance"
 
   await prisma.dropiFavoriteProduct.update({
     where: { id: productId },
@@ -62,11 +50,11 @@ export async function searchPendingProductInSociaVault(
       await searchSociaVaultMatchesWithOutcome({
         name: product.name,
         imageUrls,
-        excludeMatchKeys,
-        tiktokSortBy,
+        searchProfile: "pending",
+        excludeMatchKeys: excludeMatchKeys.length > 0 ? excludeMatchKeys : undefined,
         tiktokParseLimit:
           excludeMatchKeys.length > 0
-            ? config.maxMatchesPerPlatform * 4
+            ? config.maxMatchesPerPlatform * 3
             : undefined,
       })
 

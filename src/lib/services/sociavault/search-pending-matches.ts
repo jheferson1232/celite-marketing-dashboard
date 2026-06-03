@@ -31,6 +31,8 @@ export type SociaVaultProductSearchInput = {
   tiktokSortBy?: string
   /** Cuántos ítems parsear antes de filtrar/excluir. */
   tiktokParseLimit?: number
+  /** Productos pendientes: relevancia más tolerante y un solo sort estable. */
+  searchProfile?: "pending" | "default"
 }
 
 export type SociaVaultSearchOutcome = {
@@ -68,7 +70,10 @@ function scoreText(
   return hits / queryTokens.size
 }
 
-function mergeMatches(candidates: PendingMatchCandidate[]): PendingMatchCandidate[] {
+function mergeMatches(
+  candidates: PendingMatchCandidate[],
+  minScore = 0.15
+): PendingMatchCandidate[] {
   const byKey = new Map<string, PendingMatchCandidate>()
 
   for (const match of candidates) {
@@ -94,7 +99,7 @@ function mergeMatches(candidates: PendingMatchCandidate[]): PendingMatchCandidat
       }
       return match
     })
-    .filter((m) => m.score >= 0.15)
+    .filter((m) => m.score >= minScore)
     .sort((a, b) => b.score - a.score)
 }
 
@@ -122,17 +127,26 @@ function logSociaVaultError(platform: string, query: string, error: unknown) {
 }
 
 function sociavaultErrorMessage(error: unknown): string | null {
-  if (!axios.isAxiosError(error)) return null
-  const data = error.response?.data as
-    | { error?: string; available?: number }
-    | undefined
-  if (data?.error) {
-    if (typeof data.available === "number") {
-      return `${data.error} (disponibles: ${data.available})`
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as
+      | { error?: string; available?: number }
+      | undefined
+    if (data?.error) {
+      if (typeof data.available === "number") {
+        return `${data.error} (disponibles: ${data.available})`
+      }
+      return data.error
     }
-    return data.error
+    const status = error.response?.status
+    if (status) {
+      return `HTTP ${status}: ${error.message}`
+    }
+    return error.message
   }
-  return error.message
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return null
 }
 
 function parseTikTokSearchItems(inner: Record<string, unknown>): unknown[] {
@@ -160,9 +174,14 @@ async function searchTikTokVideos(
       date_posted: "all-time",
       ...(region ? { region } : {}),
     },
+    timeout: 90_000,
   })
 
   const root = asRecord(data) ?? {}
+  if (root.success === false) {
+    const apiError = pickString(root.error) ?? "SociaVault rechazó la búsqueda en TikTok."
+    throw new Error(apiError)
+  }
   const inner = asRecord(root.data) ?? root
   const items = parseTikTokSearchItems(inner)
   if (items.length === 0) return []
@@ -261,10 +280,17 @@ export async function searchSociaVaultMatchesWithOutcome(
   })
   if (queries.length === 0) return { matches: [], warnings }
 
-  const tiktokSortBy = product.tiktokSortBy?.trim() || "relevance"
+  const isPendingProfile = product.searchProfile === "pending"
+  const tiktokSortBy = isPendingProfile
+    ? "relevance"
+    : product.tiktokSortBy?.trim() || "relevance"
   const tiktokParseLimit =
     product.tiktokParseLimit ??
-    (excludeKeys.size > 0 ? config.maxMatchesPerPlatform * 4 : undefined)
+    (excludeKeys.size > 0 ? config.maxMatchesPerPlatform * 3 : undefined)
+  const mergeMinScore = isPendingProfile ? 0.08 : 0.15
+  const minProductRelevance = isPendingProfile
+    ? 0.12
+    : Number(process.env.SOCIAVAULT_MIN_PRODUCT_RELEVANCE) || 0.2
 
   const country =
     process.env.SOCIAVAULT_AD_LIBRARY_COUNTRY?.trim() || "ALL"
@@ -290,14 +316,16 @@ export async function searchSociaVaultMatchesWithOutcome(
       } catch (error) {
         const message = sociavaultErrorMessage(error)
         warnings.push(
-          message ? `TikTok: ${message}` : "TikTok no respondió en esta búsqueda."
+          message
+            ? `TikTok: ${message}`
+            : "TikTok no respondió (revisa créditos, API key o intenta de nuevo en unos segundos)."
         )
         logSociaVaultError("TikTok", query, error)
       }
     }
   }
 
-  const merged = mergeMatches(all)
+  const merged = mergeMatches(all, mergeMinScore)
   const withoutExcluded =
     excludeKeys.size > 0
       ? merged.filter((match) => {
@@ -321,11 +349,20 @@ export async function searchSociaVaultMatchesWithOutcome(
         })
       : merged
 
-  const filtered = filterRelevantMatches(withoutExcluded, name, imageKeywords)
+  const filtered = filterRelevantMatches(
+    withoutExcluded,
+    name,
+    imageKeywords,
+    minProductRelevance
+  )
   const matches = capTikTokMatches(filtered, config.maxMatchesPerPlatform)
 
   if (config.searchTikTok && matches.length === 0 && !warnings.some((w) => /TikTok/i.test(w))) {
-    warnings.push("Sin videos de TikTok para esta consulta.")
+    warnings.push(
+      merged.length > 0
+        ? "TikTok respondió, pero ningún video pasó el filtro de relevancia para este producto."
+        : "Sin videos de TikTok para esta consulta."
+    )
   }
 
   return { matches, warnings }
