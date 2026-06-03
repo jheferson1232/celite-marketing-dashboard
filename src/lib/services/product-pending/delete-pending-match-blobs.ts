@@ -26,10 +26,15 @@ export function blobUrlsFromPendingMatchRow(match: {
 }
 
 export async function deletePendingMatchBlobsForProduct(
-  productId: string
+  productId: string,
+  options?: { keepMatchIds?: string[] }
 ): Promise<void> {
+  const keepIds = options?.keepMatchIds?.filter(Boolean) ?? []
   const matches = await prisma.productPendingMatch.findMany({
-    where: { favoriteId: productId },
+    where: {
+      favoriteId: productId,
+      ...(keepIds.length > 0 ? { id: { notIn: keepIds } } : {}),
+    },
     select: { previewUrl: true, payload: true },
   })
 

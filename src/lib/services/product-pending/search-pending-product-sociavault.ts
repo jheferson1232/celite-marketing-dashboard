@@ -1,12 +1,24 @@
 import type { Prisma } from "@/app/generated/prisma/client"
 import prisma from "@/lib/prisma"
 import { ServerActionError } from "@/lib/server-action"
+import { getSociaVaultSearchConfig } from "@/lib/services/sociavault/sociavault-config"
 import { searchSociaVaultMatchesWithOutcome } from "@/lib/services/sociavault/search-pending-matches"
 import { deletePendingMatchBlobsForProduct } from "./delete-pending-match-blobs"
 import { mapPendingProductRow } from "./map-pending-product"
+import {
+  buildPendingMatchExclusionSet,
+  exclusionTokensFromDbRow,
+  filterNewPendingMatchCandidates,
+} from "./pending-match-exclusion"
 import { parsePendingImageUrls } from "./pending-product-images"
 import { persistPendingMatchCandidatesMedia } from "./persist-pending-match-media"
 import type { PendingProductRecord } from "./types"
+
+const PENDING_TIKTOK_SORT_ROTATION = [
+  "relevance",
+  "most-liked",
+  "create-time",
+] as const
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message
@@ -18,11 +30,26 @@ export async function searchPendingProductInSociaVault(
 ): Promise<PendingProductRecord> {
   const product = await prisma.dropiFavoriteProduct.findUnique({
     where: { id: productId },
+    include: { matches: true },
   })
 
   if (!product) {
     throw new ServerActionError("Producto no encontrado.")
   }
+
+  const previousMatches = product.matches
+  const excluded = buildPendingMatchExclusionSet(
+    previousMatches.map((row) => exclusionTokensFromDbRow(row))
+  )
+  const excludeMatchKeys = [...excluded]
+  const hadPreviousResults = previousMatches.length > 0
+  const config = getSociaVaultSearchConfig()
+  const tiktokSortBy =
+    excludeMatchKeys.length > 0
+      ? PENDING_TIKTOK_SORT_ROTATION[
+          previousMatches.length % PENDING_TIKTOK_SORT_ROTATION.length
+        ]
+      : "relevance"
 
   await prisma.dropiFavoriteProduct.update({
     where: { id: productId },
@@ -35,11 +62,19 @@ export async function searchPendingProductInSociaVault(
       await searchSociaVaultMatchesWithOutcome({
         name: product.name,
         imageUrls,
+        excludeMatchKeys,
+        tiktokSortBy,
+        tiktokParseLimit:
+          excludeMatchKeys.length > 0
+            ? config.maxMatchesPerPlatform * 4
+            : undefined,
       })
+
+    const freshCandidates = filterNewPendingMatchCandidates(rawCandidates, excluded)
 
     const candidates = await persistPendingMatchCandidatesMedia(
       productId,
-      rawCandidates
+      freshCandidates
     )
 
     const notice =
@@ -52,13 +87,28 @@ export async function searchPendingProductInSociaVault(
       /insufficient credits|créditos/i.test(w)
     )
 
-    await deletePendingMatchBlobsForProduct(productId)
+    const baulMatchIds = previousMatches
+      .filter((row) => row.isFavorite)
+      .map((row) => row.id)
+
+    if (baulMatchIds.length > 0) {
+      await deletePendingMatchBlobsForProduct(productId, {
+        keepMatchIds: baulMatchIds,
+      })
+    } else {
+      await deletePendingMatchBlobsForProduct(productId)
+    }
 
     await prisma.productPendingMatch.deleteMany({
-      where: { favoriteId: productId },
+      where: {
+        favoriteId: productId,
+        isFavorite: false,
+      },
     })
 
-    if (candidates.length > 0) {
+    const keptBaulCount = baulMatchIds.length
+
+    if (candidates.length > 0 || keptBaulCount > 0) {
       await prisma.productPendingMatch.createMany({
         data: candidates.map((match, index) => ({
           favoriteId: productId,
@@ -80,12 +130,17 @@ export async function searchPendingProductInSociaVault(
         skipDuplicates: true,
       })
 
+      const noNewVideos =
+        candidates.length === 0 && hadPreviousResults && keptBaulCount > 0
+
       await prisma.dropiFavoriteProduct.update({
         where: { id: productId },
         data: {
           status: "MATCHED",
           lastSyncedAt: new Date(),
-          lastError: notice,
+          lastError: noNewVideos
+            ? "No hay videos nuevos en esta búsqueda. Los del baúl se mantienen en el carrusel."
+            : notice,
         },
       })
     } else {
@@ -96,6 +151,9 @@ export async function searchPendingProductInSociaVault(
           lastSyncedAt: new Date(),
           lastError:
             notice ??
+            (hadPreviousResults
+              ? "No hay videos nuevos; prueba de nuevo más tarde o revisa el nombre del producto."
+              : null) ??
             (outOfCredits
               ? "Sin créditos SociaVault. Recarga en https://sociavault.com/dashboard"
               : null),

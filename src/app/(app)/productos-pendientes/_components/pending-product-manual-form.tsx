@@ -21,10 +21,7 @@ import { runServerAction } from "@/lib/server-action"
 
 export type PendingProductManualFormValues = {
   name: string
-  dropiId: string
-  url: string
   imageUrls: string[]
-  price: string
 }
 
 interface PendingProductManualFormProps {
@@ -43,10 +40,7 @@ export function PendingProductManualForm({
   isPending = false,
 }: PendingProductManualFormProps) {
   const [name, setName] = useState(defaultName)
-  const [dropiId, setDropiId] = useState("")
-  const [url, setUrl] = useState("")
   const [extraImageUrl, setExtraImageUrl] = useState("")
-  const [price, setPrice] = useState("")
   const [localImages, setLocalImages] = useState<LocalMediaItem[]>([])
   const [existingImages, setExistingImages] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
@@ -55,10 +49,7 @@ export function PendingProductManualForm({
   useEffect(() => {
     if (!open) return
     setName(defaultName)
-    setDropiId("")
-    setUrl("")
     setExtraImageUrl("")
-    setPrice("")
     setLocalImages([])
     setExistingImages([])
     setFormError(null)
@@ -90,10 +81,7 @@ export function PendingProductManualForm({
 
       await onSubmit({
         name: name.trim(),
-        dropiId: dropiId.trim(),
-        url: url.trim(),
         imageUrls,
-        price: price.trim(),
       })
 
       for (const item of localImages) {
@@ -141,50 +129,6 @@ export function PendingProductManualForm({
               disabled={busy}
               required
             />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="manual-dropi-id" className="text-sm font-medium">
-              Referencia (opcional)
-            </label>
-            <Input
-              id="manual-dropi-id"
-              value={dropiId}
-              onChange={(e) => setDropiId(e.target.value)}
-              placeholder="Se genera automático si está vacío"
-              disabled={busy}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label htmlFor="manual-price" className="text-sm font-medium">
-                Precio (opcional)
-              </label>
-              <Input
-                id="manual-price"
-                type="number"
-                min={0}
-                step="any"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="125000"
-                disabled={busy}
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <label htmlFor="manual-url" className="text-sm font-medium">
-                URL producto (opcional)
-              </label>
-              <Input
-                id="manual-url"
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://..."
-                disabled={busy}
-              />
-            </div>
           </div>
 
           <div className="space-y-2">

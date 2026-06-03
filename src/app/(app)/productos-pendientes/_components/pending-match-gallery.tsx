@@ -175,6 +175,10 @@ function TikTokMatchCard({
   const caption = info.bodyText ?? info.title ?? "Sin descripción"
   const author = info.pageName ?? info.authorHandle ?? "TikTok"
   const matchPercent = Math.round(info.score * 100)
+  const inBaul =
+    match.isFavorite ||
+    (typeof match.payload.baulCreativeId === "string" &&
+      match.payload.baulCreativeId.length > 0)
 
   return (
     <article
@@ -221,6 +225,12 @@ function TikTokMatchCard({
         <span className="absolute right-2 top-2 z-20 rounded-md bg-violet-600 px-2 py-0.5 text-xs font-bold text-white shadow">
           #{rank}
         </span>
+
+        {inBaul ? (
+          <span className="absolute left-2 top-11 z-20 rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow">
+            En el baúl
+          </span>
+        ) : null}
 
         <button
           type="button"
@@ -460,7 +470,8 @@ export function PendingMatchGallery({
         <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
           El carrusel usa todo el ancho disponible (2–6 videos según pantalla). Desplázate
           para ver más. La estrella añade al{" "}
-          <span className="text-foreground">baúl</span> y vincula variantes.
+          <span className="text-foreground">baúl</span> y vincula variantes. Al buscar de
+          nuevo se muestran videos distintos; los del baúl permanecen marcados.
         </p>
       </div>
 

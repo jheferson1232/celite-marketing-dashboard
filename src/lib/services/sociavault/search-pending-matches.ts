@@ -25,6 +25,12 @@ export type PendingMatchCandidate = {
 export type SociaVaultProductSearchInput = {
   name: string
   imageUrls?: string[]
+  /** Tokens de exclusión (ids/urls) para no repetir videos ya mostrados. */
+  excludeMatchKeys?: string[]
+  /** Orden TikTok distinto en re-búsquedas (p. ej. most-liked). */
+  tiktokSortBy?: string
+  /** Cuántos ítems parsear antes de filtrar/excluir. */
+  tiktokParseLimit?: number
 }
 
 export type SociaVaultSearchOutcome = {
@@ -142,13 +148,15 @@ function parseTikTokSearchItems(inner: Record<string, unknown>): unknown[] {
 async function searchTikTokVideos(
   query: string,
   region: string | undefined,
-  maxResults: number
+  maxResults: number,
+  options?: { sortBy?: string; parseLimit?: number }
 ): Promise<PendingMatchCandidate[]> {
   const client = getSociaVaultClient()
+  const sortBy = options?.sortBy?.trim() || "relevance"
   const { data } = await client.get("/v1/scrape/tiktok/search/keyword", {
     params: {
       query,
-      sort_by: "relevance",
+      sort_by: sortBy,
       date_posted: "all-time",
       ...(region ? { region } : {}),
     },
@@ -161,7 +169,14 @@ async function searchTikTokVideos(
 
   const matches: PendingMatchCandidate[] = []
 
-  const parseLimit = Math.min(50, Math.max(maxResults, maxResults * 2))
+  const parseLimit = Math.min(
+    50,
+    Math.max(
+      maxResults,
+      maxResults * 2,
+      options?.parseLimit ?? 0
+    )
+  )
   for (const item of items.slice(0, parseLimit)) {
     const row = asRecord(item)
     if (!row) continue
@@ -237,11 +252,19 @@ export async function searchSociaVaultMatchesWithOutcome(
   }
 
   const config = getSociaVaultSearchConfig()
+  const excludeKeys = new Set(
+    (product.excludeMatchKeys ?? []).map((key) => key.trim()).filter(Boolean)
+  )
   const { queries, imageKeywords } = await resolveSociaVaultSearchQueries({
     name,
     imageUrls: product.imageUrls,
   })
   if (queries.length === 0) return { matches: [], warnings }
+
+  const tiktokSortBy = product.tiktokSortBy?.trim() || "relevance"
+  const tiktokParseLimit =
+    product.tiktokParseLimit ??
+    (excludeKeys.size > 0 ? config.maxMatchesPerPlatform * 4 : undefined)
 
   const country =
     process.env.SOCIAVAULT_AD_LIBRARY_COUNTRY?.trim() || "ALL"
@@ -257,7 +280,11 @@ export async function searchSociaVaultMatchesWithOutcome(
         const tiktokMatches = await searchTikTokVideos(
           query,
           tiktokRegion,
-          config.maxMatchesPerPlatform
+          config.maxMatchesPerPlatform,
+          {
+            sortBy: tiktokSortBy,
+            parseLimit: tiktokParseLimit,
+          }
         )
         all.push(...tiktokMatches)
       } catch (error) {
@@ -270,7 +297,31 @@ export async function searchSociaVaultMatchesWithOutcome(
     }
   }
 
-  const filtered = filterRelevantMatches(mergeMatches(all), name, imageKeywords)
+  const merged = mergeMatches(all)
+  const withoutExcluded =
+    excludeKeys.size > 0
+      ? merged.filter((match) => {
+          const key = `${match.platform}:${match.externalId ?? match.landingUrl ?? match.title ?? ""}`
+          if (excludeKeys.has(key)) return false
+          if (match.externalId) {
+            if (excludeKeys.has(`id:${match.externalId.toLowerCase()}`)) return false
+            if (excludeKeys.has(`${match.platform}:id:${match.externalId.toLowerCase()}`)) {
+              return false
+            }
+          }
+          if (match.landingUrl && excludeKeys.has(`url:${match.landingUrl.toLowerCase()}`)) {
+            return false
+          }
+          const videoUrl =
+            typeof match.payload.videoUrl === "string" ? match.payload.videoUrl : null
+          if (videoUrl && excludeKeys.has(`video:${videoUrl.toLowerCase()}`)) {
+            return false
+          }
+          return true
+        })
+      : merged
+
+  const filtered = filterRelevantMatches(withoutExcluded, name, imageKeywords)
   const matches = capTikTokMatches(filtered, config.maxMatchesPerPlatform)
 
   if (config.searchTikTok && matches.length === 0 && !warnings.some((w) => /TikTok/i.test(w))) {

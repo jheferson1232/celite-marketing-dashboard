@@ -273,22 +273,11 @@ export function ProductosPendientesContent({
   })
 
   const addManualMutation = useMutation({
-    mutationFn: async (values: {
-      name: string
-      dropiId: string
-      url: string
-      imageUrls: string[]
-      price: string
-    }) => {
-      const priceNum = values.price ? Number.parseFloat(values.price) : undefined
+    mutationFn: async (values: { name: string; imageUrls: string[] }) => {
       return runServerAction(
         addManualPendingProductAction({
           name: values.name,
-          dropiId: values.dropiId || undefined,
-          url: values.url || undefined,
           imageUrls: values.imageUrls,
-          price:
-            priceNum != null && Number.isFinite(priceNum) ? priceNum : undefined,
         })
       )
     },
