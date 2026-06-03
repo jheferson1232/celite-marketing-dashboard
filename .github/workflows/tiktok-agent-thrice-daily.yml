@@ -1,0 +1,64 @@
+# Agente TikTok: 8:00 / 14:00 / 20:00 America/Lima (13:00 / 19:00 / 01:00 UTC).
+# Requiere secret CRON_SECRET (mismo valor que en Vercel).
+
+name: TikTok agent 3x daily
+
+on:
+  schedule:
+    - cron: "0 13 * * *"
+    - cron: "0 19 * * *"
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      trigger:
+        description: "Trigger (morning_8am | afternoon_2pm | evening_8pm)"
+        required: true
+        default: morning_8am
+      dry_run:
+        description: "Dry run (1 = sí)"
+        required: false
+        default: "0"
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Llamar cron agente TikTok
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.META_CRON_APP_URL }}
+          GH_TRIGGER: ${{ github.event.schedule }}
+          INPUT_TRIGGER: ${{ github.event.inputs.trigger }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta CRON_SECRET en GitHub Actions"
+            exit 1
+          fi
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
+          BASE="${BASE%/}"
+
+          TRIGGER="${INPUT_TRIGGER:-morning_8am}"
+          case "$GH_TRIGGER" in
+            "0 13 * * *") TRIGGER="morning_8am" ;;
+            "0 19 * * *") TRIGGER="afternoon_2pm" ;;
+            "0 1 * * *") TRIGGER="evening_8pm" ;;
+          esac
+
+          DRY="${INPUT_DRY:-0}"
+          QS="trigger=${TRIGGER}"
+          if [ "$DRY" = "1" ]; then QS="${QS}&dryRun=1"; fi
+
+          URL="${BASE}/api/cron/tiktok-agent?${QS}"
+          echo "GET ${URL}"
+          HTTP_CODE=$(curl -sS --retry 2 --retry-delay 5 --max-time 300 \
+            -o /tmp/tiktok-agent-cron.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/tiktok-agent-cron.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            exit 1
+          fi

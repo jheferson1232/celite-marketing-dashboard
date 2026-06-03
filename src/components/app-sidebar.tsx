@@ -11,6 +11,7 @@ import {
   RiMegaphoneLine,
   RiMetaLine,
   RiTiktokLine,
+  RiRobotLine,
 } from "@remixicon/react"
 import {
   Sidebar,
@@ -49,6 +50,12 @@ const navItems = [
     title: "TikTok",
     href: "/tiktok",
     icon: RiTiktokLine,
+  },
+  {
+    id: "tiktok-agente",
+    title: "TikTok Agente",
+    href: "/tiktok/agente",
+    icon: RiRobotLine,
   },
   {
     id: "campaigns",
@@ -117,9 +124,13 @@ export function AppSidebar() {
                           ? pathname === "/informe-ia" ||
                             pathname.startsWith("/informe-ia/")
                           : item.id === "tiktok"
-                            ? pathname === "/tiktok" ||
-                              pathname.startsWith("/tiktok/")
-                            : item.id === "campaigns"
+                            ? (pathname === "/tiktok" ||
+                                pathname.startsWith("/tiktok/")) &&
+                              !pathname.startsWith("/tiktok/agente")
+                            : item.id === "tiktok-agente"
+                              ? pathname === "/tiktok/agente" ||
+                                pathname.startsWith("/tiktok/agente/")
+                              : item.id === "campaigns"
                               ? pathname === "/campaigns" ||
                                 pathname.startsWith("/campaigns/")
                             : item.id === "products"

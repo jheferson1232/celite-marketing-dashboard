@@ -1,8 +1,8 @@
 import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
-/** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev. */
-const PRISMA_CLIENT_VERSION = 2
+/** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev/serverless. */
+const PRISMA_CLIENT_VERSION = 3
 
 type GlobalPrismaStore = {
   prisma?: PrismaClient
@@ -30,13 +30,18 @@ function hasPendingProductModels(client: PrismaClient) {
   return Boolean(client.dropiFavoriteProduct && client.pendingSyncRun)
 }
 
+function hasTikTokAgentModels(client: PrismaClient) {
+  return Boolean(client.tikTokAgentSettings && client.tikTokAgentRun)
+}
+
 export function getPrismaClient(forceNew = false): PrismaClient {
   if (
     !forceNew &&
     globalStore.prisma &&
     globalStore.prismaVersion === PRISMA_CLIENT_VERSION &&
     hasInformeModels(globalStore.prisma) &&
-    hasPendingProductModels(globalStore.prisma)
+    hasPendingProductModels(globalStore.prisma) &&
+    hasTikTokAgentModels(globalStore.prisma)
   ) {
     return globalStore.prisma
   }

@@ -259,3 +259,35 @@ model ProductPendingMatch {
   @@index([score])
   @@map("ProductPendingMatch")
 }
+
+/** Umbrales del agente automático TikTok (singleton id=default). */
+model TikTokAgentSettings {
+  id               String   @id @default("default")
+  adsetPauseSpendPen    Float @default(10)
+  campaignPauseSpendPen Float @default(30)
+  adsetCpaCriticoPen    Float @default(15)
+  telegramNotify        Boolean @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@map("TikTokAgentSettings")
+}
+
+/** Corrida del agente TikTok (cron o manual). */
+model TikTokAgentRun {
+  id               String    @id @default(cuid())
+  trigger          String
+  status           String    @default("running")
+  dryRun           Boolean   @default(false)
+  startedAt        DateTime  @default(now())
+  finishedAt       DateTime?
+  accountsScanned  Int       @default(1)
+  campaignsScanned Int       @default(0)
+  adgroupsScanned  Int       @default(0)
+  actionsCount     Int       @default(0)
+  summary          String?
+  errorMessage     String?
+  actions          Json      @default("[]")
+
+  @@index([startedAt])
+  @@map("TikTokAgentRun")
+}
