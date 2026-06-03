@@ -96,6 +96,7 @@ export function parseMatchDisplay(
       coverUrl:
         match.previewUrl ??
         pickString(payload.coverUrl) ??
+        pickString(payload.sourceCoverUrl) ??
         extractTikTokCoverUrl(video) ??
         pickString(payload.cover, payload.cover_url),
       videoUrl:

@@ -49,28 +49,32 @@ export async function persistPendingMatchCandidateMedia(
       : Promise.resolve(null),
   ])
 
-  if (!storedCover && !storedVideo) {
-    return match
-  }
-
   const storedAt = new Date().toISOString()
   const nextPayload: Record<string, unknown> = {
     ...payload,
     mediaStoredAt: storedAt,
   }
 
-  if (sourceCover && storedCover) {
+  if (sourceCover) {
     nextPayload.sourceCoverUrl = sourceCover
-    nextPayload.coverUrl = storedCover
+    if (storedCover) {
+      nextPayload.coverUrl = storedCover
+    }
   }
-  if (sourceVideo && storedVideo) {
+  if (sourceVideo) {
     nextPayload.sourceVideoUrl = sourceVideo
-    nextPayload.videoUrl = storedVideo
+    if (storedVideo) {
+      nextPayload.videoUrl = storedVideo
+    }
+  }
+
+  if (!storedCover && !storedVideo && !sourceCover && !sourceVideo) {
+    return match
   }
 
   return {
     ...match,
-    previewUrl: storedCover ?? match.previewUrl,
+    previewUrl: storedCover ?? match.previewUrl ?? sourceCover ?? null,
     payload: nextPayload,
   }
 }

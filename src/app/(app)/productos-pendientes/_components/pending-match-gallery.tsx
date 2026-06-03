@@ -27,6 +27,7 @@ import {
   formatMatchPlayCount,
   parseMatchDisplay,
 } from "@/lib/services/product-pending/parse-match-display"
+import { resolvePendingMatchCoverUrl } from "@/lib/services/product-pending/resolve-pending-match-cover-url"
 import {
   deletePendingMatchAction,
   favoritePendingMatchToBaulAction,
@@ -169,6 +170,7 @@ function TikTokMatchCard({
   onDelete: () => void
 }) {
   const info = parseMatchDisplay(match)
+  const coverSrc = resolvePendingMatchCoverUrl(info.coverUrl)
   const plays = formatMatchPlayCount(info)
   const likes = formatMatchLikeCount(info)
   const comments = formatMatchCommentCount(info)
@@ -190,7 +192,7 @@ function TikTokMatchCard({
     >
       <div className="relative aspect-[9/16] w-full bg-zinc-900">
         <TikTokVideoMedia
-          coverUrl={info.coverUrl}
+          coverUrl={coverSrc}
           videoUrl={info.videoUrl}
           isPlaying={isPlaying}
           onTogglePlay={onTogglePlay}
