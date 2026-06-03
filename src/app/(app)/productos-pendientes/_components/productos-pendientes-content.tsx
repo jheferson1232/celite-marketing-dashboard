@@ -241,7 +241,11 @@ function PendingProductRow({
               </div>
             ) : null}
             {product.matches.length > 0 ? (
-              <PendingMatchGallery title="Videos (TikTok)" items={tiktokVideos} />
+              <PendingMatchGallery
+                productId={product.id}
+                title="Videos (TikTok)"
+                items={tiktokVideos}
+              />
             ) : (
               <p className="text-muted-foreground text-sm">
                 Sin coincidencias todavía. Usa Buscar videos.

@@ -47,22 +47,29 @@ export function BaulContent() {
   }
 
   const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const uploaded = await uploadCreativeFileClient(file)
+    mutationFn: async (files: File[]) => {
+      const created: CreativeRecord[] = []
 
-      const created = await runServerAction(
-        createCreativeAction({
-          url: uploaded.url,
-          type: uploaded.type,
-        })
-      )
-      if (!created) throw new Error("No se pudo crear el creative")
+      for (const file of files) {
+        const uploaded = await uploadCreativeFileClient(file)
+        const record = await runServerAction(
+          createCreativeAction({
+            url: uploaded.url,
+            type: uploaded.type,
+          })
+        )
+        if (!record) throw new Error("No se pudo crear el creative")
+        created.push(record)
+      }
+
       return created
     },
     onSuccess: (created) => {
       invalidate()
-      setSelectedCreative(created)
-      setEditOpen(true)
+      if (created.length === 1) {
+        setSelectedCreative(created[0]!)
+        setEditOpen(true)
+      }
     },
   })
 
@@ -112,13 +119,20 @@ export function BaulContent() {
           <h1 className="text-2xl font-semibold tracking-tight">Baúl</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Biblioteca centralizada de imágenes y videos reutilizables entre productos.
+            Puedes subir varios archivos a la vez.
           </p>
         </div>
 
         <CreativeUploadField
           disabled={uploadMutation.isPending}
+          multiple
+          label="Subir archivos"
+          uploadingLabel="Subiendo…"
           onUpload={async (file) => {
-            await uploadMutation.mutateAsync(file)
+            await uploadMutation.mutateAsync([file])
+          }}
+          onUploadMany={async (files) => {
+            await uploadMutation.mutateAsync(files)
           }}
         />
       </div>
@@ -136,7 +150,7 @@ export function BaulContent() {
       ) : creatives.length === 0 ? (
         <div className="rounded-xl border border-dashed px-6 py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            Aún no hay creatives. Sube el primero con el botón de arriba.
+            Aún no hay creatives. Sube imágenes o videos con el botón de arriba.
           </p>
         </div>
       ) : (

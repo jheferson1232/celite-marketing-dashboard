@@ -1,8 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { RiArchiveLine, RiCheckLine, RiLoader4Line } from "@remixicon/react"
 import {
   Dialog,
@@ -17,7 +16,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
 import type { CreativeRecord } from "@/lib/services/creative"
+import { uploadCreativeFileClient } from "@/lib/services/blob/creative-client-upload"
 import { CreativeCard } from "@/app/(app)/baul/_components/creative-card"
+import { CreativeUploadField } from "@/app/(app)/baul/_components/creative-upload-field"
+import { createCreativeAction } from "@/app/(app)/baul/_actions/creatives"
 import { listCreativesAction } from "../../_actions/creatives"
 
 interface VariantCreativePickerDialogProps {
@@ -28,6 +30,20 @@ interface VariantCreativePickerDialogProps {
   isPending?: boolean
 }
 
+async function uploadCreativeFile(file: File): Promise<CreativeRecord> {
+  const uploaded = await uploadCreativeFileClient(file)
+  const created = await runServerAction(
+    createCreativeAction({
+      url: uploaded.url,
+      type: uploaded.type,
+    })
+  )
+  if (!created) {
+    throw new Error("No se pudo registrar el creative en el baúl.")
+  }
+  return created
+}
+
 export function VariantCreativePickerDialog({
   open,
   onOpenChange,
@@ -35,20 +51,58 @@ export function VariantCreativePickerDialog({
   onConfirm,
   isPending = false,
 }: VariantCreativePickerDialogProps) {
+  const queryClient = useQueryClient()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
-  const { data: creatives = [], isLoading, isError, error: queryError } = useQuery({
+  const {
+    data: creatives = [],
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["creatives"],
     queryFn: () => runServerAction(listCreativesAction()),
     staleTime: 30 * 1000,
     enabled: open,
   })
 
+  const uploadMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const created: CreativeRecord[] = []
+      for (const file of files) {
+        created.push(await uploadCreativeFile(file))
+      }
+      return created
+    },
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ["creatives"] })
+      setSelectedIds((current) => {
+        const next = new Set(current)
+        for (const creative of created) {
+          if (!assignedCreativeIds.has(creative.id)) {
+            next.add(creative.id)
+          }
+        }
+        return next
+      })
+      setError(null)
+    },
+    onError: (uploadError) => {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "No se pudo subir el archivo."
+      )
+    },
+  })
+
   const availableCreatives = useMemo(
     () => creatives.filter((creative) => !assignedCreativeIds.has(creative.id)),
     [creatives, assignedCreativeIds]
   )
+
+  const busy = isPending || uploadMutation.isPending
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +120,7 @@ export function VariantCreativePickerDialog({
   }
 
   const handleConfirm = async () => {
-    if (selectedIds.size === 0 || isPending) return
+    if (selectedIds.size === 0 || busy) return
 
     setError(null)
     const attachError = await onConfirm([...selectedIds])
@@ -79,17 +133,13 @@ export function VariantCreativePickerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={isPending ? undefined : onOpenChange}>
+    <Dialog open={open} onOpenChange={busy ? undefined : onOpenChange}>
       <DialogContent className="flex max-h-[min(90vh,800px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>Añadir creativos</DialogTitle>
           <DialogDescription>
-            Elige imágenes o videos ya subidos en el Baúl. Los nuevos archivos se
-            suben desde{" "}
-            <Link href="/baul" className="font-medium text-foreground underline-offset-4 hover:underline">
-              Baúl
-            </Link>
-            .
+            Sube archivos nuevos o elige imágenes y videos que ya estén en el baúl.
+            Los seleccionados se vincularán a esta variante al confirmar.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,12 +162,9 @@ export function VariantCreativePickerDialog({
               <p className="text-sm font-medium">No hay creativos disponibles</p>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {creatives.length === 0
-                  ? "Sube el primero en el Baúl para poder asociarlo a esta variante."
-                  : "Todos los creativos del Baúl ya están vinculados a esta variante."}
+                  ? "Sube el primero con el botón de abajo."
+                  : "Todos los creativos del baúl ya están vinculados a esta variante. Sube uno nuevo."}
               </p>
-              <Button type="button" variant="outline" className="mt-4" asChild>
-                <Link href="/baul">Ir al Baúl</Link>
-              </Button>
             </div>
           ) : (
             <div className="grid min-w-0 grid-cols-4 gap-2">
@@ -147,31 +194,47 @@ export function VariantCreativePickerDialog({
           <p className="shrink-0 px-6 pb-2 text-sm text-destructive">{error}</p>
         ) : null}
 
-        <DialogFooter className="shrink-0 border-t px-6 py-4">
-          <Button
-            type="button"
+        <DialogFooter className="shrink-0 flex-col gap-3 border-t px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <CreativeUploadField
+            disabled={busy}
+            multiple
             variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isPending}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleConfirm()}
-            disabled={isPending || selectedIds.size === 0 || availableCreatives.length === 0}
-          >
-            {isPending ? (
-              <>
-                <RiLoader4Line className="size-4 animate-spin" />
-                Vinculando…
-              </>
-            ) : selectedIds.size > 0 ? (
-              `Añadir ${selectedIds.size} creativo${selectedIds.size === 1 ? "" : "s"}`
-            ) : (
-              "Añadir creativos"
-            )}
-          </Button>
+            label="Subir archivos"
+            uploadingLabel="Subiendo…"
+            onUpload={async (file) => {
+              await uploadMutation.mutateAsync([file])
+            }}
+            onUploadMany={async (files) => {
+              await uploadMutation.mutateAsync(files)
+            }}
+          />
+
+          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={busy || selectedIds.size === 0}
+            >
+              {isPending ? (
+                <>
+                  <RiLoader4Line className="size-4 animate-spin" />
+                  Vinculando…
+                </>
+              ) : selectedIds.size > 0 ? (
+                `Añadir ${selectedIds.size} creativo${selectedIds.size === 1 ? "" : "s"}`
+              ) : (
+                "Añadir creativos"
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

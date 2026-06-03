@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { proxiedInstagramMediaUrl } from "@/lib/instagram-media-url"
+import { isVercelBlobUrl } from "@/lib/services/blob/persist-remote-media"
 import {
   fetchInstagramReelMedia,
   instagramReelUrl,
   SociaVaultInsufficientCreditsError,
 } from "@/lib/services/sociavault/instagram-reel-media"
+import { persistInstagramReelMedia } from "@/lib/services/sociavault/persist-instagram-reel-media"
 
 const SHORTCODE_RE = /^[A-Za-z0-9_-]{5,32}$/
 
@@ -44,12 +46,25 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const stored = await persistInstagramReelMedia(media)
+
+  const coverUrl = stored.coverUrl
+    ? isVercelBlobUrl(stored.coverUrl)
+      ? stored.coverUrl
+      : proxiedInstagramMediaUrl(stored.coverUrl)
+    : null
+  const videoUrl = stored.videoUrl
+    ? isVercelBlobUrl(stored.videoUrl)
+      ? stored.videoUrl
+      : proxiedInstagramMediaUrl(stored.videoUrl)
+    : null
+
   return NextResponse.json({
-    shortcode: media.shortcode ?? shortcode,
-    pageName: media.pageName,
-    coverUrl: proxiedInstagramMediaUrl(media.coverUrl),
-    videoUrl: proxiedInstagramMediaUrl(media.videoUrl),
-    caption: media.caption,
-    playCount: media.playCount,
+    shortcode: stored.shortcode ?? shortcode,
+    pageName: stored.pageName,
+    coverUrl,
+    videoUrl,
+    caption: stored.caption,
+    playCount: stored.playCount,
   })
 }

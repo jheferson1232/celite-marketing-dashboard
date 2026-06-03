@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { ServerActionError } from "@/lib/server-action"
+import { deletePendingMatchBlobs } from "./delete-pending-match-blobs"
 
 export async function deletePendingMatch(matchId: string): Promise<{ id: string }> {
   const match = await prisma.productPendingMatch.findUnique({
@@ -11,6 +12,7 @@ export async function deletePendingMatch(matchId: string): Promise<{ id: string 
     throw new ServerActionError("Video no encontrado.")
   }
 
+  await deletePendingMatchBlobs(matchId)
   await prisma.productPendingMatch.delete({ where: { id: matchId } })
 
   const remaining = await prisma.productPendingMatch.count({

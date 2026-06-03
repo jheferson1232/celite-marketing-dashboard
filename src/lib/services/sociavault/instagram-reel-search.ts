@@ -4,6 +4,7 @@ import {
   fetchInstagramReelMedia,
   instagramReelUrl,
 } from "./instagram-reel-media"
+import { persistInstagramReelMedia } from "./persist-instagram-reel-media"
 import {
   asRecord,
   pickString,
@@ -61,7 +62,8 @@ async function enrichReelFromPostInfo(
   const media = await fetchInstagramReelMedia(url, candidate.externalId)
   if (!media) return candidate
 
-  return applyReelMedia(candidate, media)
+  const stored = await persistInstagramReelMedia(media)
+  return applyReelMedia(candidate, stored)
 }
 
 /** Busca reels públicos por keyword vía Google (1 crédito). Opcional: enriquecer con post-info. */

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import type { QueryClient } from "@tanstack/react-query"
 import {
   RiChat3Line,
   RiDeleteBinLine,
@@ -16,7 +17,10 @@ import {
 } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
-import type { PendingProductMatchRecord } from "@/lib/services/product-pending/types"
+import type {
+  PendingProductMatchRecord,
+  PendingProductRecord,
+} from "@/lib/services/product-pending/types"
 import {
   formatMatchCommentCount,
   formatMatchLikeCount,
@@ -25,8 +29,52 @@ import {
 } from "@/lib/services/product-pending/parse-match-display"
 import {
   deletePendingMatchAction,
+  favoritePendingMatchToBaulAction,
   togglePendingMatchFavoriteAction,
 } from "../_actions/pending-products"
+import { PendingMatchBaulDialog } from "./pending-match-baul-dialog"
+
+const CARD_WIDTH_PX = 220
+const CARD_GAP_PX = 16
+const VISIBLE_CARDS = 6
+const GALLERY_VIEWPORT_WIDTH_PX =
+  CARD_WIDTH_PX * VISIBLE_CARDS + CARD_GAP_PX * (VISIBLE_CARDS - 1)
+
+const PENDING_PRODUCTS_QUERY_KEY = ["pending-products"] as const
+
+type GalleryMutationContext = {
+  previous: PendingProductRecord[] | undefined
+  scrollLeft: number
+}
+
+function updateProductMatchesInCache(
+  queryClient: QueryClient,
+  productId: string,
+  updater: (matches: PendingProductMatchRecord[]) => PendingProductMatchRecord[]
+) {
+  queryClient.setQueryData<PendingProductRecord[]>(
+    PENDING_PRODUCTS_QUERY_KEY,
+    (current) => {
+      if (!current) return current
+      return current.map((product) =>
+        product.id === productId
+          ? { ...product, matches: updater(product.matches) }
+          : product
+      )
+    }
+  )
+}
+
+function restoreGalleryScroll(
+  scrollRef: React.RefObject<HTMLDivElement | null>,
+  scrollLeft: number
+) {
+  requestAnimationFrame(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollLeft
+    }
+  })
+}
 
 function TikTokVideoMedia({
   coverUrl,
@@ -131,7 +179,12 @@ function TikTokMatchCard({
   const matchPercent = Math.round(info.score * 100)
 
   return (
-    <article className="group flex w-[220px] shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-950 text-zinc-100 shadow-md transition-shadow hover:shadow-lg hover:shadow-violet-950/20">
+    <article
+      className={cn(
+        "group flex w-[220px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-950 text-zinc-100 shadow-md transition-shadow hover:shadow-lg hover:shadow-violet-950/20",
+        isDeletePending && "pointer-events-none opacity-40"
+      )}
+    >
       <div className="relative aspect-[9/16] w-full bg-zinc-900">
         <TikTokVideoMedia
           coverUrl={info.coverUrl}
@@ -142,7 +195,11 @@ function TikTokMatchCard({
 
         <button
           type="button"
-          title={match.isFavorite ? "Quitar de favoritos" : "Marcar favorito"}
+          title={
+            match.isFavorite
+              ? "Quitar de favoritos"
+              : "Añadir al baúl y marcar favorito"
+          }
           disabled={isFavoritePending}
           onClick={(e) => {
             e.stopPropagation()
@@ -240,38 +297,109 @@ function TikTokMatchCard({
 }
 
 export function PendingMatchGallery({
+  productId,
   title,
   items,
 }: {
+  productId: string
   title: string
   items: PendingProductMatchRecord[]
 }) {
   const queryClient = useQueryClient()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [favoritePendingId, setFavoritePendingId] = useState<string | null>(null)
   const [deletePendingId, setDeletePendingId] = useState<string | null>(null)
+  const [baulDialogMatch, setBaulDialogMatch] =
+    useState<PendingProductMatchRecord | null>(null)
 
-  const invalidateProducts = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["pending-products"] })
+  const beginGalleryMutation = useCallback(async (): Promise<GalleryMutationContext> => {
+    const scrollLeft = scrollRef.current?.scrollLeft ?? 0
+    await queryClient.cancelQueries({ queryKey: PENDING_PRODUCTS_QUERY_KEY })
+    const previous = queryClient.getQueryData<PendingProductRecord[]>(
+      PENDING_PRODUCTS_QUERY_KEY
+    )
+    return { previous, scrollLeft }
   }, [queryClient])
 
-  const favoriteMutation = useMutation({
+  const finishGalleryMutation = useCallback(
+    (context: GalleryMutationContext | undefined) => {
+      restoreGalleryScroll(scrollRef, context?.scrollLeft ?? 0)
+      void queryClient.invalidateQueries({ queryKey: PENDING_PRODUCTS_QUERY_KEY })
+      void queryClient.invalidateQueries({ queryKey: ["creatives"] })
+    },
+    [queryClient]
+  )
+
+  const unfavoriteMutation = useMutation({
     mutationFn: (matchId: string) =>
       runServerAction(togglePendingMatchFavoriteAction(matchId)),
-    onMutate: (matchId) => setFavoritePendingId(matchId),
-    onSuccess: invalidateProducts,
-    onSettled: () => setFavoritePendingId(null),
+    onMutate: async (matchId) => {
+      setFavoritePendingId(matchId)
+      const context = await beginGalleryMutation()
+      updateProductMatchesInCache(queryClient, productId, (matches) =>
+        matches.map((match) =>
+          match.id === matchId ? { ...match, isFavorite: false } : match
+        )
+      )
+      return context
+    },
+    onError: (_error, _matchId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PENDING_PRODUCTS_QUERY_KEY, context.previous)
+      }
+    },
+    onSettled: (_data, _error, _matchId, context) => {
+      setFavoritePendingId(null)
+      finishGalleryMutation(context)
+    },
+  })
+
+  const favoriteToBaulMutation = useMutation({
+    mutationFn: (input: { matchId: string; variantIds: string[] }) =>
+      runServerAction(favoritePendingMatchToBaulAction(input)),
+    onMutate: async ({ matchId }) => {
+      setFavoritePendingId(matchId)
+      const context = await beginGalleryMutation()
+      updateProductMatchesInCache(queryClient, productId, (matches) =>
+        matches.map((match) =>
+          match.id === matchId ? { ...match, isFavorite: true } : match
+        )
+      )
+      return context
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PENDING_PRODUCTS_QUERY_KEY, context.previous)
+      }
+    },
+    onSettled: (_data, _error, _input, context) => {
+      setFavoritePendingId(null)
+      finishGalleryMutation(context)
+    },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (matchId: string) =>
       runServerAction(deletePendingMatchAction(matchId)),
-    onMutate: (matchId) => {
+    onMutate: async (matchId) => {
       setDeletePendingId(matchId)
       if (playingId === matchId) setPlayingId(null)
+      const context = await beginGalleryMutation()
+      updateProductMatchesInCache(queryClient, productId, (matches) =>
+        matches.filter((match) => match.id !== matchId)
+      )
+      return context
     },
-    onSuccess: invalidateProducts,
-    onSettled: () => setDeletePendingId(null),
+    onError: (_error, _matchId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(PENDING_PRODUCTS_QUERY_KEY, context.previous)
+      }
+    },
+    onSettled: (_data, _error, _matchId, context) => {
+      setDeletePendingId(null)
+      finishGalleryMutation(context)
+    },
   })
 
   const handleTogglePlay = useCallback(
@@ -331,14 +459,17 @@ export function PendingMatchGallery({
           </span>
         </p>
         <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
-          Haz clic en la miniatura para reproducir el video en la tarjeta. Usa{" "}
-          <span className="text-foreground">Ver en TikTok</span> para abrirlo en
-          la app o <span className="text-foreground">Descargar</span> para
-          guardar el archivo.
+          Se muestran {VISIBLE_CARDS} videos a la vez; desplázate horizontalmente para ver más.
+          La estrella añade al{" "}
+          <span className="text-foreground">baúl</span> y vincula variantes.
         </p>
       </div>
 
-      <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-gutter:stable]">
+      <div
+        ref={scrollRef}
+        className="min-h-[32rem] w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain scroll-smooth pb-2 [scrollbar-gutter:stable] snap-x snap-mandatory"
+        style={{ maxWidth: GALLERY_VIEWPORT_WIDTH_PX }}
+      >
         <div className="flex w-max gap-4 pr-2">
           {items.map((match, index) => (
             <TikTokMatchCard
@@ -349,12 +480,35 @@ export function PendingMatchGallery({
               isFavoritePending={favoritePendingId === match.id}
               isDeletePending={deletePendingId === match.id}
               onTogglePlay={() => handleTogglePlay(match)}
-              onToggleFavorite={() => favoriteMutation.mutate(match.id)}
+              onToggleFavorite={() => {
+                if (match.isFavorite) {
+                  unfavoriteMutation.mutate(match.id)
+                  return
+                }
+                setBaulDialogMatch(match)
+              }}
               onDelete={() => handleDelete(match)}
             />
           ))}
         </div>
       </div>
+
+      <PendingMatchBaulDialog
+        open={baulDialogMatch != null}
+        onOpenChange={(open) => {
+          if (!open) setBaulDialogMatch(null)
+        }}
+        match={baulDialogMatch}
+        disabled={favoriteToBaulMutation.isPending}
+        onConfirm={async (variantIds) => {
+          if (!baulDialogMatch) return
+          await favoriteToBaulMutation.mutateAsync({
+            matchId: baulDialogMatch.id,
+            variantIds,
+          })
+          setBaulDialogMatch(null)
+        }}
+      />
     </div>
   )
 }

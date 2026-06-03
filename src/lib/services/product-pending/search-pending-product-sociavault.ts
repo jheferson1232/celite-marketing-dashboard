@@ -2,8 +2,10 @@ import type { Prisma } from "@/app/generated/prisma/client"
 import prisma from "@/lib/prisma"
 import { ServerActionError } from "@/lib/server-action"
 import { searchSociaVaultMatchesWithOutcome } from "@/lib/services/sociavault/search-pending-matches"
+import { deletePendingMatchBlobsForProduct } from "./delete-pending-match-blobs"
 import { mapPendingProductRow } from "./map-pending-product"
 import { parsePendingImageUrls } from "./pending-product-images"
+import { persistPendingMatchCandidatesMedia } from "./persist-pending-match-media"
 import type { PendingProductRecord } from "./types"
 
 function errorMessage(error: unknown): string {
@@ -29,11 +31,16 @@ export async function searchPendingProductInSociaVault(
 
   try {
     const imageUrls = parsePendingImageUrls(product.imageUrls, product.imageUrl)
-    const { matches: candidates, warnings } =
+    const { matches: rawCandidates, warnings } =
       await searchSociaVaultMatchesWithOutcome({
         name: product.name,
         imageUrls,
       })
+
+    const candidates = await persistPendingMatchCandidatesMedia(
+      productId,
+      rawCandidates
+    )
 
     const notice =
       warnings.length > 0
@@ -44,6 +51,8 @@ export async function searchPendingProductInSociaVault(
     const outOfCredits = warnings.some((w) =>
       /insufficient credits|créditos/i.test(w)
     )
+
+    await deletePendingMatchBlobsForProduct(productId)
 
     await prisma.productPendingMatch.deleteMany({
       where: { favoriteId: productId },

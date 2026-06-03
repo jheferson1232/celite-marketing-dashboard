@@ -7,12 +7,22 @@ import { CREATIVE_MEDIA_ACCEPT } from "@/lib/services/blob/media-utils"
 
 interface CreativeUploadFieldProps {
   disabled?: boolean
+  multiple?: boolean
+  label?: string
+  uploadingLabel?: string
+  variant?: "default" | "outline"
   onUpload: (file: File) => Promise<void>
+  onUploadMany?: (files: File[]) => Promise<void>
 }
 
 export function CreativeUploadField({
   disabled = false,
+  multiple = false,
+  label = "Subir creative",
+  uploadingLabel = "Subiendo…",
+  variant = "default",
   onUpload,
+  onUploadMany,
 }: CreativeUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -24,15 +34,22 @@ export function CreativeUploadField({
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const fileList = event.target.files
     event.target.value = ""
-    if (!file || disabled || uploading) return
+    if (!fileList?.length || disabled || uploading) return
 
+    const files = [...fileList]
     setUploading(true)
     setError(null)
 
     try {
-      await onUpload(file)
+      if (multiple && files.length > 1 && onUploadMany) {
+        await onUploadMany(files)
+      } else {
+        for (const file of files) {
+          await onUpload(file)
+        }
+      }
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
@@ -48,6 +65,7 @@ export function CreativeUploadField({
     <div className="flex shrink-0 flex-col items-end gap-1">
       <Button
         type="button"
+        variant={variant}
         onClick={handlePickFile}
         disabled={disabled || uploading}
         className="shrink-0"
@@ -57,7 +75,7 @@ export function CreativeUploadField({
         ) : (
           <RiAddLine className="size-4" />
         )}
-        {uploading ? "Subiendo…" : "Subir creative"}
+        {uploading ? uploadingLabel : label}
       </Button>
 
       {error ? <p className="max-w-xs text-xs text-destructive">{error}</p> : null}
@@ -66,6 +84,7 @@ export function CreativeUploadField({
         ref={inputRef}
         type="file"
         accept={CREATIVE_MEDIA_ACCEPT}
+        multiple={multiple}
         className="hidden"
         disabled={disabled || uploading}
         onChange={(event) => void handleFileChange(event)}

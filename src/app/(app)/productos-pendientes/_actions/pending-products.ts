@@ -7,6 +7,7 @@ import { searchPendingProductInSociaVault } from "@/lib/services/product-pending
 import { deletePendingMatch } from "@/lib/services/product-pending/delete-pending-match"
 import { deletePendingProduct } from "@/lib/services/product-pending/delete-pending-product"
 import { savePendingMatchMedia } from "@/lib/services/product-pending/save-pending-match-media"
+import { favoritePendingMatchToBaul } from "@/lib/services/product-pending/favorite-pending-match-to-baul"
 import { togglePendingMatchFavorite } from "@/lib/services/product-pending/toggle-pending-match-favorite"
 
 export const listPendingProductsAction = createServerAction(async () =>
@@ -30,6 +31,11 @@ export const searchPendingProductSociaVaultAction = createServerAction(
 
 export const togglePendingMatchFavoriteAction = createServerAction(
   async (matchId: string) => togglePendingMatchFavorite(matchId)
+)
+
+export const favoritePendingMatchToBaulAction = createServerAction(
+  async (input: { matchId: string; variantIds: string[] }) =>
+    favoritePendingMatchToBaul(input.matchId, input.variantIds)
 )
 
 export const deletePendingMatchAction = createServerAction(async (matchId: string) =>
