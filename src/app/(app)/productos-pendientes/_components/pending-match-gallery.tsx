@@ -34,11 +34,9 @@ import {
 } from "../_actions/pending-products"
 import { PendingMatchBaulDialog } from "./pending-match-baul-dialog"
 
-const CARD_WIDTH_PX = 220
-const CARD_GAP_PX = 16
-const VISIBLE_CARDS = 6
-const GALLERY_VIEWPORT_WIDTH_PX =
-  CARD_WIDTH_PX * VISIBLE_CARDS + CARD_GAP_PX * (VISIBLE_CARDS - 1)
+/** Ancho de cada tarjeta = fracción del carrusel (100cqw) según breakpoint del contenedor. */
+const CARD_SLIDE_CLASS =
+  "w-[calc((100cqw-1rem)/2)] @sm/gallery:w-[calc((100cqw-2rem)/3)] @md/gallery:w-[calc((100cqw-3rem)/4)] @lg/gallery:w-[calc((100cqw-5rem)/6)]"
 
 const PENDING_PRODUCTS_QUERY_KEY = ["pending-products"] as const
 
@@ -181,7 +179,8 @@ function TikTokMatchCard({
   return (
     <article
       className={cn(
-        "group flex w-[220px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-950 text-zinc-100 shadow-md transition-shadow hover:shadow-lg hover:shadow-violet-950/20",
+        "group flex shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-950 text-zinc-100 shadow-md transition-shadow hover:shadow-lg hover:shadow-violet-950/20",
+        CARD_SLIDE_CLASS,
         isDeletePending && "pointer-events-none opacity-40"
       )}
     >
@@ -459,18 +458,17 @@ export function PendingMatchGallery({
           </span>
         </p>
         <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
-          Se muestran {VISIBLE_CARDS} videos a la vez; desplázate horizontalmente para ver más.
-          La estrella añade al{" "}
+          El carrusel usa todo el ancho disponible (2–6 videos según pantalla). Desplázate
+          para ver más. La estrella añade al{" "}
           <span className="text-foreground">baúl</span> y vincula variantes.
         </p>
       </div>
 
       <div
         ref={scrollRef}
-        className="min-h-[32rem] w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain scroll-smooth pb-2 [scrollbar-gutter:stable] snap-x snap-mandatory"
-        style={{ maxWidth: GALLERY_VIEWPORT_WIDTH_PX }}
+        className="@container/gallery min-h-[22rem] w-full min-w-0 overflow-x-auto overscroll-x-contain scroll-smooth pb-2 [scrollbar-gutter:stable] snap-x snap-mandatory md:min-h-[28rem] lg:min-h-[32rem]"
       >
-        <div className="flex w-max gap-4 pr-2">
+        <div className="flex w-max min-w-full gap-4 pr-2">
           {items.map((match, index) => (
             <TikTokMatchCard
               key={match.id}

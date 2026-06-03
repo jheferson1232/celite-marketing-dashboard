@@ -1,10 +1,12 @@
 "use client"
 
-import { Fragment, useCallback, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiAlertLine,
   RiBrainLine,
+  RiEyeLine,
+  RiEyeOffLine,
   RiRefreshLine,
   RiStackLine,
 } from "@remixicon/react"
@@ -64,6 +66,145 @@ function formatInformeDate(date: string): string {
   const [y, m, d] = date.split("-")
   if (!y || !m || !d) return date
   return `${d}/${m}/${y}`
+}
+
+const INFORME_HIDDEN_DAY_KEYS_STORAGE = "informe-ia-hidden-day-keys"
+
+function defaultHiddenDayKeys(
+  dateKeys: string[],
+  today: string,
+  yesterday: string
+): Set<string> {
+  const hidden = new Set<string>()
+  for (const date of dateKeys) {
+    if (date !== today && date !== yesterday) hidden.add(date)
+  }
+  return hidden
+}
+
+function readStoredHiddenDayKeys(dateKeys: string[]): Set<string> | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(INFORME_HIDDEN_DAY_KEYS_STORAGE)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return null
+    const valid = parsed.filter(
+      (d): d is string => typeof d === "string" && dateKeys.includes(d)
+    )
+    return new Set(valid)
+  } catch {
+    return null
+  }
+}
+
+function writeStoredHiddenDayKeys(hidden: Set<string>) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      INFORME_HIDDEN_DAY_KEYS_STORAGE,
+      JSON.stringify([...hidden])
+    )
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function InformeDayVisibilityControls({
+  dateKeys,
+  today,
+  yesterday,
+  hiddenDayKeys,
+  onHiddenDayKeysChange,
+}: {
+  dateKeys: string[]
+  today: string
+  yesterday: string
+  hiddenDayKeys: Set<string>
+  onHiddenDayKeysChange: (next: Set<string>) => void
+}) {
+  const visibleCount = dateKeys.length - hiddenDayKeys.size
+
+  const toggleDay = (date: string) => {
+    const next = new Set(hiddenDayKeys)
+    if (next.has(date)) next.delete(date)
+    else next.add(date)
+    onHiddenDayKeysChange(next)
+  }
+
+  const showOnlyRecent = () => {
+    onHiddenDayKeysChange(defaultHiddenDayKeys(dateKeys, today, yesterday))
+  }
+
+  const showAll = () => {
+    onHiddenDayKeysChange(new Set())
+  }
+
+  const showOnlyToday = () => {
+    const next = new Set<string>()
+    for (const date of dateKeys) {
+      if (date !== today) next.add(date)
+    }
+    onHiddenDayKeysChange(next)
+  }
+
+  if (dateKeys.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">
+          Columnas por día{" "}
+          <span className="text-muted-foreground font-normal">
+            ({visibleCount} de {dateKeys.length} visibles)
+          </span>
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={showAll}>
+            Mostrar todos
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={showOnlyRecent}>
+            Solo hoy y ayer
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={showOnlyToday}>
+            Solo hoy
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {dateKeys.map((date) => {
+          const hidden = hiddenDayKeys.has(date)
+          const isToday = date === today
+          return (
+            <Button
+              key={date}
+              type="button"
+              size="sm"
+              variant={hidden ? "outline" : "secondary"}
+              className={cn(
+                "h-8 gap-1 tabular-nums",
+                isToday && !hidden && "ring-1 ring-primary/40"
+              )}
+              onClick={() => toggleDay(date)}
+            >
+              {hidden ? (
+                <RiEyeOffLine className="size-3.5 opacity-60" />
+              ) : (
+                <RiEyeLine className="size-3.5" />
+              )}
+              {formatInformeDate(date)}
+              {date === yesterday ? (
+                <span className="text-muted-foreground text-[10px]">ayer</span>
+              ) : null}
+              {isToday ? (
+                <span className="text-muted-foreground text-[10px]">hoy</span>
+              ) : null}
+            </Button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function formatInformeRowLabel(
@@ -299,14 +440,14 @@ function InformeTotalCells({
 
 function MetricsCells({
   row,
-  dateKeys,
+  visibleDayKeys,
 }: {
   row: InformeEntityRow
-  dateKeys: string[]
+  visibleDayKeys: string[]
 }) {
   return (
     <>
-      {dateKeys.map((date) => (
+      {visibleDayKeys.map((date) => (
         <PeriodMetricsCells
           key={date}
           metrics={getMetricsForDate(row, date)}
@@ -330,18 +471,18 @@ function dayColumnSubHeaderClass(date: string, today: string): string {
 
 function InformeAccountSummary({
   totals,
-  dateKeys,
+  visibleDayKeys,
   informeStartDate,
   dateRange,
 }: {
   totals: InformeTableTotals
-  dateKeys: string[]
+  visibleDayKeys: string[]
   informeStartDate: string
   dateRange: { from: string; to: string }
 }) {
   return (
     <div className="text-muted-foreground flex flex-col gap-1 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6">
-      {dateKeys.map((date) => {
+      {visibleDayKeys.map((date) => {
         const day = getDayTotalsMetrics(totals, date)
         return (
           <p key={date}>
@@ -452,7 +593,7 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
 
 function EntityRow({
   row,
-  dateKeys,
+  visibleDayKeys,
   informeStartDate,
   indent,
   campaignActions,
@@ -460,7 +601,7 @@ function EntityRow({
   activeAdSetsCount,
 }: {
   row: InformeEntityRow
-  dateKeys: string[]
+  visibleDayKeys: string[]
   informeStartDate: string
   indent?: boolean
   /** Solo filas de campaña: conjuntos + links (como dashboard Meta). */
@@ -489,7 +630,7 @@ function EntityRow({
         activeAdSetsCount={activeAdSetsCount}
       />
       <InformeTotalCells row={row} informeStartDate={informeStartDate} />
-      <MetricsCells row={row} dateKeys={dateKeys} />
+      <MetricsCells row={row} visibleDayKeys={visibleDayKeys} />
     </TableRow>
   )
 }
@@ -498,13 +639,13 @@ function CampaignGroupRows({
   group,
   isExpanded,
   onToggleExpand,
-  dateKeys,
+  visibleDayKeys,
   informeStartDate,
 }: {
   group: InformeCampaignGroup
   isExpanded: boolean
   onToggleExpand: () => void
-  dateKeys: string[]
+  visibleDayKeys: string[]
   informeStartDate: string
 }) {
   const adsetCount = group.adsets.length
@@ -514,7 +655,7 @@ function CampaignGroupRows({
     <>
       <EntityRow
         row={group.campaign}
-        dateKeys={dateKeys}
+        visibleDayKeys={visibleDayKeys}
         informeStartDate={informeStartDate}
         adSetsCount={group.adSetsCount}
         activeAdSetsCount={group.activeAdSetsCount}
@@ -557,7 +698,7 @@ function CampaignGroupRows({
             <EntityRow
               key={adset.entityId}
               row={adset}
-              dateKeys={dateKeys}
+              visibleDayKeys={visibleDayKeys}
               informeStartDate={informeStartDate}
               indent
             />
@@ -570,11 +711,11 @@ function CampaignGroupRows({
 function InformeTotalsRow({
   groups,
   totals,
-  dateKeys,
+  visibleDayKeys,
 }: {
   groups: InformeCampaignGroup[]
   totals: InformeTableTotals
-  dateKeys: string[]
+  visibleDayKeys: string[]
 }) {
   let adsetSpendTotal = 0
   let adsetPurchasesTotal = 0
@@ -614,7 +755,7 @@ function InformeTotalsRow({
           ? formatCurrency(adsetCpaTotal, META_DASHBOARD_CURRENCY)
           : "—"}
       </TableCell>
-      {dateKeys.map((date) => (
+      {visibleDayKeys.map((date) => (
         <PeriodMetricsCells
           key={date}
           metrics={getDayTotalsMetrics(totals, date)}
@@ -628,13 +769,13 @@ function InformeTotalsRow({
 
 function InformeTable({
   groups,
-  dateKeys,
+  visibleDayKeys,
   today,
   totals,
   informeStartDate,
 }: {
   groups: InformeCampaignGroup[]
-  dateKeys: string[]
+  visibleDayKeys: string[]
   today: string
   totals: InformeTableTotals
   informeStartDate: string
@@ -692,7 +833,7 @@ function InformeTable({
           >
             CPA total
           </TableHead>
-          {dateKeys.map((date) => (
+          {visibleDayKeys.map((date) => (
             <TableHead
               key={date}
               colSpan={3}
@@ -703,7 +844,7 @@ function InformeTable({
           ))}
         </TableRow>
         <TableRow>
-          {dateKeys.map((date) => (
+          {visibleDayKeys.map((date) => (
             <Fragment key={date}>
               <TableHead className={dayColumnSubHeaderClass(date, today)}>
                 Gasto
@@ -725,7 +866,7 @@ function InformeTable({
             group={group}
             isExpanded={expandedCampaignIds.has(group.campaign.metaId)}
             onToggleExpand={() => handleToggleExpand(group.campaign.metaId)}
-            dateKeys={dateKeys}
+            visibleDayKeys={visibleDayKeys}
             informeStartDate={informeStartDate}
           />
         ))}
@@ -734,7 +875,7 @@ function InformeTable({
         <InformeTotalsRow
           groups={groups}
           totals={totals}
-          dateKeys={dateKeys}
+          visibleDayKeys={visibleDayKeys}
         />
       </TableFooter>
     </Table>
@@ -756,6 +897,10 @@ export function InformeIaContent() {
   const [estadoFilter, setEstadoFilter] = useState<InformeEstadoFilter>("ALL")
   const [periodFilter, setPeriodFilter] = useState<InformeEstadoFilter>("ALL")
   const [activarFilter, setActivarFilter] = useState(false)
+  const [hiddenDayKeys, setHiddenDayKeys] = useState<Set<string>>(() => new Set())
+  const [hiddenDaysInitKey, setHiddenDaysInitKey] = useState<string | null>(
+    null
+  )
 
   const informeQuery = useQuery({
     queryKey: ["meta-informe-ia"],
@@ -811,6 +956,32 @@ export function InformeIaContent() {
 
   const data = informeQuery.data
   const pending = syncMutation.isPending
+
+  useEffect(() => {
+    if (!data?.dateKeys.length) return
+    const initKey = `${data.date}:${data.yesterday}:${data.dateKeys.join(",")}`
+    if (hiddenDaysInitKey === initKey) return
+
+    const stored = readStoredHiddenDayKeys(data.dateKeys)
+    setHiddenDayKeys(
+      stored ?? defaultHiddenDayKeys(data.dateKeys, data.date, data.yesterday)
+    )
+    setHiddenDaysInitKey(initKey)
+  }, [data, hiddenDaysInitKey])
+
+  useEffect(() => {
+    if (hiddenDaysInitKey == null) return
+    writeStoredHiddenDayKeys(hiddenDayKeys)
+  }, [hiddenDayKeys, hiddenDaysInitKey])
+
+  const visibleDayKeys = useMemo(() => {
+    if (!data) return []
+    return data.dateKeys.filter((date) => !hiddenDayKeys.has(date))
+  }, [data, hiddenDayKeys])
+
+  const handleHiddenDayKeysChange = useCallback((next: Set<string>) => {
+    setHiddenDayKeys(next)
+  }, [])
 
   const estadoCounts = useMemo(
     () => (data ? countInformeEstadoFilters(data.groups) : null),
@@ -943,8 +1114,8 @@ export function InformeIaContent() {
 
       {pending ? (
         <p className="text-muted-foreground text-xs">
-          Sincronizando Meta y analizando campañas con IA… Puede tardar 1–2
-          minutos.
+          Sincronizando Meta… Suele tardar menos que antes; si ves límite de
+          API, espera unos minutos.
         </p>
       ) : null}
 
@@ -1002,7 +1173,7 @@ export function InformeIaContent() {
         <>
           <InformeAccountSummary
             totals={data.totals}
-            dateKeys={data.dateKeys}
+            visibleDayKeys={visibleDayKeys}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
@@ -1015,9 +1186,16 @@ export function InformeIaContent() {
         <>
           <InformeAccountSummary
             totals={data.totals}
-            dateKeys={data.dateKeys}
+            visibleDayKeys={visibleDayKeys}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
+          />
+          <InformeDayVisibilityControls
+            dateKeys={data.dateKeys}
+            today={data.date}
+            yesterday={data.yesterday}
+            hiddenDayKeys={hiddenDayKeys}
+            onHiddenDayKeysChange={handleHiddenDayKeysChange}
           />
           {estadoCounts && periodCounts ? (
             <InformeFilterBars
@@ -1037,11 +1215,17 @@ export function InformeIaContent() {
               Ningún resultado con los filtros actuales. Prueba «todas», otro
               botón t/ o desactiva «activar».
             </p>
+          ) : visibleDayKeys.length === 0 ? (
+            <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
+              No hay días visibles en la tabla. Pulsa{" "}
+              <strong className="text-foreground">Mostrar todos</strong> o activa
+              al menos un día arriba.
+            </p>
           ) : (
             <div className="min-w-0 overflow-x-auto rounded-lg border">
               <InformeTable
                 groups={filteredGroups}
-                dateKeys={data.dateKeys}
+                visibleDayKeys={visibleDayKeys}
                 today={data.date}
                 totals={data.totals}
                 informeStartDate={data.informeStartDate}

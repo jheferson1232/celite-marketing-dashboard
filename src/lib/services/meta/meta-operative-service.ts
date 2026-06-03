@@ -19,7 +19,7 @@ import {
 } from "./meta-account-daily-insights"
 import { getAdsetsByCampaignMap } from "./adsets-catalog"
 import { getInformeEntitiesActiveMap } from "./informe-entity-status"
-import { getAccountKpis } from "./account-kpis"
+import { getAccountKpis, getAccountKpisByDay } from "./account-kpis"
 import { countAdSetsForCampaign } from "./meta-adset-count"
 import { getMetaClient } from "./meta"
 import { normalizeMetaId } from "./meta-ids"
@@ -339,13 +339,52 @@ function buildDaySnapshot(
   }
 }
 
-/** Sincroniza estado Meta + métricas solo para las entidades del informe (gasto hoy). */
-export async function syncMetaOperativeStateForDate(
-  date: string,
-  metaIds: string[]
-): Promise<void> {
-  if (date < getMetaInformeStartDate() || metaIds.length === 0) return
+type DailyDayMaps = {
+  campaignDay: Map<string, Map<string, MetaDailyMetricCell>>
+  adsetDay: Map<string, Map<string, MetaDailyMetricCell>>
+}
 
+function buildDailyDayMaps(
+  daily: Awaited<ReturnType<typeof getMetaAccountDailyInsights>>
+): DailyDayMaps {
+  return {
+    campaignDay: new Map(
+      daily.campaigns.map((c) => [c.metaId, new Map(c.days.map((d) => [d.date, d]))])
+    ),
+    adsetDay: new Map(
+      daily.adsets.map((a) => [a.metaId, new Map(a.days.map((d) => [d.date, d]))])
+    ),
+  }
+}
+
+function operativeRowToSnapshot(row: {
+  spend: number
+  purchases: number
+  metaWasActive: boolean
+  sold: boolean
+}): OperativeSnapshot {
+  return {
+    spend: row.spend,
+    purchases: row.purchases,
+    metaWasActive: row.metaWasActive,
+    sold: row.sold,
+  }
+}
+
+/**
+ * Persiste MetaOperativeDay usando insights ya cargados (sin repetir Graph API por día).
+ * Una sola consulta de estados ON/OFF; KPIs de cuenta por día precargados.
+ */
+async function syncMetaOperativeStateBatch(
+  dateKeys: string[],
+  metaIds: string[],
+  daily: Awaited<ReturnType<typeof getMetaAccountDailyInsights>>,
+  accountKpisByDay: Map<string, { totalSpend: number; purchases: number }>
+): Promise<void> {
+  if (metaIds.length === 0 || dateKeys.length === 0) return
+
+  const informeStart = getMetaInformeStartDate()
+  const today = getDashboardToday()
   const { metaTrackEntity } = getInformePrisma()
   const entities = await metaTrackEntity.findMany({
     where: { metaId: { in: metaIds } },
@@ -353,73 +392,89 @@ export async function syncMetaOperativeStateForDate(
   if (entities.length === 0) return
 
   const activeByKey = await getInformeEntitiesActiveMap(entities)
-
-  const range =
-    date === getDashboardToday() ? getTodayDateRange() : { from: date, to: date }
-  const daily = await getMetaAccountDailyInsights(range)
-
-  const campaignDay = new Map(
-    daily.campaigns.map((c) => [c.metaId, new Map(c.days.map((d) => [d.date, d]))])
-  )
-  const adsetDay = new Map(
-    daily.adsets.map((a) => [a.metaId, new Map(a.days.map((d) => [d.date, d]))])
-  )
-
-  const isToday = date === getDashboardToday()
-  const prevDate = addDaysToDateString(date, -1)
+  const { campaignDay, adsetDay } = buildDailyDayMaps(daily)
   const entityIds = entities.map((e) => e.id)
 
+  const chronological = [...dateKeys].sort()
+  const rangeFrom = chronological[0]!
+  const rangeTo = chronological[chronological.length - 1]!
+
   const { metaOperativeDay } = getInformePrisma()
-  const [existingTodayRows, prevRows] = await Promise.all([
-    metaOperativeDay.findMany({
-      where: { date, entityId: { in: entityIds } },
-    }),
-    metaOperativeDay.findMany({
-      where: { date: prevDate, entityId: { in: entityIds } },
-    }),
-  ])
-  const existingByEntity = new Map(existingTodayRows.map((r) => [r.entityId, r]))
-  const prevByEntity = new Map(
-    prevRows.map((r) => [
-      r.entityId,
-      {
-        spend: r.spend,
-        purchases: r.purchases,
-        metaWasActive: r.metaWasActive,
-        sold: r.sold,
-      },
+  const operativeRows = await metaOperativeDay.findMany({
+    where: {
+      entityId: { in: entityIds },
+      date: { gte: addDaysToDateString(rangeFrom, -1), lte: rangeTo },
+    },
+  })
+
+  const storedMetaWasActive = new Map(
+    operativeRows.map((r) => [`${r.entityId}:${r.date}`, r.metaWasActive] as const)
+  )
+  const prevSnapshotByEntityDate = new Map<string, OperativeSnapshot>(
+    operativeRows.map((r) => [
+      `${r.entityId}:${r.date}`,
+      operativeRowToSnapshot(r),
     ])
   )
 
-  for (const entity of entities) {
-    const dayMap =
-      entity.type === "campaign"
-        ? campaignDay.get(entity.metaId)
-        : adsetDay.get(entity.metaId)
-    const cell = dayMap?.get(date)
+  for (const date of chronological) {
+    if (date < informeStart) continue
 
-    const spend = cell?.spend ?? 0
-    const purchases = cell?.purchases ?? 0
-    const liveActive =
-      activeByKey.get(`${entity.type}:${entity.metaId}`) ?? false
-    const existing = existingByEntity.get(entity.id)
-    const metaWasActive = isToday
-      ? liveActive
-      : (existing?.metaWasActive ?? liveActive)
+    const isToday = date === today
+    const prevDate = addDaysToDateString(date, -1)
 
-    const prev: OperativeSnapshot = prevByEntity.get(entity.id) ?? {
-      spend: 0,
-      purchases: 0,
-      metaWasActive: true,
-      sold: false,
+    for (const entity of entities) {
+      const dayMap =
+        entity.type === "campaign"
+          ? campaignDay.get(entity.metaId)
+          : adsetDay.get(entity.metaId)
+      const cell = dayMap?.get(date)
+
+      const spend = cell?.spend ?? 0
+      const purchases = cell?.purchases ?? 0
+      const liveActive =
+        activeByKey.get(`${entity.type}:${entity.metaId}`) ?? false
+      const metaWasActive = isToday
+        ? liveActive
+        : (storedMetaWasActive.get(`${entity.id}:${date}`) ?? true)
+
+      const prev: OperativeSnapshot = prevSnapshotByEntityDate.get(
+        `${entity.id}:${prevDate}`
+      ) ?? {
+        spend: 0,
+        purchases: 0,
+        metaWasActive: true,
+        sold: false,
+      }
+
+      const snapshot = buildDaySnapshot(spend, purchases, metaWasActive, prev)
+      await upsertOperativeDay(entity.id, date, snapshot)
+      prevSnapshotByEntityDate.set(
+        `${entity.id}:${date}`,
+        operativeRowToSnapshot(snapshot)
+      )
+      storedMetaWasActive.set(`${entity.id}:${date}`, snapshot.metaWasActive)
     }
 
-    const snapshot = buildDaySnapshot(spend, purchases, metaWasActive, prev)
-    await upsertOperativeDay(entity.id, date, snapshot)
+    const account = accountKpisByDay.get(date) ?? { totalSpend: 0, purchases: 0 }
+    await upsertInformeAccountDay(date, account.totalSpend, account.purchases)
   }
+}
 
-  const kpis = await getAccountKpis({ from: date, to: date })
-  await upsertInformeAccountDay(date, kpis.totalSpend, kpis.purchases)
+/** Sincroniza un solo día (p. ej. pruebas); en producción usar el batch del informe. */
+export async function syncMetaOperativeStateForDate(
+  date: string,
+  metaIds: string[]
+): Promise<void> {
+  if (date < getMetaInformeStartDate() || metaIds.length === 0) return
+
+  const range = { from: date, to: date }
+  const [daily, accountKpisByDay] = await Promise.all([
+    getMetaAccountDailyInsights(range),
+    getAccountKpisByDay(range),
+  ])
+
+  await syncMetaOperativeStateBatch([date], metaIds, daily, accountKpisByDay)
 }
 
 function getDailyCell(
@@ -605,9 +660,10 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
 
   await pruneOperativeDaysBeforeInformeStart()
 
-  const [daily, accountKpis] = await Promise.all([
+  const [daily, accountKpis, accountKpisByDay] = await Promise.all([
     getMetaAccountDailyInsights(dateRange),
     getAccountKpis(getTodayDateRange()),
+    getAccountKpisByDay(dateRange),
   ])
 
   const { campaignRows, adsetRows, trackInputs } = collectSpendingInRange(
@@ -620,9 +676,12 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
   await pruneStaleTrackEntities(metaIds)
 
   if (metaIds.length > 0) {
-    for (const d of dateKeys) {
-      await syncMetaOperativeStateForDate(d, metaIds)
-    }
+    await syncMetaOperativeStateBatch(
+      dateKeys,
+      metaIds,
+      daily,
+      accountKpisByDay
+    )
   }
 
   const metaIdSet = new Set(metaIds)
