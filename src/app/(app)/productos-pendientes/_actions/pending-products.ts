@@ -9,10 +9,15 @@ import { deletePendingProduct } from "@/lib/services/product-pending/delete-pend
 import { savePendingMatchMedia } from "@/lib/services/product-pending/save-pending-match-media"
 import { favoritePendingMatchToBaul } from "@/lib/services/product-pending/favorite-pending-match-to-baul"
 import { togglePendingMatchFavorite } from "@/lib/services/product-pending/toggle-pending-match-favorite"
+import { isSociaVaultApiKeyConfigured } from "@/lib/services/sociavault/sociavault-setup"
 
 export const listPendingProductsAction = createServerAction(async () =>
   listPendingProducts()
 )
+
+export const getSociaVaultSetupStatusAction = createServerAction(async () => ({
+  configured: isSociaVaultApiKeyConfigured(),
+}))
 
 export const addManualPendingProductAction = createServerAction(
   async (input: {

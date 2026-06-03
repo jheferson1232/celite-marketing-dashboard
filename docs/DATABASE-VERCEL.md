@@ -19,6 +19,15 @@ El asistente en Meta/TikTok y el historial de chats usan **PostgreSQL** vía Pri
 
 5. **Redeploy** en Vercel (Deployments → Redeploy).
 
+## SociaVault (productos pendientes)
+
+1. [Vercel](https://vercel.com) → proyecto → **Settings** → **Environment Variables**.
+2. Añade **`SOCIAVAULT_API_KEY`** = tu clave `sk_live_…` de [sociavault.com/dashboard](https://sociavault.com/dashboard).
+3. Activa **Production** (y Preview si usas previews). Sin comillas en el valor.
+4. Opcional: `SOCIAVAULT_SEARCH_TIKTOK=true`, `SOCIAVAULT_AD_LIBRARY_COUNTRY=VE`, `BLOB_READ_WRITE_TOKEN`.
+5. **Redeploy** obligatorio tras guardar variables.
+6. Comprueba: `https://TU-DOMINIO.vercel.app/api/health/sociavault` debe responder `{"configured":true}`.
+
 ## Comprobar conexión local
 
 ```bash

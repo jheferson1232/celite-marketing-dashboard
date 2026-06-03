@@ -30,6 +30,7 @@ import {
   addManualPendingProductAction,
   deletePendingProductAction,
   listPendingProductsAction,
+  getSociaVaultSetupStatusAction,
   searchPendingProductSociaVaultAction,
 } from "../_actions/pending-products"
 import { PendingProductManualForm } from "./pending-product-manual-form"
@@ -71,11 +72,18 @@ function isLegacyMetaNotice(message: string): boolean {
   return /Meta Ad Library|facebook-ad-library/i.test(message)
 }
 
+const SOCIAVAULT_KEY_ERROR_RE =
+  /SOCIAVAULT_API_KEY es requerida/i
+
 function noticeForDisplay(
   lastError: string | null,
-  status: PendingProductStatus
+  status: PendingProductStatus,
+  sociavaultConfigured: boolean
 ): string | null {
   if (!lastError || isLegacyMetaNotice(lastError)) return null
+  if (sociavaultConfigured && SOCIAVAULT_KEY_ERROR_RE.test(lastError)) {
+    return "Pulsa «Buscar videos» de nuevo (la API key ya está en el servidor)."
+  }
   return lastError
 }
 
@@ -93,18 +101,24 @@ function PendingProductRow({
   isDeleting,
   onSearchSociaVault,
   onDelete,
+  sociavaultConfigured,
 }: {
   product: PendingProductRecord
   isSearchingSociaVault: boolean
   isDeleting: boolean
   onSearchSociaVault: () => void
   onDelete: () => void
+  sociavaultConfigured: boolean
 }) {
   const [open, setOpen] = useState(false)
   const tiktokVideos = product.matches
   const imageCount = product.imageUrls.length
   const isSearching = product.status === "SEARCHING" || isSearchingSociaVault
-  const displayNotice = noticeForDisplay(product.lastError, product.status)
+  const displayNotice = noticeForDisplay(
+    product.lastError,
+    product.status,
+    sociavaultConfigured
+  )
 
   return (
     <>
@@ -272,6 +286,14 @@ export function ProductosPendientesContent({
     staleTime: 15 * 1000,
   })
 
+  const { data: sociavaultSetup } = useQuery({
+    queryKey: ["sociavault-setup"],
+    queryFn: () => runServerAction(getSociaVaultSetupStatusAction()),
+    staleTime: 60 * 1000,
+  })
+
+  const sociavaultConfigured = sociavaultSetup?.configured ?? true
+
   const addManualMutation = useMutation({
     mutationFn: async (values: { name: string; imageUrls: string[] }) => {
       return runServerAction(
@@ -363,6 +385,21 @@ export function ProductosPendientesContent({
         }}
       />
 
+      {!sociavaultConfigured ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <p className="font-medium">Falta SOCIAVAULT_API_KEY en Vercel</p>
+          <p className="mt-1 text-destructive/90">
+            En el proyecto de Vercel → Settings → Environment Variables, añade{" "}
+            <code className="rounded bg-destructive/15 px-1">SOCIAVAULT_API_KEY</code>{" "}
+            con tu clave <code className="rounded bg-destructive/15 px-1">sk_live_…</code>,
+            marca <strong>Production</strong> y haz Redeploy. Luego pulsa «Buscar videos».
+          </p>
+        </div>
+      ) : null}
+
       {searchSociaVaultMutation.isError ? (
         <p className="text-sm text-destructive">
           {searchSociaVaultMutation.error instanceof Error
@@ -432,6 +469,7 @@ export function ProductosPendientesContent({
                     deleteProductMutation.variables === product.id
                   }
                   onSearchSociaVault={() => handleSearchSociaVault(product.id)}
+                  sociavaultConfigured={sociavaultConfigured}
                   onDelete={() => {
                     if (
                       !window.confirm(
