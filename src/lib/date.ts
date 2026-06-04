@@ -46,3 +46,18 @@ export function buildDateKeys(from: string, to: string): string[] {
   }
   return keys
 }
+
+/** Fecha y hora en español (zona dashboard) para creativos del Baúl. */
+export function formatCreativeAddedAt(value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value
+  if (Number.isNaN(date.getTime())) return "—"
+
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: DASHBOARD_TIMEZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
+}

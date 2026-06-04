@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { RiImageLine, RiPlayCircleLine, RiVideoLine } from "@remixicon/react"
+import { formatCreativeAddedAt } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import type { CreativeRecord } from "@/lib/services/creative"
 
@@ -76,6 +77,13 @@ export function CreativeCard({
             <RiVideoLine className="size-3" />
           )}
           {creative.type}
+        </span>
+
+        <span
+          className="absolute bottom-2 left-2 right-2 rounded-md bg-black/60 px-2 py-1 text-center text-[10px] font-medium leading-tight text-white"
+          title="Fecha y hora en que se agregó al Baúl"
+        >
+          {formatCreativeAddedAt(creative.createdAt)}
         </span>
       </div>
 
