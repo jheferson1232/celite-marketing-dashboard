@@ -9,13 +9,16 @@ import {
   getRoas,
 } from "./report"
 import { withTikTokCache } from "./tiktok-cache"
+import { buildTikTokCacheKey } from "./tiktok-api.server"
 
 const ACCOUNT_KPIS_TTL_MS = 2 * 60 * 1000
 
 export async function getTikTokAccountKpis(
   dateRange: DateRange
 ): Promise<AccountKpis> {
-  const cacheKey = `tiktok-account-kpis:${dateRange.from}:${dateRange.to}`
+  const cacheKey = await buildTikTokCacheKey(
+    `account-kpis:${dateRange.from}:${dateRange.to}`
+  )
   return withTikTokCache(cacheKey, ACCOUNT_KPIS_TTL_MS, () =>
     fetchTikTokAccountKpis(dateRange)
   )

@@ -11,7 +11,7 @@ import {
   getTikTokLandingPageUrl,
   resolveTikTokLandingPageUrl,
 } from "./landing-page-url"
-import { getTikTokRequestContext } from "./tiktok-api.server"
+import { buildTikTokCacheKey, getTikTokRequestContext } from "./tiktok-api.server"
 import { withTikTokCache } from "./tiktok-cache"
 import { fetchTikTokPurchaseGenderByAdId } from "./purchase-gender"
 import type {
@@ -106,7 +106,9 @@ async function fetchVideoCovers(videoIds: string[]): Promise<Map<string, string>
 export async function getTikTokAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
-  const cacheKey = `tiktok-ad-insights:${dateRange.from}:${dateRange.to}`
+  const cacheKey = await buildTikTokCacheKey(
+    `ad-insights:${dateRange.from}:${dateRange.to}`
+  )
   return withTikTokCache(cacheKey, AD_INSIGHTS_TTL_MS, () =>
     fetchTikTokAdInsights(dateRange)
   )

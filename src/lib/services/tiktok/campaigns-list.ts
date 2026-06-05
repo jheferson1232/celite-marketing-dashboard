@@ -14,6 +14,7 @@ import { getLastSevenDaysRange } from "./campaign-daily-insights"
 import { collectUniqueLandingUrlsByCampaign } from "./campaign-landing-urls"
 import { fetchAllPages } from "./fetch-all-pages"
 import { withTikTokCache } from "./tiktok-cache"
+import { buildTikTokCacheKey } from "./tiktok-api.server"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
 import type { TikTokAd, TikTokAdGroup, TikTokCampaign } from "./types"
 
@@ -29,7 +30,9 @@ function normalizeStatus(status?: string): CampaignRow["status"] {
 export async function getTikTokCampaignsList(
   dateRange: DateRange
 ): Promise<CampaignRow[]> {
-  const cacheKey = `tiktok-campaigns:${dateRange.from}:${dateRange.to}`
+  const cacheKey = await buildTikTokCacheKey(
+    `campaigns:${dateRange.from}:${dateRange.to}`
+  )
   return withTikTokCache(cacheKey, CAMPAIGNS_TTL_MS, () =>
     fetchTikTokCampaignsList(dateRange)
   )

@@ -1,6 +1,6 @@
 import type { DateRange } from "@/lib/services/meta/types"
 import { addDaysToDateString, getDashboardToday } from "@/lib/date"
-import { getTikTokRequestContext } from "./tiktok-api.server"
+import { buildTikTokCacheKey, getTikTokRequestContext } from "./tiktok-api.server"
 import { withTikTokCache } from "./tiktok-cache"
 import type { TikTokApiResponse, TikTokReportData, TikTokReportRow } from "./types"
 
@@ -216,7 +216,9 @@ export async function fetchIntegratedReport(
 export async function fetchCachedCampaignMetricsByDateRange(
   dateRange: DateRange
 ): Promise<Map<string, Record<string, string>>> {
-  const cacheKey = `tiktok-campaign-report:${dateRange.from}:${dateRange.to}`
+  const cacheKey = await buildTikTokCacheKey(
+    `campaign-report:${dateRange.from}:${dateRange.to}`
+  )
   return withTikTokCache(cacheKey, REPORT_TTL_MS, async () => {
     const rows = await fetchIntegratedReport(
       "AUCTION_CAMPAIGN",
@@ -235,7 +237,9 @@ export async function fetchCachedCampaignMetricsByDateRange(
 export async function fetchCachedAdGroupMetricsByDateRange(
   dateRange: DateRange
 ): Promise<Map<string, Record<string, string>>> {
-  const cacheKey = `tiktok-adgroup-report:${dateRange.from}:${dateRange.to}`
+  const cacheKey = await buildTikTokCacheKey(
+    `adgroup-report:${dateRange.from}:${dateRange.to}`
+  )
   return withTikTokCache(cacheKey, REPORT_TTL_MS, async () => {
     const rows = await fetchIntegratedReport(
       "AUCTION_ADGROUP",

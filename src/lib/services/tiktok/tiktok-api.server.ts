@@ -23,3 +23,9 @@ export async function getTikTokRequestContext(): Promise<{
     client: createTikTokClient(credentials.accessToken),
   }
 }
+
+/** Claves de caché scoped por advertiser (multi-cuenta en dashboard). */
+export async function buildTikTokCacheKey(scope: string): Promise<string> {
+  const { advertiserId } = await getTikTokRequestContext()
+  return `tiktok:${advertiserId}:${scope}`
+}

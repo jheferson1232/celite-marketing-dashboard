@@ -123,22 +123,38 @@ export function TikTokContent() {
     [accountId]
   )
 
+  const handleAccountChange = useCallback(
+    async (nextId: string) => {
+      if (nextId === accountId) return
+      setAccountId(nextId)
+      await runServerAction(clearTikTokCacheAction())
+      await queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0]).startsWith("tiktok-"),
+      })
+    },
+    [accountId, queryClient, setAccountId]
+  )
+
+  const isDashboardFetching =
+    isLoadingKpis ||
+    isLoadingCampaigns ||
+    isLoadingAdInsights ||
+    isLoadingAccounts
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            Dashboard TikTok
-          </h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+          Dashboard TikTok
+        </h1>
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <TikTokAccountSelect
             accounts={accounts}
             value={accountId}
-            onChange={setAccountId}
+            onChange={handleAccountChange}
             disabled={isLoadingAccounts}
-            className="sm:min-w-[240px]"
+            compact
           />
-        </div>
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
@@ -150,7 +166,7 @@ export function TikTokContent() {
             <Button
               type="button"
               variant="outline"
-              className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
+              className="h-8 min-w-0 flex-1 gap-2 px-3 sm:h-9 sm:flex-none sm:w-auto"
               onClick={handleReload}
               disabled={isReloading || !accountId}
             >
@@ -166,7 +182,7 @@ export function TikTokContent() {
       <div className="min-w-0 w-full">
         <KpiCards
           data={kpis}
-          isLoading={isLoadingKpis || isLoadingAccounts}
+          isLoading={isDashboardFetching}
           currency={TIKTOK_DASHBOARD_CURRENCY}
         />
       </div>
@@ -188,6 +204,7 @@ export function TikTokContent() {
         <TabsContent value="campaigns" className="min-w-0 outline-none">
           <TikTokManageProvider accountId={accountId}>
             <CampaignsTable
+              key={accountId ?? "no-account"}
               data={campaigns}
               isLoading={isLoadingCampaigns || isLoadingAccounts}
               currency={TIKTOK_DASHBOARD_CURRENCY}
