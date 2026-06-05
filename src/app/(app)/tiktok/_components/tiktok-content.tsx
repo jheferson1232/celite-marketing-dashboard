@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { runServerAction } from "@/lib/server-action"
 import { getTikTokAccountKpisSummary } from "../_actions/account-kpis"
@@ -19,10 +19,13 @@ import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-pi
 import { ThemeToggleButton } from "@/app/(app)/dashboard/_components/theme-toggle-button"
 import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { TikTokManageProvider } from "./tiktok-manage-provider"
+import { TikTokAccountSelect } from "./tiktok-account-select"
+import { useTikTokDashboardAccount } from "./use-tiktok-dashboard-account"
 import {
   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
   TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
 } from "@/app/(app)/dashboard/_components/campaigns/use-persisted-column-visibility"
+import type { DateRange } from "@/lib/services/meta/types"
 import {
   RiAdvertisementLine,
   RiMegaphoneLine,
@@ -33,10 +36,17 @@ export function TikTokContent() {
   const queryClient = useQueryClient()
   const [isReloading, setIsReloading] = useState(false)
   const { dateRange, setDateRange } = useDateRange()
+  const {
+    accounts,
+    accountId,
+    setAccountId,
+    isLoading: isLoadingAccounts,
+  } = useTikTokDashboardAccount()
 
   const dashboardQueryOptions = {
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    enabled: Boolean(accountId),
   } as const
 
   const handleReload = async () => {
@@ -62,36 +72,71 @@ export function TikTokContent() {
   }
 
   const { data: kpis, isLoading: isLoadingKpis } = useQuery({
-    queryKey: ["tiktok-account-kpis", dateRange],
-    queryFn: () => runServerAction(getTikTokAccountKpisSummary(dateRange)),
+    queryKey: ["tiktok-account-kpis", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(
+        getTikTokAccountKpisSummary({ dateRange, accountId: accountId ?? undefined })
+      ),
     ...dashboardQueryOptions,
   })
 
   const { data: campaigns, isLoading: isLoadingCampaigns } = useQuery({
-    queryKey: ["tiktok-campaigns", dateRange],
-    queryFn: () => runServerAction(getTikTokCampaignsListAction(dateRange)),
+    queryKey: ["tiktok-campaigns", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(
+        getTikTokCampaignsListAction({ dateRange, accountId: accountId ?? undefined })
+      ),
     ...dashboardQueryOptions,
   })
 
   const { data: adSetsByCampaignId } = useQuery({
-    queryKey: ["tiktok-all-campaign-adgroups", dateRange],
-    queryFn: () => runServerAction(getTikTokAllCampaignAdGroupsAction(dateRange)),
+    queryKey: ["tiktok-all-campaign-adgroups", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(
+        getTikTokAllCampaignAdGroupsAction({
+          dateRange,
+          accountId: accountId ?? undefined,
+        })
+      ),
     ...dashboardQueryOptions,
   })
 
   const { data: adInsights, isLoading: isLoadingAdInsights } = useQuery({
-    queryKey: ["tiktok-ad-insights", dateRange],
-    queryFn: () => runServerAction(getTikTokAdInsightsList(dateRange)),
+    queryKey: ["tiktok-ad-insights", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(
+        getTikTokAdInsightsList({ dateRange, accountId: accountId ?? undefined })
+      ),
     ...dashboardQueryOptions,
   })
+
+  const fetchCampaignAdSets = useCallback(
+    (input: {
+      campaignId: string
+      dateRange: DateRange
+      objective?: string
+    }) =>
+      getTikTokCampaignAdGroups({
+        ...input,
+        accountId: accountId ?? undefined,
+      }),
+    [accountId]
+  )
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
             Dashboard TikTok
           </h1>
+          <TikTokAccountSelect
+            accounts={accounts}
+            value={accountId}
+            onChange={setAccountId}
+            disabled={isLoadingAccounts}
+            className="sm:min-w-[240px]"
+          />
         </div>
         <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <DateRangePicker
@@ -107,7 +152,7 @@ export function TikTokContent() {
               variant="outline"
               className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
               onClick={handleReload}
-              disabled={isReloading}
+              disabled={isReloading || !accountId}
             >
               <RiRefreshLine
                 className={isReloading ? "size-4 animate-spin" : "size-4"}
@@ -121,7 +166,7 @@ export function TikTokContent() {
       <div className="min-w-0 w-full">
         <KpiCards
           data={kpis}
-          isLoading={isLoadingKpis}
+          isLoading={isLoadingKpis || isLoadingAccounts}
           currency={TIKTOK_DASHBOARD_CURRENCY}
         />
       </div>
@@ -141,13 +186,13 @@ export function TikTokContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
-          <TikTokManageProvider>
+          <TikTokManageProvider accountId={accountId}>
             <CampaignsTable
               data={campaigns}
-              isLoading={isLoadingCampaigns}
+              isLoading={isLoadingCampaigns || isLoadingAccounts}
               currency={TIKTOK_DASHBOARD_CURRENCY}
               adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
-              fetchCampaignAdSets={getTikTokCampaignAdGroups}
+              fetchCampaignAdSets={fetchCampaignAdSets}
               enableTikTokManage
               tikTokAdSetsByCampaignId={adSetsByCampaignId}
               columnVisibilityStorageKey={TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
@@ -158,7 +203,7 @@ export function TikTokContent() {
         <TabsContent value="ads" className="min-w-0 outline-none">
           <AdsView
             data={adInsights}
-            isLoading={isLoadingAdInsights}
+            isLoading={isLoadingAdInsights || isLoadingAccounts}
             currency={TIKTOK_DASHBOARD_CURRENCY}
           />
         </TabsContent>

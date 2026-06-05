@@ -24,7 +24,7 @@ export function useProductoLinkedCampaigns(
   const { data: tiktokCampaignsAll = [], isLoading: isLoadingTikTokCampaigns } =
     useQuery({
       queryKey: ["tiktok-campaigns", dateRange],
-      queryFn: () => runServerAction(getTikTokCampaignsListAction(dateRange)),
+      queryFn: () => runServerAction(getTikTokCampaignsListAction({ dateRange })),
       enabled: hasTikTok,
       ...dashboardQueryOptions,
     })
@@ -40,7 +40,7 @@ export function useProductoLinkedCampaigns(
   const { data: tiktokAdSetsByCampaignId } = useQuery({
     queryKey: ["tiktok-all-campaign-adgroups", dateRange],
     queryFn: () =>
-      runServerAction(getTikTokAllCampaignAdGroupsAction(dateRange)),
+      runServerAction(getTikTokAllCampaignAdGroupsAction({ dateRange })),
     enabled: hasTikTok,
     ...dashboardQueryOptions,
   })

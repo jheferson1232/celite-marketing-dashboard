@@ -7,6 +7,7 @@ import {
   readTikTokEnvCredentials,
   type TikTokCredentials,
 } from "./tiktok-client"
+import { getTikTokDashboardAccountId } from "./tiktok-dashboard-account.server"
 
 export type { TikTokCredentials, TikTokCredentialSource } from "./tiktok-client"
 
@@ -21,6 +22,22 @@ export function assertTikTokAdAccountPrisma() {
 export const resolveTikTokCredentials = cache(
   async (): Promise<TikTokCredentials> => {
     if (prisma.tikTokAdAccount) {
+      const dashboardAccountId = getTikTokDashboardAccountId()
+      if (dashboardAccountId) {
+        const selected = await prisma.tikTokAdAccount.findFirst({
+          where: { id: dashboardAccountId, status: "active" },
+        })
+        if (selected) {
+          return {
+            accessToken: selected.accessToken,
+            advertiserId: selected.advertiserId,
+            identityId: selected.identityId,
+            source: "database",
+            accountId: selected.id,
+          }
+        }
+      }
+
       const defaultAccount = await prisma.tikTokAdAccount.findFirst({
         where: { status: "active", isDefault: true },
         orderBy: { connectedAt: "desc" },

@@ -20,7 +20,7 @@ function removePendingKey(current: Set<string>, key: string): Set<string> {
   return next
 }
 
-export function useTikTokManageMutations() {
+export function useTikTokManageMutations(accountId?: string) {
   const { invalidateAfterManageChange } = useInvalidateTikTokDashboard()
   const [pendingKeys, setPendingKeys] = React.useState<Set<string>>(
     () => new Set()
@@ -70,7 +70,7 @@ export function useTikTokManageMutations() {
 
       if (entity.type === "campaign") {
         campaignStatusMutation.mutate(
-          { campaignId: entity.id, operationStatus },
+          { campaignId: entity.id, operationStatus, accountId },
           {
             onSuccess: () => {
               invalidateAfterManageChange({ campaignId: entity.id })
@@ -83,7 +83,7 @@ export function useTikTokManageMutations() {
       }
 
       adGroupStatusMutation.mutate(
-        { adgroupId: entity.id, operationStatus },
+        { adgroupId: entity.id, operationStatus, accountId },
         {
           onSuccess: () => {
             invalidateAfterManageChange({
@@ -96,6 +96,7 @@ export function useTikTokManageMutations() {
       )
     },
     [
+      accountId,
       adGroupStatusMutation,
       campaignStatusMutation,
       clearPending,
@@ -114,7 +115,7 @@ export function useTikTokManageMutations() {
 
       if (entity.type === "campaign") {
         campaignBudgetMutation.mutate(
-          { campaignId: entity.id, budget },
+          { campaignId: entity.id, budget, accountId },
           {
             onSuccess: () => {
               invalidateAfterManageChange({ campaignId: entity.id })
@@ -127,7 +128,7 @@ export function useTikTokManageMutations() {
       }
 
       adGroupBudgetMutation.mutate(
-        { adgroupId: entity.id, budget },
+        { adgroupId: entity.id, budget, accountId },
         {
           onSuccess: () => {
             invalidateAfterManageChange({
@@ -140,6 +141,7 @@ export function useTikTokManageMutations() {
       )
     },
     [
+      accountId,
       adGroupBudgetMutation,
       campaignBudgetMutation,
       clearPending,

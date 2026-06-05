@@ -10,11 +10,13 @@ const TikTokManageContext = React.createContext<TikTokManageContextValue | null>
 )
 
 export function TikTokManageProvider({
+  accountId,
   children,
 }: {
+  accountId?: string | null
   children: React.ReactNode
 }) {
-  const value = useTikTokManageMutations()
+  const value = useTikTokManageMutations(accountId ?? undefined)
   return (
     <TikTokManageContext.Provider value={value}>
       {children}

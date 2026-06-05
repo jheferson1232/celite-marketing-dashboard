@@ -26,7 +26,7 @@ export function useProductoCampaignLinks({
 
   const { data: tiktokCampaigns = [] } = useQuery({
     queryKey: ["tiktok-campaigns", dateRange],
-    queryFn: () => runServerAction(getTikTokCampaignsListAction(dateRange)),
+    queryFn: () => runServerAction(getTikTokCampaignsListAction({ dateRange })),
     enabled,
     staleTime: 2 * 60 * 1000,
   })
