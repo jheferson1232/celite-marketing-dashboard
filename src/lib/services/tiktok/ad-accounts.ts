@@ -4,6 +4,10 @@ import {
   assertTikTokAdAccountPrisma,
 } from "./tiktok-credentials.server"
 import { createTikTokClient } from "./tiktok-client"
+import {
+  parseTikTokAdvertiserStatus,
+  type TikTokAdvertiserStatusKind,
+} from "./tiktok-advertiser-status.shared"
 
 export type TikTokAdAccountSummary = {
   id: string
@@ -12,7 +16,12 @@ export type TikTokAdAccountSummary = {
   currency: string | null
   timezone: string | null
   country: string | null
+  /** Conectada en el dashboard vs desconectada */
   status: "active" | "disconnected"
+  /** Estado en TikTok Ads (API /advertiser/info/) */
+  advertiserStatus: string | null
+  advertiserStatusKind: TikTokAdvertiserStatusKind
+  advertiserStatusLabel: string
   isDefault: boolean
   isDefaultForTests: boolean
   connectedAt: string
@@ -44,12 +53,14 @@ function mapAccountRow(row: {
   currency: string | null
   timezone: string | null
   country: string | null
+  advertiserStatus: string | null
   status: string
   isDefault: boolean
   isDefaultForTests: boolean
   connectedAt: Date
   identityId: string | null
 }): TikTokAdAccountSummary {
+  const tikTokStatus = parseTikTokAdvertiserStatus(row.advertiserStatus)
   return {
     id: row.id,
     advertiserId: row.advertiserId,
@@ -58,6 +69,9 @@ function mapAccountRow(row: {
     timezone: row.timezone,
     country: row.country,
     status: row.status === "disconnected" ? "disconnected" : "active",
+    advertiserStatus: tikTokStatus.raw,
+    advertiserStatusKind: tikTokStatus.kind,
+    advertiserStatusLabel: tikTokStatus.label,
     isDefault: row.isDefault,
     isDefaultForTests: row.isDefaultForTests,
     connectedAt: row.connectedAt.toISOString(),
@@ -65,6 +79,15 @@ function mapAccountRow(row: {
     source: "database",
   }
 }
+
+const ADVERTISER_INFO_FIELDS = [
+  "advertiser_id",
+  "name",
+  "currency",
+  "timezone",
+  "country",
+  "status",
+] as const
 
 async function fetchAdvertiserInfo(
   accessToken: string,
@@ -76,6 +99,7 @@ async function fetchAdvertiserInfo(
   }>("/advertiser/info/", {
     params: {
       advertiser_ids: JSON.stringify([advertiserId]),
+      fields: JSON.stringify([...ADVERTISER_INFO_FIELDS]),
     },
   })
 
@@ -193,6 +217,7 @@ export async function connectTikTokAdAccount(input: {
         currency: info.currency ?? null,
         timezone: info.timezone ?? null,
         country: info.country ?? null,
+        advertiserStatus: info.status?.trim() || null,
         status: "active",
         isDefault: setAsDefault || activeCount === 0,
       },
@@ -204,6 +229,7 @@ export async function connectTikTokAdAccount(input: {
         currency: info.currency ?? null,
         timezone: info.timezone ?? null,
         country: info.country ?? null,
+        advertiserStatus: info.status?.trim() || null,
         status: "active",
         ...(setAsDefault ? { isDefault: true } : {}),
       },
@@ -398,8 +424,49 @@ export async function refreshTikTokAdAccountMetadata(
       currency: info.currency ?? account.currency,
       timezone: info.timezone ?? account.timezone,
       country: info.country ?? account.country,
+      advertiserStatus: info.status?.trim() || account.advertiserStatus,
     },
   })
 
   return mapAccountRow(updated)
+}
+
+export async function refreshAllTikTokAdAccountStatuses(): Promise<
+  TikTokAdAccountSummary[]
+> {
+  assertTikTokAdAccountPrisma()
+
+  const rows = await prisma.tikTokAdAccount.findMany({
+    where: { status: "active" },
+    orderBy: { connectedAt: "desc" },
+  })
+
+  await Promise.all(
+    rows.map(async (row) => {
+      if (!row.accessToken?.trim()) return
+      try {
+        const info = await fetchAdvertiserInfo(
+          row.accessToken,
+          row.advertiserId
+        )
+        await prisma.tikTokAdAccount.update({
+          where: { id: row.id },
+          data: {
+            name: info.name?.trim() || row.name,
+            currency: info.currency ?? row.currency,
+            timezone: info.timezone ?? row.timezone,
+            country: info.country ?? row.country,
+            advertiserStatus: info.status?.trim() || null,
+          },
+        })
+      } catch (error) {
+        console.warn(
+          `[tiktok] No se pudo refrescar estado de ${row.advertiserId}:`,
+          error instanceof Error ? error.message : error
+        )
+      }
+    })
+  )
+
+  return listTikTokAdAccounts()
 }

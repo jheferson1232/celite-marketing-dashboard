@@ -23,10 +23,12 @@ import {
   getTikTokOAuthStatusAction,
   importTikTokEnvAccountAction,
   listTikTokAdAccountsAction,
+  refreshAllTikTokAdAccountsAction,
   setDefaultTikTokAdAccountForTestsAction,
 } from "../_actions/tiktok-ad-accounts"
 import { ConnectTikTokAccountButton } from "./connect-tiktok-account-button"
 import { ConnectTikTokAccountDialog } from "./connect-tiktok-account-dialog"
+import { TikTokAdvertiserStatusBadge } from "./tiktok-advertiser-status-badge"
 
 const ACCOUNTS_QUERY_KEY = ["tiktok-ad-accounts"] as const
 
@@ -165,6 +167,20 @@ export function TikTokCuentasContent() {
     },
   })
 
+  const refreshMutation = useMutation({
+    mutationFn: () => runServerAction(refreshAllTikTokAdAccountsAction()),
+    onSuccess: () => {
+      invalidate()
+    },
+    onError: (error) => {
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Error al actualizar estados",
+      })
+    },
+  })
+
   const accounts = accountsQuery.data ?? []
   const envAccount = envQuery.data
   const isLoading = accountsQuery.isLoading || envQuery.isLoading
@@ -172,7 +188,8 @@ export function TikTokCuentasContent() {
     connectMutation.isPending ||
     importEnvMutation.isPending ||
     testDefaultMutation.isPending ||
-    disconnectMutation.isPending
+    disconnectMutation.isPending ||
+    refreshMutation.isPending
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
@@ -247,12 +264,17 @@ export function TikTokCuentasContent() {
                     <span className="truncate text-base font-semibold">
                       {account.name}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                    >
-                      ACTIVA
-                    </Badge>
+                    <TikTokAdvertiserStatusBadge
+                      label={account.advertiserStatusLabel}
+                      kind={account.advertiserStatusKind}
+                      raw={account.advertiserStatus}
+                    />
+                    {account.advertiserStatusKind === "suspended" ||
+                    account.advertiserStatusKind === "limited" ? (
+                      <span className="text-muted-foreground text-xs">
+                        No podés operar campañas con esta cuenta en TikTok.
+                      </span>
+                    ) : null}
                     {account.isDefaultForTests ? (
                       <Badge variant="secondary" className="gap-1">
                         <RiStarFill className="size-3 text-amber-500" />
@@ -358,13 +380,10 @@ export function TikTokCuentasContent() {
           variant="ghost"
           size="sm"
           disabled={isLoading || isBusy}
-          onClick={() => {
-            void accountsQuery.refetch()
-            void envQuery.refetch()
-          }}
+          onClick={() => refreshMutation.mutate()}
         >
-          <RiRefreshLine />
-          Actualizar lista
+          <RiRefreshLine className={refreshMutation.isPending ? "animate-spin" : ""} />
+          Actualizar estados TikTok
         </Button>
       </div>
 

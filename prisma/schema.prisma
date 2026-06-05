@@ -282,8 +282,9 @@ model TikTokAdAccount {
   identityId   String?
   currency     String?
   timezone     String?
-  country      String?
-  status       String   @default("active")
+  country          String?
+  advertiserStatus String?
+  status           String   @default("active")
   isDefault    Boolean  @default(false)
   isDefaultForTests Boolean @default(false)
   connectedAt  DateTime @default(now())

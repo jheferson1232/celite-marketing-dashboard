@@ -7,6 +7,7 @@ import {
   getTikTokEnvAccountSummary,
   importTikTokEnvAccount,
   listTikTokAdAccounts,
+  refreshAllTikTokAdAccountStatuses,
   refreshTikTokAdAccountMetadata,
   setDefaultTikTokAdAccount,
   setDefaultTikTokAdAccountForTests,
@@ -75,4 +76,8 @@ export const disconnectTikTokAdAccountAction = createServerAction(
 
 export const refreshTikTokAdAccountAction = createServerAction(
   async (accountId: string) => refreshTikTokAdAccountMetadata(accountId)
+)
+
+export const refreshAllTikTokAdAccountsAction = createServerAction(async () =>
+  refreshAllTikTokAdAccountStatuses()
 )
