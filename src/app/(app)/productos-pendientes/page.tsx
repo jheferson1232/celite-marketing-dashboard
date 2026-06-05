@@ -3,16 +3,15 @@ import { AppPageScrollShell } from "@/components/app-page-scroll-shell"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   describeSociaVaultCreditsPerSearch,
-  getSociaVaultSearchConfig,
 } from "@/lib/services/sociavault/sociavault-config"
-import { ProductosPendientesShell } from "./_components/productos-pendientes-shell"
+import { ProductosPendientesContent } from "./_components/productos-pendientes-content"
 
 export const maxDuration = 300
 
 export const metadata = {
   title: "Productos pendientes | Marketing",
   description:
-    "Productos pendientes, tiendas y scraping Meta Ad Library con SociaVault",
+    "Productos pendientes y búsqueda de videos TikTok con SociaVault",
 }
 
 export default function ProductosPendientesPage() {
@@ -27,7 +26,7 @@ export default function ProductosPendientesPage() {
           </div>
         }
       >
-        <ProductosPendientesShell
+        <ProductosPendientesContent
           creditsHint={describeSociaVaultCreditsPerSearch()}
         />
       </Suspense>
