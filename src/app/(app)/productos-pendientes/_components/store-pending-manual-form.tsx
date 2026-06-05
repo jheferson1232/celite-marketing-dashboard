@@ -47,9 +47,18 @@ export function StorePendingManualForm({
       await onSubmit({ source: source.trim() })
       onOpenChange(false)
     } catch (error) {
-      setFormError(
+      const raw =
         error instanceof Error ? error.message : "No se pudo guardar la tienda."
-      )
+      const short =
+        raw.includes("Invalid `") && raw.includes("findFirst()` invocation")
+          ? (raw.split("\n").find((line) => /does not exist|P2021|relation/i.test(line)) ??
+            "Faltan tablas de tiendas en la base de datos. Ejecuta `pnpm exec prisma migrate deploy` (local) o redeploy en Vercel.")
+          : /P2021|does not exist|relation.*StorePending/i.test(raw)
+            ? "Faltan tablas de tiendas en la base de datos. Ejecuta `pnpm exec prisma migrate deploy` (local) o redeploy en Vercel."
+            : raw.length > 280
+              ? `${raw.slice(0, 280)}…`
+              : raw
+      setFormError(short)
     }
   }
 
