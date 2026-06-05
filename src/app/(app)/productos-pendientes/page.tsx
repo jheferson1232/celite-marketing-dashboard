@@ -5,13 +5,14 @@ import {
   describeSociaVaultCreditsPerSearch,
   getSociaVaultSearchConfig,
 } from "@/lib/services/sociavault/sociavault-config"
-import { ProductosPendientesContent } from "./_components/productos-pendientes-content"
+import { ProductosPendientesShell } from "./_components/productos-pendientes-shell"
 
 export const maxDuration = 300
 
 export const metadata = {
   title: "Productos pendientes | Marketing",
-  description: "Productos y búsqueda de videos TikTok con SociaVault",
+  description:
+    "Productos pendientes, tiendas y scraping Meta Ad Library con SociaVault",
 }
 
 export default function ProductosPendientesPage() {
@@ -26,7 +27,7 @@ export default function ProductosPendientesPage() {
           </div>
         }
       >
-        <ProductosPendientesContent
+        <ProductosPendientesShell
           creditsHint={describeSociaVaultCreditsPerSearch()}
         />
       </Suspense>

@@ -274,8 +274,10 @@ function PendingProductRow({
 
 export function ProductosPendientesContent({
   creditsHint,
+  embedded = false,
 }: {
   creditsHint: string
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const [manualFormOpen, setManualFormOpen] = useState(false)
@@ -345,7 +347,12 @@ export function ProductosPendientesContent({
   }, [products])
 
   return (
-    <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
+    <div
+      className={cn(
+        "flex w-full flex-col gap-6",
+        !embedded && "p-6 lg:p-8"
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-1 flex items-center gap-2 text-muted-foreground">
