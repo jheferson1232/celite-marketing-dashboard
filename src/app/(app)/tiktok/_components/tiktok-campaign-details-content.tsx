@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table"
 import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
-import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights"
+import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 import { getTikTokCampaignDailyInsightsAction } from "../_actions/campaign-daily-insights"
 import { TikTokCampaignDetailsChart } from "./tiktok-campaign-details-chart"
 

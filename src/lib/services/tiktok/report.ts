@@ -1,6 +1,6 @@
 import type { DateRange } from "@/lib/services/meta/types"
 import { addDaysToDateString, getDashboardToday } from "@/lib/date"
-import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
+import { getTikTokRequestContext } from "./tiktok-api.server"
 import { withTikTokCache } from "./tiktok-cache"
 import type { TikTokApiResponse, TikTokReportData, TikTokReportRow } from "./types"
 
@@ -179,8 +179,7 @@ export async function fetchIntegratedReport(
     reportType?: TikTokReportType
   }
 ): Promise<TikTokReportRow[]> {
-  const api = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client: api, advertiserId } = await getTikTokRequestContext()
   const rows: TikTokReportRow[] = []
   let page = 1
   let totalPage = 1

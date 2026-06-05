@@ -272,6 +272,28 @@ model TikTokAgentSettings {
   @@map("TikTokAgentSettings")
 }
 
+/** Cuenta TikTok Ads conectada (credenciales para API). */
+model TikTokAdAccount {
+  id           String   @id @default(cuid())
+  advertiserId String   @unique
+  name         String
+  accessToken  String
+  refreshToken String?
+  identityId   String?
+  currency     String?
+  timezone     String?
+  country      String?
+  status       String   @default("active")
+  isDefault    Boolean  @default(false)
+  isDefaultForTests Boolean @default(false)
+  connectedAt  DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status, isDefault])
+  @@index([status, isDefaultForTests])
+  @@map("TikTokAdAccount")
+}
+
 /** Corrida del agente TikTok (cron o manual). */
 model TikTokAgentRun {
   id               String    @id @default(cuid())

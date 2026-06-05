@@ -11,7 +11,7 @@ import {
   getTikTokLandingPageUrl,
   resolveTikTokLandingPageUrl,
 } from "./landing-page-url"
-import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
+import { getTikTokRequestContext } from "./tiktok-api.server"
 import { withTikTokCache } from "./tiktok-cache"
 import { fetchTikTokPurchaseGenderByAdId } from "./purchase-gender"
 import type {
@@ -41,8 +41,7 @@ function buildActions(purchases: number, comments: number): MetaAction[] {
 async function fetchImageUrls(imageIds: string[]): Promise<Map<string, string>> {
   if (imageIds.length === 0) return new Map()
 
-  const api = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client: api, advertiserId } = await getTikTokRequestContext()
   const map = new Map<string, string>()
   const BATCH = 100
 
@@ -74,8 +73,7 @@ async function fetchImageUrls(imageIds: string[]): Promise<Map<string, string>> 
 async function fetchVideoCovers(videoIds: string[]): Promise<Map<string, string>> {
   if (videoIds.length === 0) return new Map()
 
-  const api = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client: api, advertiserId } = await getTikTokRequestContext()
   const map = new Map<string, string>()
   const BATCH = 60
 

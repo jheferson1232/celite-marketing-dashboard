@@ -10,6 +10,7 @@ import {
   RiShoppingBag2Line,
   RiMegaphoneLine,
   RiMetaLine,
+  RiLinksLine,
   RiTiktokLine,
   RiRobotLine,
 } from "@remixicon/react"
@@ -50,6 +51,12 @@ const navItems = [
     title: "TikTok",
     href: "/tiktok",
     icon: RiTiktokLine,
+  },
+  {
+    id: "tiktok-cuentas",
+    title: "Cuentas TikTok Ads",
+    href: "/tiktok/cuentas",
+    icon: RiLinksLine,
   },
   {
     id: "tiktok-agente",
@@ -124,13 +131,14 @@ export function AppSidebar() {
                           ? pathname === "/informe-ia" ||
                             pathname.startsWith("/informe-ia/")
                           : item.id === "tiktok"
-                            ? (pathname === "/tiktok" ||
-                                pathname.startsWith("/tiktok/")) &&
-                              !pathname.startsWith("/tiktok/agente")
-                            : item.id === "tiktok-agente"
-                              ? pathname === "/tiktok/agente" ||
-                                pathname.startsWith("/tiktok/agente/")
-                              : item.id === "campaigns"
+                            ? pathname === "/tiktok"
+                            : item.id === "tiktok-cuentas"
+                              ? pathname === "/tiktok/cuentas" ||
+                                pathname.startsWith("/tiktok/cuentas/")
+                              : item.id === "tiktok-agente"
+                                ? pathname === "/tiktok/agente" ||
+                                  pathname.startsWith("/tiktok/agente/")
+                                : item.id === "campaigns"
                               ? pathname === "/campaigns" ||
                                 pathname.startsWith("/campaigns/")
                             : item.id === "products"

@@ -1,5 +1,5 @@
 import { parseAsString, useQueryStates } from "nuqs"
-import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights"
+import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 
 function defaultRange() {
   return getLastSevenDaysRange()

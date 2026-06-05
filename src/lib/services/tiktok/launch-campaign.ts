@@ -15,7 +15,10 @@ import type {
   TikTokLaunchCampaignConfig,
   TikTokLaunchResult,
 } from "./launch-campaign-types"
-import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
+import {
+  getTikTokRequestContext,
+} from "./tiktok-api.server"
+import { resolveTikTokCredentials } from "./tiktok-credentials.server"
 import { clearTikTokCache } from "./tiktok-cache"
 import { pacedTikTokRequest } from "./tiktok-request-pacing"
 import type { TikTokCampaign } from "./types"
@@ -46,18 +49,21 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function getIdentityId(cfg: TikTokLaunchCampaignConfig): string {
+function getIdentityId(
+  cfg: TikTokLaunchCampaignConfig,
+  identityId: string | null
+): string {
   return (
     cfg.campaign.identity_id ??
+    identityId?.trim() ??
     process.env.TIKTOK_IDENTITY_ID?.trim() ??
     "1e66c1ac-4cf3-5052-85d8-ff750ffe808f"
   )
 }
 
-function getAccessToken(): string {
-  const token = process.env.TIKTOK_ACCESS_TOKEN?.trim()
-  if (!token) throw new Error("TIKTOK_ACCESS_TOKEN no está configurado")
-  return token
+async function getAccessToken(): Promise<string> {
+  const { accessToken } = await resolveTikTokCredentials()
+  return accessToken
 }
 
 function buildUrl(
@@ -88,7 +94,7 @@ function updateProgress(
 
 async function tiktokPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   return pacedTikTokRequest(async () => {
-    const client = getTikTokClient()
+    const { client } = await getTikTokRequestContext()
     const { data } = await client.post<{ data: T }>(path, body)
     return data.data
   })
@@ -99,8 +105,7 @@ async function tiktokGet<T>(
   params: Record<string, string> = {}
 ): Promise<T> {
   return pacedTikTokRequest(async () => {
-    const client = getTikTokClient()
-    const advertiserId = getTikTokAdvertiserId()
+    const { client, advertiserId } = await getTikTokRequestContext()
     const { data } = await client.get<{ data: T }>(path, {
       params: { advertiser_id: advertiserId, ...params },
     })
@@ -174,8 +179,8 @@ async function uploadVideo(filePath: string, ctx: LaunchContext): Promise<string
 
   const name = filePath.split(/[/\\]/).pop() ?? "video.mp4"
   const buf = fs.readFileSync(filePath)
-  const token = getAccessToken()
-  const advertiserId = getTikTokAdvertiserId()
+  const token = await getAccessToken()
+  const { advertiserId } = await getTikTokRequestContext()
   const fd = new FormData()
   fd.append("advertiser_id", advertiserId)
   fd.append("upload_type", "UPLOAD_BY_FILE")
@@ -245,8 +250,8 @@ async function uploadCover(videoId: string, ctx: LaunchContext): Promise<string>
     return existing
   }
 
-  const token = getAccessToken()
-  const advertiserId = getTikTokAdvertiserId()
+  const token = await getAccessToken()
+  const { advertiserId } = await getTikTokRequestContext()
   const fd = new FormData()
   fd.append("advertiser_id", advertiserId)
   fd.append("upload_type", "UPLOAD_BY_FILE")
@@ -301,7 +306,7 @@ async function resolveCampaignId(
     return { campaignId: existing, reusedExisting: true }
   }
 
-  const advertiserId = getTikTokAdvertiserId()
+  const { advertiserId } = await getTikTokRequestContext()
   const campaignData = await tiktokPost<{ campaign_id: string }>(
     "/campaign/create/",
     {
@@ -341,9 +346,10 @@ async function createAdgroupAndAd(
   index: number,
   videoId: string,
   imageId: string,
-  startTime: string
+  startTime: string,
+  api: { advertiserId: string; identityId: string | null }
 ): Promise<TikTokLaunchResult["adGroups"][number]> {
-  const advertiserId = getTikTokAdvertiserId()
+  const { advertiserId, identityId } = api
   const CTAS = cfg.ctas ?? ["SHOP_NOW", "ORDER_NOW", "LEARN_MORE"]
   const cta = CTAS[index % CTAS.length]!
   const landingUrl = buildUrl(
@@ -393,7 +399,7 @@ async function createAdgroupAndAd(
         ad_name: ag.name,
         ad_format: "SINGLE_VIDEO",
         identity_type: "TT_USER",
-        identity_id: getIdentityId(cfg),
+        identity_id: getIdentityId(cfg, identityId),
         video_id: videoId,
         image_ids: [imageId],
         ad_text: cfg.campaign.ad_text ?? "",
@@ -418,6 +424,9 @@ export async function launchTikTokCampaign(
   cfg: TikTokLaunchCampaignConfig,
   options: LaunchOptions = {}
 ): Promise<TikTokLaunchResult> {
+  const { advertiserId, identityId } = await getTikTokRequestContext()
+  const launchApi = { advertiserId, identityId }
+
   const ctx: LaunchContext = {
     cfg,
     metrics: options.metrics,
@@ -495,7 +504,8 @@ export async function launchTikTokCampaign(
         i,
         videoIds[i]!,
         imageIds[i]!,
-        startTime
+        startTime,
+        launchApi
       )
       results.push(result)
     }
@@ -513,9 +523,8 @@ export async function launchTikTokCampaign(
     updateProgress(ctx, "enable_campaign", totalAdgroups, totalAdgroups)
 
     const enableCampaign = async () => {
-      const advertiserId = getTikTokAdvertiserId()
       await tiktokPost("/campaign/status/update/", {
-        advertiser_id: advertiserId,
+        advertiser_id: launchApi.advertiserId,
         campaign_ids: [campaignId],
         operation_status: "ENABLE",
       })
@@ -527,7 +536,7 @@ export async function launchTikTokCampaign(
         ...Array.from({ length: Math.ceil(agIds.length / 20) }, (_, batchIndex) => {
           const start = batchIndex * 20
           return tiktokPost("/adgroup/status/update/", {
-            advertiser_id: advertiserId,
+            advertiser_id: launchApi.advertiserId,
             adgroup_ids: agIds.slice(start, start + 20),
             operation_status: "ENABLE",
           })
@@ -535,7 +544,7 @@ export async function launchTikTokCampaign(
         ...Array.from({ length: Math.ceil(adIds.length / 20) }, (_, batchIndex) => {
           const start = batchIndex * 20
           return tiktokPost("/ad/status/update/", {
-            advertiser_id: advertiserId,
+            advertiser_id: launchApi.advertiserId,
             ad_ids: adIds.slice(start, start + 20),
             operation_status: "ENABLE",
           })

@@ -24,6 +24,7 @@ import {
 } from "./launch-progress"
 import type { LaunchCheckItem } from "./launch-preflight"
 import { stageCampaignAdgroupVideosFromBlob } from "./stage-campaign-videos"
+import { hasTikTokCredentialsConfigured } from "./tiktok-credentials.server"
 
 export type CampaignLaunchPreflightResult = {
   ready: boolean
@@ -54,16 +55,14 @@ export type LaunchFromCampaignSummary = {
 
 const LAUNCHABLE_STATUSES = new Set(["draft", "ready"])
 
-function checkTikTokEnv(): LaunchCheckItem {
-  const token = process.env.TIKTOK_ACCESS_TOKEN?.trim()
-  const advertiserId = process.env.TIKTOK_ADVERTISER_ID?.trim()
-  const ok = Boolean(token && advertiserId)
+async function checkTikTokEnv(): Promise<LaunchCheckItem> {
+  const ok = await hasTikTokCredentialsConfigured()
   return {
     ok,
     label: "Credenciales TikTok",
     detail: ok
-      ? "Token y advertiser configurados"
-      : "Faltan TIKTOK_ACCESS_TOKEN o TIKTOK_ADVERTISER_ID",
+      ? "Cuenta TikTok Ads conectada (BD o .env)"
+      : "Conectá una cuenta en Cuentas TikTok Ads o configurá .env",
   }
 }
 
@@ -98,9 +97,9 @@ function buildLaunchConfigFromCampaign(
   }
 }
 
-function buildCampaignLaunchPreflight(
+async function buildCampaignLaunchPreflight(
   campaign: CampaignRecord
-): CampaignLaunchPreflightResult {
+): Promise<CampaignLaunchPreflightResult> {
   const checks: LaunchCheckItem[] = []
   const aboConfig = campaign.config as ABOStrategyConfig
   const context = getABOCampaignContext(aboConfig)
@@ -173,7 +172,7 @@ function buildCampaignLaunchPreflight(
         : "Se requiere al menos un video asociado",
   })
 
-  checks.push(checkTikTokEnv())
+  checks.push(await checkTikTokEnv())
 
   const blocking = checks.filter((c) => !c.ok)
   const ready = blocking.length === 0 && launchCfg.adgroups.length > 0
@@ -203,7 +202,7 @@ export async function previewLaunchFromCampaign(
   campaignId: string
 ): Promise<CampaignLaunchPreflightResult> {
   const campaign = await getCampaignForTikTokLaunch(campaignId)
-  return buildCampaignLaunchPreflight(campaign)
+  return await buildCampaignLaunchPreflight(campaign)
 }
 
 export function formatLaunchFromCampaignMessage(
@@ -241,7 +240,7 @@ export async function launchTikTokCampaignFromCampaign(
 
   try {
     const campaign = await getCampaignForTikTokLaunch(campaignId)
-    const preflight = buildCampaignLaunchPreflight(campaign)
+    const preflight = await buildCampaignLaunchPreflight(campaign)
 
     if (!preflight.ready) {
       const missing = preflight.checks

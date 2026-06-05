@@ -22,7 +22,7 @@ import {
   TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
-import type { TikTokCampaignDailyInsight } from "@/lib/services/tiktok/campaign-daily-insights"
+import type { TikTokCampaignDailyInsight } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 
 const chartConfig = {
   spend: {

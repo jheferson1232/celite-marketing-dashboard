@@ -1,6 +1,6 @@
 import { isTikTokEditableDailyBudget } from "./budget-mode"
 import { fetchAllPages } from "./fetch-all-pages"
-import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
+import { getTikTokRequestContext } from "./tiktok-api.server"
 import { clearTikTokCache } from "./tiktok-cache"
 import type { TikTokAdGroup, TikTokCampaign } from "./types"
 
@@ -161,9 +161,9 @@ export async function updateTikTokCampaignStatus(
     throw new Error("Se requiere al menos un ID de campaña")
   }
 
-  const client = getTikTokClient()
+  const { client, advertiserId } = await getTikTokRequestContext()
   await client.post("/campaign/status/update/", {
-    advertiser_id: getTikTokAdvertiserId(),
+    advertiser_id: advertiserId,
     campaign_ids: campaignIds,
     operation_status: operationStatus,
   })
@@ -179,8 +179,7 @@ export async function updateTikTokAdGroupStatus(
     throw new Error("Se requiere al menos un ID de conjunto")
   }
 
-  const client = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client, advertiserId } = await getTikTokRequestContext()
   const sample = await fetchAdGroupById(adgroupIds[0]!)
   const useSmartPlus = sample != null && isUpgradedSmartPlusAdGroup(sample)
 
@@ -211,9 +210,9 @@ export async function updateTikTokCampaignBudget(
 
   assertValidDailyBudget(budget)
 
-  const client = getTikTokClient()
+  const { client, advertiserId } = await getTikTokRequestContext()
   await client.post("/campaign/update/", {
-    advertiser_id: getTikTokAdvertiserId(),
+    advertiser_id: advertiserId,
     campaign_id: campaignId,
     budget,
   })
@@ -253,8 +252,7 @@ export async function updateTikTokAdGroupBudget(
 
   assertValidDailyBudget(budget)
 
-  const client = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client, advertiserId } = await getTikTokRequestContext()
   const adGroup = await fetchAdGroupById(adgroupId)
   const useSmartPlus = adGroup != null && isUpgradedSmartPlusAdGroup(adGroup)
 

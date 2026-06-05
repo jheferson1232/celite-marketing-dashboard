@@ -6,7 +6,7 @@ import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
 import { getTikTokCampaignsListAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
 import { runServerAction } from "@/lib/server-action"
 import type { ProductPlatform, ProductRecord } from "@/lib/services/product"
-import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights"
+import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 import {
   linkProductCampaignAction,
   unlinkProductCampaignAction,

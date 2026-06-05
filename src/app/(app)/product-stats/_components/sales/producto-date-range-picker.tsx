@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights"
+import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 
 interface ProductoDateRangePickerProps {
   from: string

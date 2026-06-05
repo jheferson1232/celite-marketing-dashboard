@@ -1,12 +1,11 @@
-import { getTikTokAdvertiserId, getTikTokClient } from "./tiktok"
+import { getTikTokRequestContext } from "./tiktok-api.server"
 import type { TikTokApiResponse, TikTokListResponse } from "./types"
 
 export async function fetchAllPages<T>(
   path: string,
   extraParams: Record<string, string> = {}
 ): Promise<T[]> {
-  const api = getTikTokClient()
-  const advertiserId = getTikTokAdvertiserId()
+  const { client: api, advertiserId } = await getTikTokRequestContext()
   const items: T[] = []
   let page = 1
   let totalPage = 1
