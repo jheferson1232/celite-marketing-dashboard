@@ -17,7 +17,7 @@ import { CampaignsTable } from "@/app/(app)/dashboard/_components/campaigns"
 import { AdsView } from "@/app/(app)/dashboard/_components/ads"
 import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-picker"
 import { ThemeToggleButton } from "@/app/(app)/dashboard/_components/theme-toggle-button"
-import { TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import { resolveTikTokAccountCurrency } from "@/lib/services/tiktok/account-currency"
 import { TikTokManageProvider } from "./tiktok-manage-provider"
 import { TikTokAccountSelect } from "./tiktok-account-select"
 import { useTikTokDashboardAccount } from "./use-tiktok-dashboard-account"
@@ -40,8 +40,11 @@ export function TikTokContent() {
     accounts,
     accountId,
     setAccountId,
+    selectedAccount,
     isLoading: isLoadingAccounts,
   } = useTikTokDashboardAccount()
+
+  const accountCurrency = resolveTikTokAccountCurrency(selectedAccount?.currency)
 
   const dashboardQueryOptions = {
     staleTime: 2 * 60 * 1000,
@@ -183,7 +186,7 @@ export function TikTokContent() {
         <KpiCards
           data={kpis}
           isLoading={isDashboardFetching}
-          currency={TIKTOK_DASHBOARD_CURRENCY}
+          currency={accountCurrency}
         />
       </div>
 
@@ -202,12 +205,12 @@ export function TikTokContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
-          <TikTokManageProvider accountId={accountId}>
+          <TikTokManageProvider accountId={accountId} currency={accountCurrency}>
             <CampaignsTable
               key={accountId ?? "no-account"}
               data={campaigns}
               isLoading={isLoadingCampaigns || isLoadingAccounts}
-              currency={TIKTOK_DASHBOARD_CURRENCY}
+              currency={accountCurrency}
               adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
               fetchCampaignAdSets={fetchCampaignAdSets}
               enableTikTokManage
@@ -221,7 +224,8 @@ export function TikTokContent() {
           <AdsView
             data={adInsights}
             isLoading={isLoadingAdInsights || isLoadingAccounts}
-            currency={TIKTOK_DASHBOARD_CURRENCY}
+            currency={accountCurrency}
+            platform="tiktok"
           />
         </TabsContent>
       </Tabs>

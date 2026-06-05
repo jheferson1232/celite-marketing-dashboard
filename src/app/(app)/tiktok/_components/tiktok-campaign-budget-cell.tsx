@@ -1,8 +1,9 @@
 "use client"
 
 import type { CampaignRow } from "@/lib/services/meta/types"
-import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { TikTokBudgetCell } from "./tiktok-budget-cell"
+import { useTikTokDashboardCurrency } from "./tiktok-manage-provider"
 import { canEditTikTokDailyBudget } from "./tiktok-manage-types"
 
 interface TikTokCampaignBudgetCellProps {
@@ -10,6 +11,7 @@ interface TikTokCampaignBudgetCellProps {
 }
 
 export function TikTokCampaignBudgetCell({ campaign }: TikTokCampaignBudgetCellProps) {
+  const currency = useTikTokDashboardCurrency()
   const entity = {
     type: "campaign" as const,
     id: campaign.id,
@@ -31,7 +33,7 @@ export function TikTokCampaignBudgetCell({ campaign }: TikTokCampaignBudgetCellP
         className="text-right text-sm tabular-nums text-muted-foreground"
         title="Presupuesto en conjuntos — expande la fila para editar cada uno"
       >
-        {formatCurrency(sum, TIKTOK_DASHBOARD_CURRENCY)}
+        {formatCurrency(sum, currency)}
         <span className="mt-0.5 block text-[10px] font-normal">Σ conjuntos</span>
       </div>
     )

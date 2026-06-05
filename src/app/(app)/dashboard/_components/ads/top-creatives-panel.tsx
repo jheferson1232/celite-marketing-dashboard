@@ -43,6 +43,7 @@ import { CreativePreviewImage } from "./creative-preview-image"
 interface TopCreativesPanelProps {
   rows: AdInsightRow[]
   currency?: CurrencyCode
+  platform?: "meta" | "tiktok"
 }
 
 function mergeRows(group: AdInsightRow[]): AdInsightRow {
@@ -133,6 +134,7 @@ function CreativeCard({
   metrics,
   metricOptions,
   currency,
+  platform,
   adsCount,
 }: {
   creativeKey: string
@@ -140,11 +142,12 @@ function CreativeCard({
   metrics: MetricKey[]
   metricOptions: { key: MetricKey; label: string }[]
   currency: CurrencyCode
+  platform: "meta" | "tiktok"
   adsCount: number
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
   const hasVideo = !!row.video_id
-  const displayTitle = getCreativeCardDisplayTitle(row, currency)
+  const displayTitle = getCreativeCardDisplayTitle(row, currency, platform)
 
   // We need to adapt AdInsightRow to CreativeRow for CreativePreviewDialog
   const creativeRowAdapter = {
@@ -254,9 +257,10 @@ function CreativeCard({
 export function TopCreativesPanel({
   rows,
   currency = META_DASHBOARD_CURRENCY,
+  platform = "meta",
 }: TopCreativesPanelProps) {
   const metricOptions =
-    currency === META_DASHBOARD_CURRENCY
+    platform === "meta"
       ? META_CREATIVES_TABLE_METRICS
       : METRIC_OPTIONS
 
@@ -385,6 +389,7 @@ export function TopCreativesPanel({
             metrics={selectedMetrics}
             metricOptions={metricOptions}
             currency={currency}
+            platform={platform}
             adsCount={count}
           />
         ))}

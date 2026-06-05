@@ -12,7 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import {
+  formatCurrency,
+  TIKTOK_DASHBOARD_CURRENCY,
+  type CurrencyCode,
+} from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
 import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 import { getTikTokCampaignDailyInsightsAction } from "../_actions/campaign-daily-insights"
@@ -20,10 +24,12 @@ import { TikTokCampaignDetailsChart } from "./tiktok-campaign-details-chart"
 
 interface TikTokCampaignDetailsContentProps {
   campaignId: string
+  currency?: CurrencyCode
 }
 
 export function TikTokCampaignDetailsContent({
   campaignId,
+  currency = TIKTOK_DASHBOARD_CURRENCY,
 }: TikTokCampaignDetailsContentProps) {
   const dateRange = getLastSevenDaysRange()
 
@@ -67,7 +73,7 @@ export function TikTokCampaignDetailsContent({
       <div className="grid grid-cols-3 gap-3">
         <SummaryCard
           label="Gasto total"
-          value={formatCurrency(data.totals.spend, TIKTOK_DASHBOARD_CURRENCY)}
+          value={formatCurrency(data.totals.spend, currency)}
         />
         <SummaryCard
           label="Compras"
@@ -77,7 +83,7 @@ export function TikTokCampaignDetailsContent({
           label="CPA"
           value={
             data.totals.cpa > 0
-              ? formatCurrency(data.totals.cpa, TIKTOK_DASHBOARD_CURRENCY)
+              ? formatCurrency(data.totals.cpa, currency)
               : "—"
           }
         />
@@ -85,9 +91,9 @@ export function TikTokCampaignDetailsContent({
 
       <div>
         <h3 className="mb-2 text-sm font-medium">Gasto diario y compras</h3>
-        <TikTokCampaignDetailsChart days={data.days} />
+        <TikTokCampaignDetailsChart days={data.days} currency={currency} />
         <p className="mt-2 text-xs text-muted-foreground">
-          Barras: gasto (S/) · Línea: compras
+          Barras: gasto ({currency === "PEN" ? "S/" : "$"}) · Línea: compras
         </p>
       </div>
 
@@ -111,7 +117,7 @@ export function TikTokCampaignDetailsContent({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {day.spend > 0
-                      ? formatCurrency(day.spend, TIKTOK_DASHBOARD_CURRENCY)
+                      ? formatCurrency(day.spend, currency)
                       : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -119,7 +125,7 @@ export function TikTokCampaignDetailsContent({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {day.cpa > 0
-                      ? formatCurrency(day.cpa, TIKTOK_DASHBOARD_CURRENCY)
+                      ? formatCurrency(day.cpa, currency)
                       : "—"}
                   </TableCell>
                 </TableRow>

@@ -2,7 +2,6 @@ import type { AdInsightRow, MetaAction } from "@/lib/services/meta/types"
 import {
   formatCurrency,
   META_DASHBOARD_CURRENCY,
-  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
 
@@ -13,7 +12,7 @@ export function passesTikTokCreativeSpendFilter(
   spend: number | string,
   currency: CurrencyCode
 ): boolean {
-  if (currency !== TIKTOK_DASHBOARD_CURRENCY) return true
+  if (currency !== "PEN") return true
   const value = typeof spend === "string" ? parseFloat(spend) : spend
   return Number.isFinite(value) && value >= TIKTOK_MIN_CREATIVE_SPEND_PEN
 }
@@ -24,7 +23,7 @@ export function hasVisibleCreativesForAdsView(
   currency: CurrencyCode
 ): boolean {
   if (!rows.length) return false
-  if (currency !== TIKTOK_DASHBOARD_CURRENCY) return true
+  if (currency !== "PEN") return true
 
   const map = new Map<string, number>()
   for (const row of rows) {
@@ -291,9 +290,10 @@ export function pickAdsetNamesFromGroup(group: AdInsightRow[]): string {
 /** TikTok: título = campaña. Meta sin URL: campaña; con URL: nombre del anuncio. */
 export function getCreativeCardDisplayTitle(
   row: AdInsightRow,
-  currency: CurrencyCode = META_DASHBOARD_CURRENCY
+  currency: CurrencyCode = META_DASHBOARD_CURRENCY,
+  platform: "meta" | "tiktok" = "meta"
 ): string {
-  if (currency === TIKTOK_DASHBOARD_CURRENCY) {
+  if (platform === "tiktok") {
     return row.campaign_name?.trim() || row.ad_name?.trim() || "Sin nombre"
   }
   if (!row.url?.trim()) {

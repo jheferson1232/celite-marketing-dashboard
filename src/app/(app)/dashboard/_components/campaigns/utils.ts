@@ -15,7 +15,7 @@ export function formatPercent(value: number): string {
 
 /** Umbrales de clasificación por moneda (gasto y CPA en la misma unidad). */
 function getPerformanceThresholds(currency: CurrencyCode) {
-  if (currency === TIKTOK_DASHBOARD_CURRENCY) {
+  if (currency === "PEN") {
     return {
       /** CPA &lt; esto con venta → Excelente (equiv. 10k COP Informe IA). */
       excelenteMaxCpa: 10,
@@ -211,7 +211,7 @@ export function getCostPerResultCellClassName(
 ): string | undefined {
   if (costPerResult <= 0) return undefined
 
-  if (currency === TIKTOK_DASHBOARD_CURRENCY) {
+  if (currency === "PEN") {
     return getTikTokCostPerResultCellClassName(costPerResult)
   }
 

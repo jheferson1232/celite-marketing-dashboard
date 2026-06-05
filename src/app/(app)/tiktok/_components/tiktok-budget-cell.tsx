@@ -8,13 +8,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   canEditTikTokDailyBudget,
   type TikTokManageEntity,
 } from "./tiktok-manage-types"
-import { useTikTokManage } from "./tiktok-manage-provider"
+import {
+  useTikTokDashboardCurrency,
+  useTikTokManage,
+} from "./tiktok-manage-provider"
 
 interface TikTokBudgetCellProps {
   entity: TikTokManageEntity
@@ -22,6 +25,7 @@ interface TikTokBudgetCellProps {
 }
 
 export function TikTokBudgetCell({ entity, className }: TikTokBudgetCellProps) {
+  const currency = useTikTokDashboardCurrency()
   const { isEntityPending, getEntityError, setEntityBudget } = useTikTokManage()
   const isPending = isEntityPending(entity)
   const errorMessage = getEntityError(entity)
@@ -65,7 +69,7 @@ export function TikTokBudgetCell({ entity, className }: TikTokBudgetCellProps) {
           onClick={(e) => e.stopPropagation()}
         >
           {displayBudget != null && displayBudget > 0
-            ? formatCurrency(displayBudget, TIKTOK_DASHBOARD_CURRENCY)
+            ? formatCurrency(displayBudget, currency)
             : "Definir"}
         </button>
       </PopoverTrigger>
@@ -84,7 +88,7 @@ export function TikTokBudgetCell({ entity, className }: TikTokBudgetCellProps) {
             aria-label="Presupuesto diario"
           />
           <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-            PEN
+            {currency}
           </span>
         </div>
         {errorMessage ? (

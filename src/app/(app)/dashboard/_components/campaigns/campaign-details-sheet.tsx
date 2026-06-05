@@ -25,6 +25,7 @@ export function CampaignDetailsSheet({
   open,
   onOpenChange,
   platform = "meta",
+  currency,
 }: CampaignDetailsSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -43,7 +44,10 @@ export function CampaignDetailsSheet({
         </SheetHeader>
 
         {platform === "tiktok" && campaign?.id ? (
-          <TikTokCampaignDetailsContent campaignId={campaign.id} />
+          <TikTokCampaignDetailsContent
+            campaignId={campaign.id}
+            currency={currency}
+          />
         ) : platform === "meta" && campaign?.id ? (
           <MetaCampaignDetailsContent
             campaignId={campaign.id}

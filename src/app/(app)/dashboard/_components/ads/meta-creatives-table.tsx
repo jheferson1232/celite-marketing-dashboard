@@ -22,7 +22,6 @@ import {
 import {
   formatLandingPagePath,
   META_DASHBOARD_CURRENCY,
-  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
@@ -49,8 +48,8 @@ import { cn } from "@/lib/utils"
 
 interface MetaCreativesTableProps {
   rows: AdInsightRow[]
-  /** Por defecto Meta (COP). TikTok pasa PEN. */
   currency?: CurrencyCode
+  platform?: "meta" | "tiktok"
 }
 
 export interface MergedMetaCreativeRow extends AdInsightRow {
@@ -222,6 +221,7 @@ function UrlCell({ row }: { row: MergedMetaCreativeRow }) {
 export function MetaCreativesTable({
   rows,
   currency = META_DASHBOARD_CURRENCY,
+  platform = "meta",
 }: MetaCreativesTableProps) {
   const [sortKey, setSortKey] = React.useState<MetricKey>("spend")
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc")
@@ -318,7 +318,7 @@ export function MetaCreativesTable({
             <TableHead
               className="text-right"
               title={
-                currency === TIKTOK_DASHBOARD_CURRENCY
+                platform === "tiktok"
                   ? "Estimado según reparto de gasto (audiencia TikTok)"
                   : undefined
               }
@@ -326,7 +326,7 @@ export function MetaCreativesTable({
               <span className="inline-flex items-center gap-1">
                 <RiMenLine className="size-4 text-blue-600" />
                 Hombres
-                {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+                {platform === "tiktok" ? (
                   <span className="text-[10px] font-normal text-muted-foreground">
                     ~
                   </span>
@@ -336,7 +336,7 @@ export function MetaCreativesTable({
             <TableHead
               className="text-right"
               title={
-                currency === TIKTOK_DASHBOARD_CURRENCY
+                platform === "tiktok"
                   ? "Estimado según reparto de gasto (audiencia TikTok)"
                   : undefined
               }
@@ -344,7 +344,7 @@ export function MetaCreativesTable({
               <span className="inline-flex items-center gap-1">
                 <RiWomenLine className="size-4 text-pink-600" />
                 Mujeres
-                {currency === TIKTOK_DASHBOARD_CURRENCY ? (
+                {platform === "tiktok" ? (
                   <span className="text-[10px] font-normal text-muted-foreground">
                     ~
                   </span>
@@ -355,7 +355,7 @@ export function MetaCreativesTable({
         </TableHeader>
         <TableBody>
           {sorted.map((row) => {
-            const displayTitle = getCreativeCardDisplayTitle(row, currency)
+            const displayTitle = getCreativeCardDisplayTitle(row, currency, platform)
             const genderTotal =
               row.purchasesMale + row.purchasesFemale + row.purchasesUnknown
             const malePct = genderPurchasePercent(row.purchasesMale, genderTotal)

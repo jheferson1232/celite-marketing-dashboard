@@ -66,7 +66,7 @@ export function ProductoLinkedCampaignsTable({
               No hay campañas TikTok vinculadas.
             </p>
           ) : (
-            <TikTokManageProvider>
+            <TikTokManageProvider currency={TIKTOK_DASHBOARD_CURRENCY}>
               <CampaignsTable
                 data={tiktokCampaigns}
                 isLoading={isLoading}
