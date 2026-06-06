@@ -12,6 +12,7 @@ import {
   setDefaultTikTokAdAccount,
   setDefaultTikTokAdAccountForTests,
 } from "@/lib/services/tiktok/ad-accounts"
+import { getTikTokAdAccountsHealth } from "@/lib/services/tiktok/account-health"
 import { clearTikTokCache } from "@/lib/services/tiktok/tiktok-cache"
 import {
   getTikTokOAuthRedirectUri,
@@ -80,4 +81,8 @@ export const refreshTikTokAdAccountAction = createServerAction(
 
 export const refreshAllTikTokAdAccountsAction = createServerAction(async () =>
   refreshAllTikTokAdAccountStatuses()
+)
+
+export const getTikTokAdAccountsHealthAction = createServerAction(async () =>
+  getTikTokAdAccountsHealth()
 )

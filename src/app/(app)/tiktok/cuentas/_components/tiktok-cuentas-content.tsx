@@ -19,6 +19,7 @@ import {
 import {
   connectTikTokAdAccountAction,
   disconnectTikTokAdAccountAction,
+  getTikTokAdAccountsHealthAction,
   getTikTokEnvAccountSummaryAction,
   getTikTokOAuthStatusAction,
   importTikTokEnvAccountAction,
@@ -28,12 +29,15 @@ import {
 } from "../_actions/tiktok-ad-accounts"
 import { ConnectTikTokAccountButton } from "./connect-tiktok-account-button"
 import { ConnectTikTokAccountDialog } from "./connect-tiktok-account-dialog"
+import { TikTokAccountHealthMetrics } from "./tiktok-account-health-metrics"
 import { TikTokAdvertiserStatusBadge } from "./tiktok-advertiser-status-badge"
 
 const ACCOUNTS_QUERY_KEY = ["tiktok-ad-accounts"] as const
+const ACCOUNTS_HEALTH_QUERY_KEY = ["tiktok-ad-accounts-health"] as const
 
 function invalidateAccounts(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY })
+  void queryClient.invalidateQueries({ queryKey: ACCOUNTS_HEALTH_QUERY_KEY })
   void queryClient.invalidateQueries({ queryKey: ["tiktok-env-account"] })
   void queryClient.invalidateQueries({ queryKey: ["tiktok-account-kpis"] })
   void queryClient.invalidateQueries({ queryKey: ["tiktok-campaigns-list"] })
@@ -84,6 +88,13 @@ export function TikTokCuentasContent() {
   const accountsQuery = useQuery({
     queryKey: ACCOUNTS_QUERY_KEY,
     queryFn: () => runServerAction(listTikTokAdAccountsAction()),
+  })
+
+  const accountsHealthQuery = useQuery({
+    queryKey: ACCOUNTS_HEALTH_QUERY_KEY,
+    queryFn: () => runServerAction(getTikTokAdAccountsHealthAction()),
+    enabled: (accountsQuery.data?.length ?? 0) > 0,
+    staleTime: 2 * 60 * 1000,
   })
 
   const envQuery = useQuery({
@@ -182,8 +193,14 @@ export function TikTokCuentasContent() {
   })
 
   const accounts = accountsQuery.data ?? []
+  const healthByAccountId = new Map(
+    (accountsHealthQuery.data ?? []).map((item) => [item.accountId, item])
+  )
   const envAccount = envQuery.data
   const isLoading = accountsQuery.isLoading || envQuery.isLoading
+  const isHealthLoading =
+    accounts.length > 0 &&
+    (accountsHealthQuery.isLoading || accountsHealthQuery.isFetching)
   const isBusy =
     connectMutation.isPending ||
     importEnvMutation.isPending ||
@@ -305,6 +322,11 @@ export function TikTokCuentasContent() {
                       <p className="font-medium">{account.country ?? "—"}</p>
                     </div>
                   </div>
+                  <TikTokAccountHealthMetrics
+                    health={healthByAccountId.get(account.id)}
+                    isLoading={isHealthLoading}
+                    currencyFallback={account.currency}
+                  />
                   <p className="text-muted-foreground text-xs uppercase tracking-wide">
                     Conectada hace {formatConnectedRelative(account.connectedAt)}
                   </p>
@@ -383,7 +405,7 @@ export function TikTokCuentasContent() {
           onClick={() => refreshMutation.mutate()}
         >
           <RiRefreshLine className={refreshMutation.isPending ? "animate-spin" : ""} />
-          Actualizar estados TikTok
+          Actualizar estados y métricas
         </Button>
       </div>
 
