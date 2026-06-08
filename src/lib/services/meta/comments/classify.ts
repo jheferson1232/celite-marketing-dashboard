@@ -225,7 +225,7 @@ export async function classifyMetaComment(
   const system = buildSystemPrompt(context)
 
   const { object } = await generateObject({
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: anthropic("claude-sonnet-4-6"),
     schema: decisionSchema,
     system,
     prompt: `Comentario:\n"""${message}"""`,
