@@ -6,6 +6,7 @@ import {
   RiArchiveLine,
   RiBarChartGroupedLine,
   RiBrainLine,
+  RiChat3Line,
   RiStarLine,
   RiShoppingBag2Line,
   RiMegaphoneLine,
@@ -45,6 +46,12 @@ const navItems = [
     title: "Informe IA (Meta)",
     href: "/informe-ia",
     icon: RiBrainLine,
+  },
+  {
+    id: "meta-comentarios",
+    title: "Comentarios IA (Meta)",
+    href: "/meta/comentarios",
+    icon: RiChat3Line,
   },
   {
     id: "tiktok",
@@ -130,7 +137,10 @@ export function AppSidebar() {
                         : item.id === "informe-ia"
                           ? pathname === "/informe-ia" ||
                             pathname.startsWith("/informe-ia/")
-                          : item.id === "tiktok"
+                          : item.id === "meta-comentarios"
+                            ? pathname === "/meta/comentarios" ||
+                              pathname.startsWith("/meta/comentarios/")
+                            : item.id === "tiktok"
                             ? pathname === "/tiktok"
                             : item.id === "tiktok-cuentas"
                               ? pathname === "/tiktok/cuentas" ||

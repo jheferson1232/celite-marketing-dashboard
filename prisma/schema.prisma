@@ -295,6 +295,47 @@ model TikTokAdAccount {
   @@map("TikTokAdAccount")
 }
 
+/** Corrida del agente de comentarios Meta/Facebook (cron o manual). */
+model MetaCommentAgentRun {
+  id             String    @id @default(cuid())
+  trigger        String
+  status         String    @default("running")
+  dryRun         Boolean   @default(false)
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  pagesScanned   Int       @default(0)
+  postsScanned   Int       @default(0)
+  commentsSeen   Int       @default(0)
+  actionsCount   Int       @default(0)
+  summary        String?
+  errorMessage   String?
+
+  @@index([startedAt])
+  @@map("MetaCommentAgentRun")
+}
+
+/** Decisión del agente por comentario (dedupe por metaCommentId). */
+model MetaCommentDecision {
+  id             String   @id @default(cuid())
+  runId          String?
+  metaCommentId  String   @unique
+  postStoryId    String?
+  adId           String?
+  pageId         String?
+  authorName     String?
+  message        String
+  classification String
+  action         String
+  replyText      String?
+  applied        Boolean  @default(false)
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([runId])
+  @@map("MetaCommentDecision")
+}
+
 /** Corrida del agente TikTok (cron o manual). */
 model TikTokAgentRun {
   id               String    @id @default(cuid())
