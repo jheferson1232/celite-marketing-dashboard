@@ -314,6 +314,21 @@ model MetaCommentAgentRun {
   @@map("MetaCommentAgentRun")
 }
 
+/** Configuración de monitoreo y respuestas por página de Facebook. */
+model MetaCommentPageConfig {
+  id            String   @id @default(cuid())
+  pageId        String   @unique
+  pageName      String
+  enabled       Boolean  @default(true)
+  replyMode     String   @default("professional")
+  replyTemplate String?
+  websiteUrl    String?
+  updatedAt     DateTime @updatedAt
+
+  @@index([enabled])
+  @@map("MetaCommentPageConfig")
+}
+
 /** Decisión del agente por comentario (dedupe por metaCommentId). */
 model MetaCommentDecision {
   id             String   @id @default(cuid())

@@ -2,7 +2,7 @@ import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 /** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev/serverless. */
-const PRISMA_CLIENT_VERSION = 9
+const PRISMA_CLIENT_VERSION = 10
 
 type GlobalPrismaStore = {
   prisma?: PrismaClient
@@ -39,7 +39,11 @@ function hasTikTokAdAccountModel(client: PrismaClient) {
 }
 
 function hasMetaCommentAgentModels(client: PrismaClient) {
-  return Boolean(client.metaCommentAgentRun && client.metaCommentDecision)
+  return Boolean(
+    client.metaCommentAgentRun &&
+      client.metaCommentDecision &&
+      client.metaCommentPageConfig
+  )
 }
 
 export function getPrismaClient(forceNew = false): PrismaClient {

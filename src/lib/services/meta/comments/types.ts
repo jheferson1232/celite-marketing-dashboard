@@ -9,6 +9,12 @@ export type MetaCommentClassification =
 
 export type MetaCommentActionKind = "hide" | "reply" | "skip"
 
+export type MetaCommentDateRange = "today" | "7d"
+
+export type MetaCommentActivityFilter = "all" | "replies" | "deleted"
+
+export type MetaCommentReplyMode = "professional" | "friendly" | "concise"
+
 export type MetaCommentAgentRunSummary = {
   runId: string
   trigger: MetaCommentAgentTrigger
@@ -31,6 +37,7 @@ export type MetaCommentDecisionRecord = {
   postStoryId: string | null
   adId: string | null
   pageId: string | null
+  pageName: string | null
   authorName: string | null
   message: string
   classification: MetaCommentClassification
@@ -39,6 +46,30 @@ export type MetaCommentDecisionRecord = {
   applied: boolean
   errorMessage: string | null
   createdAt: string
+}
+
+export type MetaCommentDashboardMetrics = {
+  range: MetaCommentDateRange
+  totalActivity: number
+  deletedComments: number
+  repliedComments: number
+  errors: number
+  monitoredPages: number
+}
+
+export type MetaMonitoredPageConfig = {
+  pageId: string
+  pageName: string
+  enabled: boolean
+  replyMode: MetaCommentReplyMode
+  replyTemplate: string | null
+  websiteUrl: string | null
+  updatedAt: string
+}
+
+export type MetaCommentPageMonitoringState = {
+  available: MetaMonitoredPageConfig[]
+  monitored: MetaMonitoredPageConfig[]
 }
 
 export type MetaPageAccess = {
@@ -69,5 +100,13 @@ export type MetaCommentAgentStatus = {
   pageTokenConfigured: boolean
   pageCount: number
   pageNames: string[]
+  monitoredCount: number
   missing: string[]
+}
+
+export type MetaCommentPageReplyUpdate = {
+  pageId: string
+  replyMode?: MetaCommentReplyMode
+  replyTemplate?: string | null
+  websiteUrl?: string | null
 }

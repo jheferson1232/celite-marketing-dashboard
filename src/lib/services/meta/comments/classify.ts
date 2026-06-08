@@ -5,6 +5,7 @@ import { isAnthropicConfigured } from "./env"
 import type {
   MetaCommentActionKind,
   MetaCommentClassification,
+  MetaCommentReplyMode,
 } from "./types"
 
 const decisionSchema = z.object({
@@ -19,7 +20,30 @@ const decisionSchema = z.object({
   replyText: z.string().max(150).optional(),
 })
 
-const SYSTEM_PROMPT = `Sos el moderador de comentarios en anuncios de Facebook para una marca de calzado en Colombia.
+function buildSystemPrompt(context?: {
+  replyMode?: MetaCommentReplyMode
+  replyTemplate?: string | null
+  websiteUrl?: string | null
+  pageName?: string | null
+}): string {
+  const modeHint =
+    context?.replyMode === "friendly"
+      ? "Tono cercano y cálido."
+      : context?.replyMode === "concise"
+        ? "Respuestas muy breves y directas."
+        : "Tono profesional y amable."
+
+  const extra: string[] = [modeHint]
+  if (context?.pageName) extra.push(`Página: ${context.pageName}.`)
+  if (context?.websiteUrl) {
+    extra.push(`Podés invitar a visitar: ${context.websiteUrl}`)
+  }
+  if (context?.replyTemplate?.trim()) {
+    extra.push(`Plantilla guía: ${context.replyTemplate.trim()}`)
+  }
+
+  return `Sos el moderador de comentarios en anuncios de Facebook para una marca de calzado en Colombia.
+${extra.join("\n")}
 Clasificá cada comentario y decidí la acción:
 
 - spam o troll → action "hide"
@@ -30,6 +54,9 @@ Reglas:
 - No inventes datos de producto ni precios concretos.
 - Si es duda de talla/envío sin datos, invitá a escribir por DM o revisar la landing.
 - replyText solo cuando action es "reply".`
+}
+
+const DEFAULT_SYSTEM_PROMPT = buildSystemPrompt()
 
 function normalizeDecision(
   raw: z.infer<typeof decisionSchema>
@@ -65,7 +92,15 @@ function normalizeDecision(
   }
 }
 
-export async function classifyMetaComment(message: string): Promise<{
+export async function classifyMetaComment(
+  message: string,
+  context?: {
+    replyMode?: MetaCommentReplyMode
+    replyTemplate?: string | null
+    websiteUrl?: string | null
+    pageName?: string | null
+  }
+): Promise<{
   classification: MetaCommentClassification
   action: MetaCommentActionKind
   replyText: string | null
@@ -74,10 +109,12 @@ export async function classifyMetaComment(message: string): Promise<{
     throw new Error("ANTHROPIC_API_KEY es requerida para clasificar comentarios")
   }
 
+  const system = context ? buildSystemPrompt(context) : DEFAULT_SYSTEM_PROMPT
+
   const { object } = await generateObject({
     model: anthropic("claude-sonnet-4-20250514"),
     schema: decisionSchema,
-    system: SYSTEM_PROMPT,
+    system,
     prompt: `Comentario:\n"""${message}"""`,
     temperature: 0.2,
   })

@@ -2,6 +2,7 @@ import {
   getMissingMetaCommentAgentEnv,
   isAnthropicConfigured,
 } from "./env"
+import { getMonitoredPageCount } from "./page-config"
 import { resolveMetaPageAccessList } from "./page-token"
 import { isMetaEnvConfigured } from "../meta-env"
 import { META_PAGE_ACCESS_TOKEN_ENV } from "./env"
@@ -29,12 +30,22 @@ export async function getMetaCommentAgentStatus(): Promise<MetaCommentAgentStatu
     )
   }
 
+  let monitoredCount = 0
+  if (pageTokenConfigured) {
+    try {
+      monitoredCount = await getMonitoredPageCount()
+    } catch {
+      monitoredCount = pages.length
+    }
+  }
+
   return {
     anthropicConfigured: isAnthropicConfigured(),
     metaConfigured: isMetaEnvConfigured(),
     pageTokenConfigured,
     pageCount: pages.length,
     pageNames: pages.map((p) => p.pageName),
+    monitoredCount: monitoredCount || pages.length,
     missing: [...new Set(missing)],
   }
 }

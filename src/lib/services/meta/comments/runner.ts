@@ -5,7 +5,10 @@ import { classifyMetaComment } from "./classify"
 import { fetchActiveMetaAdPosts } from "./fetch-ad-posts"
 import { fetchRecentPostComments } from "./fetch-comments"
 import { getMetaCommentAgentSetupMessage } from "./env"
-import { resolveMetaPageAccessList } from "./page-token"
+import {
+  getEnabledMetaPageAccessList,
+  getPageConfigMap,
+} from "./page-config"
 import type {
   MetaCommentAgentRunSummary,
   MetaCommentAgentTrigger,
@@ -66,6 +69,7 @@ function toDecisionRecord(row: {
     postStoryId: row.postStoryId,
     adId: row.adId,
     pageId: row.pageId,
+    pageName: null,
     authorName: row.authorName,
     message: row.message,
     classification: row.classification as MetaCommentDecisionRecord["classification"],
@@ -126,9 +130,10 @@ export async function runMetaCommentAgent(input: {
   })
 
   try {
-    const [pages, posts] = await Promise.all([
-      resolveMetaPageAccessList(),
+    const [pages, posts, pageConfigMap] = await Promise.all([
+      getEnabledMetaPageAccessList(),
       fetchActiveMetaAdPosts(),
+      getPageConfigMap(),
     ])
 
     if (pages.length === 0) {
@@ -157,7 +162,15 @@ export async function runMetaCommentAgent(input: {
 
         commentsSeen += 1
 
-        const decision = await classifyMetaComment(comment.message)
+        const pageConfig = page.pageId
+          ? pageConfigMap.get(page.pageId)
+          : undefined
+        const decision = await classifyMetaComment(comment.message, {
+          replyMode: pageConfig?.replyMode,
+          replyTemplate: pageConfig?.replyTemplate,
+          websiteUrl: pageConfig?.websiteUrl,
+          pageName: pageConfig?.pageName ?? page.pageName,
+        })
         let applied = false
         let errorMessage: string | null = null
 
