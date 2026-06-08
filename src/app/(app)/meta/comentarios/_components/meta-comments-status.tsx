@@ -7,11 +7,11 @@ import type { MetaCommentAgentStatus } from "@/lib/services/meta/comments/types"
 function StatusPill({
   label,
   ok,
-  env,
+  detail,
 }: {
   label: string
   ok: boolean
-  env: string
+  detail: string
 }) {
   return (
     <div
@@ -22,7 +22,7 @@ function StatusPill({
       }
     >
       <p className="text-sm font-medium">{label}</p>
-      <p className="text-muted-foreground text-xs">{ok ? "Conectado" : `Falta ${env}`}</p>
+      <p className="text-muted-foreground text-xs">{detail}</p>
     </div>
   )
 }
@@ -48,19 +48,37 @@ export function MetaCommentsStatus({
             <StatusPill
               label="Anthropic Claude"
               ok={status.anthropicConfigured}
-              env="ANTHROPIC_API_KEY"
+              detail={
+                status.anthropicConfigured
+                  ? "Conectado"
+                  : "Falta ANTHROPIC_API_KEY"
+              }
             />
             <StatusPill
               label="Meta Ads"
               ok={status.metaConfigured}
-              env="META_ACCESS_TOKEN"
+              detail={
+                status.metaConfigured
+                  ? "Conectado"
+                  : "Falta META_ACCESS_TOKEN"
+              }
             />
             <StatusPill
               label="Páginas Facebook"
               ok={status.pageTokenConfigured}
-              env="META_PAGE_ACCESS_TOKEN"
+              detail={
+                status.pageTokenConfigured
+                  ? "Conectado"
+                  : status.pageResolveHint?.includes("expired") ||
+                      status.pageResolveHint?.includes("expir")
+                    ? "Token de Meta expirado"
+                    : "Sin páginas detectadas"
+              }
             />
           </div>
+          {status.pageResolveHint && !status.pageTokenConfigured ? (
+            <p className="text-destructive text-xs">{status.pageResolveHint}</p>
+          ) : null}
           {status.pageCount > 0 ? (
             <p className="text-muted-foreground text-xs">
               Páginas detectadas: {status.pageNames.join(", ")} · Monitoreando{" "}

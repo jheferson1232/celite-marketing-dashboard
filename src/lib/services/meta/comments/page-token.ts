@@ -1,3 +1,4 @@
+import { metaGraphErrorMessage } from "../meta-errors"
 import { buildMetaGraphUrl, metaGraphFetchJson } from "../meta-graph-fetch"
 import {
   META_PAGE_ACCESS_TOKEN_ENV,
@@ -32,7 +33,13 @@ export async function resolveMetaPageAccessList(): Promise<MetaPageAccess[]> {
     fields: "id,name,access_token",
     limit: "50",
   })
-  const data = await metaGraphFetchJson<MetaAccountsResponse>(url)
+  const data = await metaGraphFetchJson<
+    MetaAccountsResponse & { error?: { message?: string } }
+  >(url)
+
+  if (data.error?.message) {
+    throw new Error(metaGraphErrorMessage(400, { error: data.error }))
+  }
 
   return (data.data ?? [])
     .filter((page) => page.access_token)

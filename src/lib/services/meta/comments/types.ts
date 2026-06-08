@@ -102,6 +102,8 @@ export type MetaCommentAgentStatus = {
   pageNames: string[]
   monitoredCount: number
   missing: string[]
+  /** Detalle cuando no se pudieron listar páginas vía me/accounts. */
+  pageResolveHint: string | null
 }
 
 export type MetaCommentPageReplyUpdate = {
