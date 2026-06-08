@@ -8,6 +8,10 @@ import {
   getMetaOAuthRedirectUri,
   usesMetaBusinessLogin,
 } from "@/lib/services/meta/meta-oauth.server"
+import {
+  getMetaOAuthDiagnostics,
+  saveMetaOAuthConfigId,
+} from "@/lib/services/meta/meta-oauth-diagnostics"
 
 export const listConnectedFacebookPagesAction = createServerAction(async () => {
   const pages = await listConnectedPages()
@@ -28,8 +32,24 @@ export const disconnectFacebookPageAction = createServerAction(
   }
 )
 
-export const getMetaOAuthStatusAction = createServerAction(async () => ({
-  configured: isMetaOAuthConfigured(),
-  redirectUri: getMetaOAuthRedirectUri(),
-  businessLoginConfigured: usesMetaBusinessLogin(),
-}))
+export const getMetaOAuthStatusAction = createServerAction(async () => {
+  const redirectUri = getMetaOAuthRedirectUri()
+  const [businessLoginConfigured, diagnostics] = await Promise.all([
+    usesMetaBusinessLogin(),
+    getMetaOAuthDiagnostics(redirectUri),
+  ])
+
+  return {
+    configured: isMetaOAuthConfigured(),
+    redirectUri,
+    businessLoginConfigured,
+    diagnostics,
+  }
+})
+
+export const saveMetaOAuthConfigIdAction = createServerAction(
+  async (configId: string) => {
+    await saveMetaOAuthConfigId(configId)
+    return { ok: true }
+  }
+)

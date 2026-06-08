@@ -332,6 +332,8 @@ model MetaCommentAgentSettings {
   dmReplyEnabled          Boolean  @default(false)
   dmReplyPrompt           String?
   dmDataToCollect         String?
+  /** Facebook Login for Business → Configuration ID (alternativa a META_OAUTH_CONFIG_ID en env). */
+  metaOAuthConfigId       String?
   updatedAt               DateTime @updatedAt
 
   @@map("MetaCommentAgentSettings")

@@ -3,6 +3,7 @@ import "server-only"
 import crypto from "crypto"
 import axios from "axios"
 import prisma from "@/lib/prisma"
+import { resolveMetaOAuthConfigId } from "./meta-oauth-diagnostics"
 
 const META_OAUTH_STATE_COOKIE = "meta_oauth_state"
 const META_GRAPH_BASE = "https://graph.facebook.com/v22.0"
@@ -44,16 +45,17 @@ export function createMetaOAuthState(): string {
   return crypto.randomBytes(24).toString("hex")
 }
 
-/** Config de Facebook Login for Business (Meta App Dashboard → Configurations). */
-export function getMetaOAuthConfigId(): string | null {
-  return process.env.META_OAUTH_CONFIG_ID?.trim() || null
+/** Config de Facebook Login for Business (env o BD). */
+export async function getMetaOAuthConfigId(): Promise<string | null> {
+  const { configId } = await resolveMetaOAuthConfigId()
+  return configId
 }
 
-export function usesMetaBusinessLogin(): boolean {
-  return Boolean(getMetaOAuthConfigId())
+export async function usesMetaBusinessLogin(): Promise<boolean> {
+  return Boolean(await getMetaOAuthConfigId())
 }
 
-export function buildMetaOAuthLoginUrl(state: string): string {
+export async function buildMetaOAuthLoginUrl(state: string): Promise<string> {
   const appId = process.env.META_APP_ID?.trim()
   if (!appId) throw new Error("Falta META_APP_ID en variables de entorno")
 
@@ -63,7 +65,7 @@ export function buildMetaOAuthLoginUrl(state: string): string {
   url.searchParams.set("state", state)
   url.searchParams.set("response_type", "code")
 
-  const configId = getMetaOAuthConfigId()
+  const configId = await getMetaOAuthConfigId()
   if (configId) {
     // Apps Business nuevas: usar config_id en vez de scope
     url.searchParams.set("config_id", configId)

@@ -1,20 +1,24 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   RiCheckboxCircleLine,
   RiCloseCircleLine,
+  RiExternalLinkLine,
   RiFacebookBoxFill,
 } from "@remixicon/react"
 import { runServerAction } from "@/lib/server-action"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { MetaOAuthDiagnostics } from "@/lib/services/meta/meta-oauth-diagnostics"
 import {
   disconnectFacebookPageAction,
   getMetaOAuthStatusAction,
   listConnectedFacebookPagesAction,
+  saveMetaOAuthConfigIdAction,
 } from "../_actions/meta-facebook-connect"
 
 type PageRow = {
@@ -47,10 +51,14 @@ export function MetaFacebookConnect({
     queryFn: () => runServerAction(getMetaOAuthStatusAction()),
   })
 
+  const [configIdInput, setConfigIdInput] = useState("")
+  const [configIdError, setConfigIdError] = useState<string | null>(null)
+
   const oauthReady = oauthStatusQuery.data?.configured ?? false
   const businessLoginConfigured =
     oauthStatusQuery.data?.businessLoginConfigured ?? false
   const redirectUri = oauthStatusQuery.data?.redirectUri
+  const diagnostics = oauthStatusQuery.data?.diagnostics
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({
@@ -69,6 +77,19 @@ export function MetaFacebookConnect({
     mutationFn: (pageId: string) =>
       runServerAction(disconnectFacebookPageAction(pageId)),
     onSuccess: invalidate,
+  })
+
+  const saveConfigIdMutation = useMutation({
+    mutationFn: (configId: string) =>
+      runServerAction(saveMetaOAuthConfigIdAction(configId)),
+    onSuccess: async () => {
+      setConfigIdError(null)
+      setConfigIdInput("")
+      await queryClient.invalidateQueries({ queryKey: ["meta-oauth-status"] })
+    },
+    onError: (error: Error) => {
+      setConfigIdError(error.message)
+    },
   })
 
   useEffect(() => {
@@ -126,22 +147,22 @@ export function MetaFacebookConnect({
         </div>
       ) : null}
 
-      {!oauthStatusQuery.isLoading && oauthReady && !businessLoginConfigured ? (
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-          <p className="font-medium">
-            Si Facebook muestra «Función no disponible»
-          </p>
-          <p className="mt-1 text-xs opacity-90">
-            Las apps Business nuevas requieren{" "}
-            <strong>Facebook Login for Business</strong>. En Meta for Developers →
-            tu app → <strong>Facebook Login for Business → Configurations</strong>{" "}
-            → Create configuration con permisos de páginas. Copiá el{" "}
-            <code className="text-xs">config_id</code> y agregalo como{" "}
-            <code className="text-xs">META_OAUTH_CONFIG_ID</code> en{" "}
-            <code className="text-xs">.env</code> o Vercel. También agregá tu usuario
-            en <strong>App roles</strong> si la app está en Development.
-          </p>
-        </div>
+      {!oauthStatusQuery.isLoading && oauthReady && diagnostics ? (
+        <MetaOAuthSetupPanel
+          diagnostics={diagnostics}
+          businessLoginConfigured={businessLoginConfigured}
+          configIdInput={configIdInput}
+          configIdError={configIdError}
+          saving={saveConfigIdMutation.isPending}
+          onConfigIdChange={setConfigIdInput}
+          onSaveConfigId={() => {
+            if (!configIdInput.trim()) {
+              setConfigIdError("Pegá el Configuration ID de Meta.")
+              return
+            }
+            saveConfigIdMutation.mutate(configIdInput.trim())
+          }}
+        />
       ) : null}
 
       <div className="flex flex-col items-center gap-4 py-2">
@@ -187,6 +208,128 @@ export function MetaFacebookConnect({
             />
           ))}
         </div>
+      ) : null}
+    </div>
+  )
+}
+
+function MetaOAuthSetupPanel({
+  diagnostics,
+  businessLoginConfigured,
+  configIdInput,
+  configIdError,
+  saving,
+  onConfigIdChange,
+  onSaveConfigId,
+}: {
+  diagnostics: MetaOAuthDiagnostics
+  businessLoginConfigured: boolean
+  configIdInput: string
+  configIdError: string | null
+  saving: boolean
+  onConfigIdChange: (value: string) => void
+  onSaveConfigId: () => void
+}) {
+  if (businessLoginConfigured && diagnostics.issues.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mb-4 space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+      <div>
+        <p className="font-medium">Configuración requerida en Meta</p>
+        {diagnostics.appName ? (
+          <p className="mt-1 text-xs opacity-90">
+            App: <strong>{diagnostics.appName}</strong>
+            {diagnostics.appId ? ` (${diagnostics.appId})` : null}
+          </p>
+        ) : null}
+      </div>
+
+      {diagnostics.issues.length > 0 ? (
+        <ul className="list-inside list-disc space-y-1 text-xs opacity-90">
+          {diagnostics.issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <ol className="space-y-1 text-xs opacity-90">
+        <li>
+          1. Abrí{" "}
+          {diagnostics.metaBusinessLoginUrl ? (
+            <a
+              href={diagnostics.metaBusinessLoginUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-medium underline"
+            >
+              Facebook Login for Business
+              <RiExternalLinkLine className="size-3" />
+            </a>
+          ) : (
+            "Facebook Login for Business"
+          )}{" "}
+          → <strong>Configurations</strong> → Create configuration (permisos de
+          páginas).
+        </li>
+        <li>
+          2. En Redirect URIs pegá:{" "}
+          <code className="break-all text-xs">{diagnostics.redirectUri}</code>
+        </li>
+        <li>3. Copiá el <strong>Configuration ID</strong> y pegalo abajo.</li>
+      </ol>
+
+      {!businessLoginConfigured ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            value={configIdInput}
+            onChange={(e) => onConfigIdChange(e.target.value)}
+            placeholder="Configuration ID (config_id)"
+            className="bg-background h-9 text-sm"
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            disabled={saving}
+            onClick={onSaveConfigId}
+          >
+            {saving ? "Guardando…" : "Guardar config_id"}
+          </Button>
+        </div>
+      ) : null}
+
+      {configIdError ? (
+        <p className="text-destructive text-xs">{configIdError}</p>
+      ) : null}
+
+      {businessLoginConfigured ? (
+        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+          config_id configurado
+          {diagnostics.configIdSource === "database"
+            ? " (guardado en el dashboard)"
+            : diagnostics.configIdSource === "env"
+              ? " (desde variables de entorno)"
+              : ""}
+          . Probá conectar de nuevo.
+        </p>
+      ) : null}
+
+      {diagnostics.metaAppReviewUrl ? (
+        <p className="text-xs opacity-90">
+          Si faltan permisos de páginas, revisá{" "}
+          <a
+            href={diagnostics.metaAppReviewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-medium underline"
+          >
+            App Review
+            <RiExternalLinkLine className="size-3" />
+          </a>
+          .
+        </p>
       ) : null}
     </div>
   )

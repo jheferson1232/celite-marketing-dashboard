@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   try {
     const state = createMetaOAuthState()
-    const loginUrl = buildMetaOAuthLoginUrl(state)
+    const loginUrl = await buildMetaOAuthLoginUrl(state)
     const response = NextResponse.redirect(loginUrl)
 
     response.cookies.set(META_OAUTH_STATE_COOKIE, state, {
