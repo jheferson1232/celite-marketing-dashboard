@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   disconnectFacebookPageAction,
+  getMetaOAuthStatusAction,
   listConnectedFacebookPagesAction,
 } from "../_actions/meta-facebook-connect"
 
@@ -40,6 +41,14 @@ export function MetaFacebookConnect({
     queryKey: ["meta-facebook-connections"],
     queryFn: () => runServerAction(listConnectedFacebookPagesAction()),
   })
+
+  const oauthStatusQuery = useQuery({
+    queryKey: ["meta-oauth-status"],
+    queryFn: () => runServerAction(getMetaOAuthStatusAction()),
+  })
+
+  const oauthReady = oauthStatusQuery.data?.configured ?? false
+  const redirectUri = oauthStatusQuery.data?.redirectUri
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({
@@ -94,21 +103,51 @@ export function MetaFacebookConnect({
         </div>
       ) : null}
 
+      {!oauthStatusQuery.isLoading && !oauthReady ? (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          <p className="font-medium">OAuth de Facebook no configurado en el servidor</p>
+          <p className="mt-1 text-xs opacity-90">
+            Agregá <code className="text-xs">META_APP_ID</code> y{" "}
+            <code className="text-xs">META_APP_SECRET</code> en Vercel (Settings →
+            Environment Variables) y volvé a desplegar. Son distintos del token de
+            Meta Ads (<code className="text-xs">META_ACCESS_TOKEN</code>).
+          </p>
+          {redirectUri ? (
+            <p className="mt-2 text-xs opacity-90">
+              En Meta for Developers → tu app → Facebook Login → Valid OAuth Redirect
+              URIs, agregá:{" "}
+              <code className="break-all text-xs">{redirectUri}</code>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex flex-col items-center gap-4 py-2">
-        <Button
-          asChild
-          size="lg"
-          className="h-12 w-full max-w-md bg-[#1877F2] px-8 text-base font-semibold text-white shadow-md shadow-blue-500/25 hover:bg-[#166FE5]"
-        >
-          <a href="/api/meta/oauth/start">
+        {oauthReady ? (
+          <Button
+            asChild
+            size="lg"
+            className="h-12 w-full max-w-md bg-[#1877F2] px-8 text-base font-semibold text-white shadow-md shadow-blue-500/25 hover:bg-[#166FE5]"
+          >
+            <a href="/api/meta/oauth/start">
+              Connect Facebook &amp; Instagram
+            </a>
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            disabled
+            className="h-12 w-full max-w-md bg-[#1877F2]/50 px-8 text-base font-semibold text-white"
+          >
             Connect Facebook &amp; Instagram
-          </a>
-        </Button>
+          </Button>
+        )}
 
         {!hasPages ? (
           <p className="text-muted-foreground max-w-md text-center text-sm">
-            Autorizá el acceso a tus páginas para que el agente pueda leer y
-            responder comentarios.
+            {oauthReady
+              ? "Autorizá el acceso a tus páginas para que el agente pueda leer y responder comentarios."
+              : "El botón se habilita cuando META_APP_ID y META_APP_SECRET estén configurados."}
           </p>
         ) : null}
       </div>
