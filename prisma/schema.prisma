@@ -314,6 +314,44 @@ model MetaCommentAgentRun {
   @@map("MetaCommentAgentRun")
 }
 
+/** Configuración global del agente de comentarios (singleton id=default). */
+model MetaCommentAgentSettings {
+  id                      String   @id @default("default")
+  country                 String   @default("CO")
+  contactInfo             String?
+  shippingTime            String?
+  businessInfo            String?
+  deleteNegativeEnabled   Boolean  @default(true)
+  deletePrompt            String?
+  deleteExamplesRemove    String?
+  deleteExamplesKeep      String?
+  publicReplyEnabled      Boolean  @default(true)
+  publicReplyPrompt       String?
+  publicReplyIncludeLink  Boolean  @default(true)
+  publicReplyIncludePrice Boolean  @default(true)
+  dmReplyEnabled          Boolean  @default(false)
+  dmReplyPrompt           String?
+  dmDataToCollect         String?
+  updatedAt               DateTime @updatedAt
+
+  @@map("MetaCommentAgentSettings")
+}
+
+/** Producto/comentario configurable para el agente (catálogo). */
+model MetaCommentProduct {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  imageUrl    String?
+  tags        Json     @default("[]")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+  @@map("MetaCommentProduct")
+}
+
 /** Configuración de monitoreo y respuestas por página de Facebook. */
 model MetaCommentPageConfig {
   id            String   @id @default(cuid())

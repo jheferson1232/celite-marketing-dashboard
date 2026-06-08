@@ -1,7 +1,9 @@
 import prisma from "@/lib/prisma"
 import { assertMetaEnvConfigured } from "../meta-env"
 import { applyMetaCommentAction } from "./apply-action"
+import { getOrCreateMetaCommentAgentSettings } from "./agent-settings"
 import { classifyMetaComment } from "./classify"
+import { listActiveMetaCommentProducts } from "./products"
 import { fetchActiveMetaAdPosts } from "./fetch-ad-posts"
 import { fetchRecentPostComments } from "./fetch-comments"
 import { getMetaCommentAgentSetupMessage } from "./env"
@@ -130,11 +132,14 @@ export async function runMetaCommentAgent(input: {
   })
 
   try {
-    const [pages, posts, pageConfigMap] = await Promise.all([
-      getEnabledMetaPageAccessList(),
-      fetchActiveMetaAdPosts(),
-      getPageConfigMap(),
-    ])
+    const [pages, posts, pageConfigMap, agentSettings, products] =
+      await Promise.all([
+        getEnabledMetaPageAccessList(),
+        fetchActiveMetaAdPosts(),
+        getPageConfigMap(),
+        getOrCreateMetaCommentAgentSettings(),
+        listActiveMetaCommentProducts(),
+      ])
 
     if (pages.length === 0) {
       throw new Error(
@@ -170,6 +175,8 @@ export async function runMetaCommentAgent(input: {
           replyTemplate: pageConfig?.replyTemplate,
           websiteUrl: pageConfig?.websiteUrl,
           pageName: pageConfig?.pageName ?? page.pageName,
+          agentSettings,
+          products,
         })
         let applied = false
         let errorMessage: string | null = null

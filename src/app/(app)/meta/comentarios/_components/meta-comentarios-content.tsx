@@ -7,6 +7,8 @@ import {
   RiCalendarLine,
   RiChat3Line,
   RiPlayLine,
+  RiFlashlightLine,
+  RiSettings3Line,
 } from "@remixicon/react"
 import { runServerAction } from "@/lib/server-action"
 import { Button } from "@/components/ui/button"
@@ -184,6 +186,18 @@ export function MetaComentariosContent() {
             />
             <span className="text-sm">Dry run</span>
           </div>
+          <Button type="button" variant="outline" asChild>
+            <Link href="/meta/comentarios/configuracion">
+              <RiSettings3Line className="size-4" />
+              Configuración
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <Link href="/meta/comentarios/configuracion/prueba">
+              <RiFlashlightLine className="size-4" />
+              Probar asistente
+            </Link>
+          </Button>
           <Button
             type="button"
             onClick={() => runMutation.mutate()}
