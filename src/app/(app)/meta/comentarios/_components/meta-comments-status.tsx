@@ -8,19 +8,21 @@ function StatusPill({
   label,
   ok,
   detail,
+  neutral,
 }: {
   label: string
   ok: boolean
   detail: string
+  neutral?: boolean
 }) {
+  const className = ok
+    ? "rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3"
+    : neutral
+      ? "rounded-xl border border-border bg-muted/40 px-4 py-3"
+      : "rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3"
+
   return (
-    <div
-      className={
-        ok
-          ? "rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3"
-          : "rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3"
-      }
-    >
+    <div className={className}>
       <p className="text-sm font-medium">{label}</p>
       <p className="text-muted-foreground text-xs">{detail}</p>
     </div>
@@ -44,56 +46,52 @@ export function MetaCommentsStatus({
         <Skeleton className="h-20 w-full" />
       ) : status ? (
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatusPill
               label="Anthropic Claude"
               ok={status.anthropicConfigured}
               detail={
                 status.anthropicConfigured
-                  ? "Conectado"
+                  ? "Modelo de IA conectado"
                   : "Falta ANTHROPIC_API_KEY"
               }
             />
             <StatusPill
-              label="Meta Ads"
-              ok={status.metaConfigured}
+              label="Facebook & Instagram"
+              ok={status.oauthConnected}
+              neutral={!status.oauthConnected}
               detail={
-                status.metaConfigured
-                  ? "Conectado"
-                  : "Falta META_ACCESS_TOKEN"
-              }
-            />
-            <StatusPill
-              label="Páginas Facebook"
-              ok={status.pageTokenConfigured}
-              detail={
-                status.pageTokenConfigured
-                  ? "Conectado"
-                  : status.pageResolveHint?.includes("expired") ||
-                      status.pageResolveHint?.includes("expir")
-                    ? "Token de Meta expirado"
-                    : "Sin páginas detectadas"
+                status.oauthConnected
+                  ? `${status.oauthPageCount} página${status.oauthPageCount !== 1 ? "s" : ""} conectada${status.oauthPageCount !== 1 ? "s" : ""}`
+                  : "Conectá usando el botón de abajo"
               }
             />
           </div>
-          {status.pageResolveHint && !status.pageTokenConfigured ? (
-            <p className="text-destructive text-xs">{status.pageResolveHint}</p>
-          ) : null}
-          {status.pageCount > 0 ? (
+
+          {status.oauthConnected && status.pageCount > 0 ? (
             <p className="text-muted-foreground text-xs">
-              Páginas detectadas: {status.pageNames.join(", ")} · Monitoreando{" "}
+              Páginas: {status.pageNames.join(", ")} · Monitoreando{" "}
               {status.monitoredCount}
             </p>
           ) : null}
+
           {status.missing.length > 0 ? (
             <p className="text-destructive text-xs">
               Falta configurar: {status.missing.join(", ")}
             </p>
-          ) : (
-            <p className="text-emerald-600 text-xs dark:text-emerald-400">
-              Listo para ejecutar el agente.
+          ) : status.anthropicConfigured ? (
+            <p
+              className={
+                status.oauthConnected
+                  ? "text-xs text-emerald-600 dark:text-emerald-400"
+                  : "text-xs text-muted-foreground"
+              }
+            >
+              {status.oauthConnected
+                ? "Listo para ejecutar el agente."
+                : "Conectá tus páginas de Facebook para activar el agente."}
             </p>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

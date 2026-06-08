@@ -1,68 +1,55 @@
-import {
-  getMissingMetaCommentAgentEnv,
-  isAnthropicConfigured,
-} from "./env"
+import prisma from "@/lib/prisma"
+import { isAnthropicConfigured } from "./env"
 import { getMonitoredPageCount } from "./page-config"
-import { resolveMetaPageAccessList } from "./page-token"
 import { isMetaEnvConfigured } from "../meta-env"
-import { META_PAGE_ACCESS_TOKEN_ENV } from "./env"
 import type { MetaCommentAgentStatus } from "./types"
 
 export async function getMetaCommentAgentStatus(): Promise<MetaCommentAgentStatus> {
-  const missing = getMissingMetaCommentAgentEnv()
-  let pages: Awaited<ReturnType<typeof resolveMetaPageAccessList>> = []
-  let pageResolveHint: string | null = null
+  // Solo Anthropic es requerido en status.
+  // Meta Ads y páginas de Facebook se configuran por separado (OAuth / env).
+  const missing: string[] = []
+  if (!isAnthropicConfigured()) missing.push("ANTHROPIC_API_KEY")
 
-  if (isMetaEnvConfigured()) {
-    try {
-      pages = await resolveMetaPageAccessList()
-      if (
-        pages.length === 0 &&
-        !process.env[META_PAGE_ACCESS_TOKEN_ENV]?.trim()
-      ) {
-        pageResolveHint =
-          "Meta no devolvió páginas en me/accounts. Verificá que el token tenga pages_show_list, pages_read_engagement y pages_manage_engagement."
-      }
-    } catch (error) {
-      pages = []
-      pageResolveHint =
-        error instanceof Error
-          ? error.message
-          : "No se pudieron listar las páginas de Facebook"
-    }
+  // Contar páginas OAuth conectadas en BD (independiente del token de ads)
+  let oauthPageCount = 0
+  let pageNames: string[] = []
+  try {
+    const oauthPages = await prisma.metaFacebookConnection.findMany({
+      where: { connected: true },
+      select: { pageName: true },
+      orderBy: { pageName: "asc" },
+    })
+    oauthPageCount = oauthPages.length
+    pageNames = oauthPages.map((p) => p.pageName)
+  } catch {
+    oauthPageCount = 0
   }
 
-  const pageTokenConfigured = Boolean(
-    process.env[META_PAGE_ACCESS_TOKEN_ENV]?.trim() || pages.length > 0
-  )
+  const oauthConnected = oauthPageCount > 0
 
-  if (!pageTokenConfigured && isMetaEnvConfigured()) {
-    if (pageResolveHint?.toLowerCase().includes("expired")) {
-      missing.push("META_ACCESS_TOKEN expirado — generá uno nuevo en Meta")
-    } else {
-      missing.push(
-        "Acceso a páginas: META_PAGE_ACCESS_TOKEN o permisos pages_* en META_ACCESS_TOKEN"
-      )
-    }
-  }
+  // "Páginas activas" = solo OAuth; NO se usa me/accounts para status
+  const pageTokenConfigured = oauthConnected
 
   let monitoredCount = 0
   if (pageTokenConfigured) {
     try {
       monitoredCount = await getMonitoredPageCount()
     } catch {
-      monitoredCount = pages.length
+      monitoredCount = oauthPageCount
     }
   }
 
+  // Solo marcar como faltante Anthropic y Meta Ads; páginas se gestionan via UI
   return {
     anthropicConfigured: isAnthropicConfigured(),
     metaConfigured: isMetaEnvConfigured(),
     pageTokenConfigured,
-    pageCount: pages.length,
-    pageNames: pages.map((p) => p.pageName),
-    monitoredCount: monitoredCount || pages.length,
+    oauthConnected,
+    oauthPageCount,
+    pageCount: oauthPageCount,
+    pageNames,
+    monitoredCount: monitoredCount || oauthPageCount,
     missing: [...new Set(missing)],
-    pageResolveHint,
+    pageResolveHint: null,
   }
 }

@@ -98,11 +98,14 @@ export type MetaCommentAgentStatus = {
   anthropicConfigured: boolean
   metaConfigured: boolean
   pageTokenConfigured: boolean
+  /** Páginas conectadas via OAuth (BD). */
+  oauthConnected: boolean
+  oauthPageCount: number
   pageCount: number
   pageNames: string[]
   monitoredCount: number
   missing: string[]
-  /** Detalle cuando no se pudieron listar páginas vía me/accounts. */
+  /** Detalle cuando no se pudieron listar páginas. */
   pageResolveHint: string | null
 }
 

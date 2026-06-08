@@ -2,7 +2,7 @@ import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 /** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev/serverless. */
-const PRISMA_CLIENT_VERSION = 11
+const PRISMA_CLIENT_VERSION = 12
 
 type GlobalPrismaStore = {
   prisma?: PrismaClient
@@ -44,7 +44,8 @@ function hasMetaCommentAgentModels(client: PrismaClient) {
       client.metaCommentDecision &&
       client.metaCommentPageConfig &&
       client.metaCommentAgentSettings &&
-      client.metaCommentProduct
+      client.metaCommentProduct &&
+      client.metaFacebookConnection
   )
 }
 

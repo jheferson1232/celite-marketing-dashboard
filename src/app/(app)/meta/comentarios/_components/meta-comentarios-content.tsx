@@ -21,22 +21,18 @@ import type {
 import {
   getMetaCommentAgentStatusAction,
   getMetaCommentDashboardMetricsAction,
-  getMetaCommentPageMonitoringAction,
   listMetaCommentActivityAction,
   listMetaCommentAgentRunsAction,
   listMetaCommentPageConfigsAction,
   runMetaCommentAgentNowAction,
-  setAllMetaCommentPagesEnabledAction,
-  setMetaCommentPageEnabledAction,
-  syncMetaCommentPagesAction,
   updateMetaCommentPageReplyAction,
 } from "../_actions/meta-comments-agent"
 import { MetaCommentsActivity } from "./meta-comments-activity"
 import { MetaCommentsMetrics } from "./meta-comments-metrics"
-import { MetaCommentsPageMonitoring } from "./meta-comments-page-monitoring"
 import { MetaCommentsReplyConfig } from "./meta-comments-reply-config"
 import { MetaCommentsRuns } from "./meta-comments-runs"
 import { MetaCommentsStatus } from "./meta-comments-status"
+import { MetaFacebookConnect } from "./meta-facebook-connect"
 
 export function MetaComentariosContent() {
   const queryClient = useQueryClient()
@@ -70,33 +66,19 @@ export function MetaComentariosContent() {
     refetchInterval: 30_000,
   })
 
-  const monitoringQuery = useQuery({
-    queryKey: ["meta-comment-page-monitoring"],
-    queryFn: async () => {
-      await runServerAction(syncMetaCommentPagesAction())
-      return runServerAction(getMetaCommentPageMonitoringAction())
-    },
-  })
-
   const pageConfigsQuery = useQuery({
     queryKey: ["meta-comment-page-configs"],
     queryFn: () => runServerAction(listMetaCommentPageConfigsAction()),
   })
 
   const status = statusQuery.data
-  const ready =
-    status?.anthropicConfigured &&
-    status?.metaConfigured &&
-    status?.pageTokenConfigured
+  const ready = status?.anthropicConfigured && status?.oauthConnected
 
   const invalidateDashboard = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["meta-comment-metrics"] }),
       queryClient.invalidateQueries({ queryKey: ["meta-comment-activity"] }),
       queryClient.invalidateQueries({ queryKey: ["meta-comment-agent-runs"] }),
-      queryClient.invalidateQueries({
-        queryKey: ["meta-comment-page-monitoring"],
-      }),
       queryClient.invalidateQueries({ queryKey: ["meta-comment-page-configs"] }),
       queryClient.invalidateQueries({ queryKey: ["meta-comment-agent-status"] }),
     ])
@@ -104,23 +86,6 @@ export function MetaComentariosContent() {
 
   const runMutation = useMutation({
     mutationFn: () => runServerAction(runMetaCommentAgentNowAction({ dryRun })),
-    onSuccess: invalidateDashboard,
-  })
-
-  const pageMutation = useMutation({
-    mutationFn: (input: { pageId: string; enabled: boolean }) =>
-      runServerAction(
-        setMetaCommentPageEnabledAction({
-          pageId: input.pageId,
-          enabled: input.enabled,
-        })
-      ),
-    onSuccess: invalidateDashboard,
-  })
-
-  const pageBulkMutation = useMutation({
-    mutationFn: (enabled: boolean) =>
-      runServerAction(setAllMetaCommentPagesEnabledAction(enabled)),
     onSuccess: invalidateDashboard,
   })
 
@@ -133,9 +98,6 @@ export function MetaComentariosContent() {
     }) => runServerAction(updateMetaCommentPageReplyAction(input)),
     onSuccess: invalidateDashboard,
   })
-
-  const configBusy =
-    pageMutation.isPending || pageBulkMutation.isPending || replyMutation.isPending
 
   return (
     <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-8 p-4 sm:p-6 lg:p-8">
@@ -214,6 +176,8 @@ export function MetaComentariosContent() {
         loading={statusQuery.isLoading}
       />
 
+      <MetaFacebookConnect onConnectionChange={invalidateDashboard} />
+
       <MetaCommentsMetrics
         metrics={metricsQuery.data}
         loading={metricsQuery.isLoading}
@@ -226,26 +190,14 @@ export function MetaComentariosContent() {
         onFilterChange={setActivityFilter}
       />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <MetaCommentsPageMonitoring
-          state={monitoringQuery.data}
-          loading={monitoringQuery.isLoading}
-          busy={configBusy}
-          onTogglePage={(pageId, enabled) =>
-            pageMutation.mutate({ pageId, enabled })
-          }
-          onAddAll={() => pageBulkMutation.mutate(true)}
-          onRemoveAll={() => pageBulkMutation.mutate(false)}
-        />
-        <MetaCommentsReplyConfig
-          pages={pageConfigsQuery.data}
-          loading={pageConfigsQuery.isLoading}
-          busy={configBusy}
-          onSave={async (input) => {
-            await replyMutation.mutateAsync(input)
-          }}
-        />
-      </div>
+      <MetaCommentsReplyConfig
+        pages={pageConfigsQuery.data}
+        loading={pageConfigsQuery.isLoading}
+        busy={replyMutation.isPending}
+        onSave={async (input) => {
+          await replyMutation.mutateAsync(input)
+        }}
+      />
 
       <div className="rounded-2xl border bg-card px-5 py-4 text-sm shadow-sm">
         <p>

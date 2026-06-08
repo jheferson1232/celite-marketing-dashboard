@@ -352,6 +352,22 @@ model MetaCommentProduct {
   @@map("MetaCommentProduct")
 }
 
+/** Conexión OAuth de Facebook/Instagram: páginas autorizadas por el usuario. */
+model MetaFacebookConnection {
+  id           String    @id @default(cuid())
+  pageId       String    @unique
+  pageName     String
+  pageCategory String?
+  accessToken  String
+  tokenExpires DateTime?
+  connected    Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([connected])
+  @@map("MetaFacebookConnection")
+}
+
 /** Configuración de monitoreo y respuestas por página de Facebook. */
 model MetaCommentPageConfig {
   id            String   @id @default(cuid())
