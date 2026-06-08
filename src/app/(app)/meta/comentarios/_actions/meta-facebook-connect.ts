@@ -6,6 +6,7 @@ import {
   listConnectedPages,
   isMetaOAuthConfigured,
   getMetaOAuthRedirectUri,
+  usesMetaBusinessLogin,
 } from "@/lib/services/meta/meta-oauth.server"
 
 export const listConnectedFacebookPagesAction = createServerAction(async () => {
@@ -30,4 +31,5 @@ export const disconnectFacebookPageAction = createServerAction(
 export const getMetaOAuthStatusAction = createServerAction(async () => ({
   configured: isMetaOAuthConfigured(),
   redirectUri: getMetaOAuthRedirectUri(),
+  businessLoginConfigured: usesMetaBusinessLogin(),
 }))

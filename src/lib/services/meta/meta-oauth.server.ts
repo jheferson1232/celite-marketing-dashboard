@@ -44,6 +44,15 @@ export function createMetaOAuthState(): string {
   return crypto.randomBytes(24).toString("hex")
 }
 
+/** Config de Facebook Login for Business (Meta App Dashboard → Configurations). */
+export function getMetaOAuthConfigId(): string | null {
+  return process.env.META_OAUTH_CONFIG_ID?.trim() || null
+}
+
+export function usesMetaBusinessLogin(): boolean {
+  return Boolean(getMetaOAuthConfigId())
+}
+
 export function buildMetaOAuthLoginUrl(state: string): string {
   const appId = process.env.META_APP_ID?.trim()
   if (!appId) throw new Error("Falta META_APP_ID en variables de entorno")
@@ -52,11 +61,19 @@ export function buildMetaOAuthLoginUrl(state: string): string {
   url.searchParams.set("client_id", appId)
   url.searchParams.set("redirect_uri", getMetaOAuthRedirectUri())
   url.searchParams.set("state", state)
-  url.searchParams.set(
-    "scope",
-    "pages_show_list,pages_read_engagement,pages_manage_engagement,pages_manage_metadata"
-  )
   url.searchParams.set("response_type", "code")
+
+  const configId = getMetaOAuthConfigId()
+  if (configId) {
+    // Apps Business nuevas: usar config_id en vez de scope
+    url.searchParams.set("config_id", configId)
+    url.searchParams.set("override_default_response_type", "true")
+  } else {
+    url.searchParams.set(
+      "scope",
+      "pages_show_list,pages_read_engagement,pages_manage_engagement,pages_manage_metadata"
+    )
+  }
 
   return url.toString()
 }

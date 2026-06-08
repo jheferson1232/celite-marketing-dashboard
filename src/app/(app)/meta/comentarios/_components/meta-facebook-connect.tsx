@@ -48,6 +48,8 @@ export function MetaFacebookConnect({
   })
 
   const oauthReady = oauthStatusQuery.data?.configured ?? false
+  const businessLoginConfigured =
+    oauthStatusQuery.data?.businessLoginConfigured ?? false
   const redirectUri = oauthStatusQuery.data?.redirectUri
 
   const invalidate = async () => {
@@ -108,9 +110,11 @@ export function MetaFacebookConnect({
           <p className="font-medium">OAuth de Facebook no configurado en el servidor</p>
           <p className="mt-1 text-xs opacity-90">
             Agregá <code className="text-xs">META_APP_ID</code> y{" "}
-            <code className="text-xs">META_APP_SECRET</code> en Vercel (Settings →
-            Environment Variables) y volvé a desplegar. Son distintos del token de
-            Meta Ads (<code className="text-xs">META_ACCESS_TOKEN</code>).
+            <code className="text-xs">META_APP_SECRET</code> en tu{" "}
+            <code className="text-xs">.env</code> local (y reiniciá{" "}
+            <code className="text-xs">pnpm dev</code>) o en Vercel para producción.
+            Son distintos del token de Meta Ads (
+            <code className="text-xs">META_ACCESS_TOKEN</code>).
           </p>
           {redirectUri ? (
             <p className="mt-2 text-xs opacity-90">
@@ -119,6 +123,24 @@ export function MetaFacebookConnect({
               <code className="break-all text-xs">{redirectUri}</code>
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {!oauthStatusQuery.isLoading && oauthReady && !businessLoginConfigured ? (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          <p className="font-medium">
+            Si Facebook muestra «Función no disponible»
+          </p>
+          <p className="mt-1 text-xs opacity-90">
+            Las apps Business nuevas requieren{" "}
+            <strong>Facebook Login for Business</strong>. En Meta for Developers →
+            tu app → <strong>Facebook Login for Business → Configurations</strong>{" "}
+            → Create configuration con permisos de páginas. Copiá el{" "}
+            <code className="text-xs">config_id</code> y agregalo como{" "}
+            <code className="text-xs">META_OAUTH_CONFIG_ID</code> en{" "}
+            <code className="text-xs">.env</code> o Vercel. También agregá tu usuario
+            en <strong>App roles</strong> si la app está en Development.
+          </p>
         </div>
       ) : null}
 
