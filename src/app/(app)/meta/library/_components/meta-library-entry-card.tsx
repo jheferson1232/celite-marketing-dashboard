@@ -16,6 +16,7 @@ import {
   RiFacebookCircleFill,
   RiGlobalLine,
   RiGroupLine,
+  RiMetaLine,
   RiPencilLine,
   RiPlayFill,
   RiRefreshLine,
@@ -26,7 +27,10 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { MetaLibraryEntryRecord } from "@/lib/services/meta/library/meta-library-entries"
 import type { MetaLibraryPreviewSlide } from "@/lib/services/meta/library/meta-library-ads"
-import { facebookPageProfileUrl } from "@/lib/services/meta/library/meta-library-links"
+import {
+  facebookAdLibrarySearchUrl,
+  facebookPageProfileUrl,
+} from "@/lib/services/meta/library/meta-library-links"
 import {
   fetchMetaLibraryEntryAdsAction,
   getMetaLibraryEntryStorePreviewAction,
@@ -139,6 +143,12 @@ export function MetaLibraryEntryCard({
     "Sin título"
 
   const storeHref = entry.url ?? (domain ? `https://${domain}` : null)
+  const adLibraryHref = facebookAdLibrarySearchUrl({
+    facebookPage: entry.facebookPage,
+    pageId: company?.pageId,
+    storeDomain: domain,
+    companyName: company?.name,
+  })
   const facebookPageHref = facebookPageProfileUrl({
     facebookPage: entry.facebookPage,
     pageId: company?.pageId,
@@ -326,19 +336,34 @@ export function MetaLibraryEntryCard({
               ) : null}
             </dl>
           )}
-          {facebookPageHref ? (
+          {adLibraryHref || facebookPageHref ? (
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button type="button" size="sm" variant="outline" asChild>
-                <a
-                  href={facebookPageHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <RiFacebookCircleFill className="size-4 text-blue-600" />
-                  Facebook
-                  <RiExternalLinkLine className="size-3.5 opacity-60" />
-                </a>
-              </Button>
+              {adLibraryHref ? (
+                <Button type="button" size="sm" variant="outline" asChild>
+                  <a
+                    href={adLibraryHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <RiMetaLine className="size-4 text-blue-600" />
+                    Ad Library
+                    <RiExternalLinkLine className="size-3.5 opacity-60" />
+                  </a>
+                </Button>
+              ) : null}
+              {facebookPageHref ? (
+                <Button type="button" size="sm" variant="outline" asChild>
+                  <a
+                    href={facebookPageHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <RiFacebookCircleFill className="size-4 text-blue-600" />
+                    Facebook
+                    <RiExternalLinkLine className="size-3.5 opacity-60" />
+                  </a>
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -34,6 +34,53 @@ function parseFacebookPageInput(raw: string): {
   return { companyName: trimmed.replace(/^@/, "") }
 }
 
+export function facebookAdLibrarySearchUrl(input: {
+  facebookPage?: string | null
+  pageId?: string | null
+  storeDomain?: string | null
+  companyName?: string | null
+}): string | null {
+  const pageId =
+    input.pageId?.trim() ||
+    (input.facebookPage ? parseFacebookPageInput(input.facebookPage).pageId : undefined)
+
+  if (pageId) {
+    const params = new URLSearchParams({
+      active_status: "all",
+      ad_type: "all",
+      country: "ALL",
+      view_all_page_id: pageId,
+      search_type: "page",
+      media_type: "all",
+    })
+    return `https://www.facebook.com/ads/library/?${params.toString()}`
+  }
+
+  const parsedPage = input.facebookPage
+    ? parseFacebookPageInput(input.facebookPage)
+    : {}
+
+  const query =
+    input.companyName?.trim() ||
+    parsedPage.companyName ||
+    input.storeDomain?.trim() ||
+    (input.facebookPage && !/facebook\.com|fb\.com/i.test(input.facebookPage)
+      ? input.facebookPage.trim().replace(/^@/, "")
+      : undefined)
+
+  if (!query) return null
+
+  const params = new URLSearchParams({
+    active_status: "all",
+    ad_type: "all",
+    country: "ALL",
+    q: query,
+    search_type: "keyword_unordered",
+    media_type: "all",
+  })
+  return `https://www.facebook.com/ads/library/?${params.toString()}`
+}
+
 export function facebookPageProfileUrl(input: {
   facebookPage?: string | null
   pageId?: string | null
