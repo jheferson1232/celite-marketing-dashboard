@@ -13,6 +13,7 @@ import {
   RiDeleteBinLine,
   RiExternalLinkLine,
   RiEyeLine,
+  RiFacebookCircleFill,
   RiGlobalLine,
   RiGroupLine,
   RiPencilLine,
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { MetaLibraryEntryRecord } from "@/lib/services/meta/library/meta-library-entries"
 import type { MetaLibraryPreviewSlide } from "@/lib/services/meta/library/meta-library-ads"
+import { facebookPageProfileUrl } from "@/lib/services/meta/library/meta-library-links"
 import {
   fetchMetaLibraryEntryAdsAction,
   getMetaLibraryEntryStorePreviewAction,
@@ -136,8 +138,11 @@ export function MetaLibraryEntryCard({
     domain ??
     "Sin título"
 
-  const pageName = company?.name ?? entry.facebookPage
   const storeHref = entry.url ?? (domain ? `https://${domain}` : null)
+  const facebookPageHref = facebookPageProfileUrl({
+    facebookPage: entry.facebookPage,
+    pageId: company?.pageId,
+  })
   const publishedLabel = storeQuery.data?.publishedAt
     ? format(new Date(storeQuery.data.publishedAt), "d MMM yyyy", { locale: es })
     : format(new Date(entry.createdAt), "d MMM yyyy", { locale: es })
@@ -279,18 +284,27 @@ export function MetaLibraryEntryCard({
                   </dd>
                 </div>
               </div>
-              {pageName ? (
+              {entry.facebookPage ? (
                 <div className="flex items-start gap-2">
                   <RiGlobalLine className="text-muted-foreground mt-0.5 size-4 shrink-0" />
                   <div className="min-w-0">
                     <dt className="text-muted-foreground text-xs">Página Meta</dt>
-                    <dd className="truncate">{pageName}</dd>
+                    <dd className="truncate">{entry.facebookPage}</dd>
                   </div>
                 </div>
               ) : !adsQuery.isFetched ? (
                 <p className="text-muted-foreground text-xs">
                   Pulsa play en anuncios para datos de la página en SociaVault.
                 </p>
+              ) : null}
+              {company?.name ? (
+                <div className="flex items-start gap-2">
+                  <RiGroupLine className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                  <div className="min-w-0">
+                    <dt className="text-muted-foreground text-xs">Nombre en Meta</dt>
+                    <dd className="truncate">{company.name}</dd>
+                  </div>
+                </div>
               ) : null}
               {company?.category ? (
                 <div className="flex items-start gap-2">
@@ -312,6 +326,21 @@ export function MetaLibraryEntryCard({
               ) : null}
             </dl>
           )}
+          {facebookPageHref ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button type="button" size="sm" variant="outline" asChild>
+                <a
+                  href={facebookPageHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <RiFacebookCircleFill className="size-4 text-blue-600" />
+                  Facebook
+                  <RiExternalLinkLine className="size-3.5 opacity-60" />
+                </a>
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 space-y-3">
