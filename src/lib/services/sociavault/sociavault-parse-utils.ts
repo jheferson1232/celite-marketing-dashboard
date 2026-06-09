@@ -9,6 +9,9 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
 export function pickString(...values: unknown[]): string | null {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim()
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(Math.trunc(value))
+    }
   }
   return null
 }

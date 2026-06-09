@@ -407,6 +407,26 @@ model MetaCommentDecision {
   @@map("MetaCommentDecision")
 }
 
+/** Entrada manual de URL + página de Facebook (Meta Ad Library). */
+model MetaLibraryEntry {
+  id                String    @id @default(cuid())
+  url               String?
+  facebookPage      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastSyncedAt      DateTime?
+  syncWarning       String?
+  activeCount       Int?
+  totalCount        Int?
+  companyData       Json?
+  adsData           Json?
+  previewSlidesData Json?
+
+  @@index([updatedAt])
+  @@index([lastSyncedAt])
+  @@map("MetaLibraryEntry")
+}
+
 /** Corrida del agente TikTok (cron o manual). */
 model TikTokAgentRun {
   id               String    @id @default(cuid())

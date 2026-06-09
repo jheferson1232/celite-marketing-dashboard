@@ -12,6 +12,7 @@ import {
   RiMegaphoneLine,
   RiMetaLine,
   RiLinksLine,
+  RiBookOpenLine,
   RiTiktokLine,
   RiRobotLine,
 } from "@remixicon/react"
@@ -52,6 +53,12 @@ const navItems = [
     title: "Comentarios IA (Meta)",
     href: "/meta/comentarios",
     icon: RiChat3Line,
+  },
+  {
+    id: "meta-library",
+    title: "Meta Library",
+    href: "/meta/library",
+    icon: RiBookOpenLine,
   },
   {
     id: "tiktok",
@@ -140,7 +147,10 @@ export function AppSidebar() {
                           : item.id === "meta-comentarios"
                             ? pathname === "/meta/comentarios" ||
                               pathname.startsWith("/meta/comentarios/")
-                            : item.id === "tiktok"
+                            : item.id === "meta-library"
+                              ? pathname === "/meta/library" ||
+                                pathname.startsWith("/meta/library/")
+                              : item.id === "tiktok"
                             ? pathname === "/tiktok"
                             : item.id === "tiktok-cuentas"
                               ? pathname === "/tiktok/cuentas" ||
