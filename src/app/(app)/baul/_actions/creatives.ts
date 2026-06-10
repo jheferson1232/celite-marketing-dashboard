@@ -1,9 +1,7 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
-import { formDataToCreativeUploadInput } from "@/lib/services/blob/creative-media"
 import {
-  createCreativeFromUpload,
   createCreativeFromUrl,
   deleteCreative,
   getCreativeById,
@@ -16,19 +14,6 @@ import {
 
 export const listCreativesAction = createServerAction(
   async (): Promise<CreativeRecord[]> => listCreatives()
-)
-
-export const uploadCreativeAction = createServerAction(
-  async (formData: FormData): Promise<CreativeRecord> => {
-    const input = formDataToCreativeUploadInput(formData)
-    const file = input.files[0]
-    if (!file) throw new Error("No se recibió ningún archivo")
-
-    return createCreativeFromUpload({
-      type: input.type,
-      file,
-    })
-  }
 )
 
 export const createCreativeAction = createServerAction(

@@ -72,6 +72,11 @@ export async function runServerAction<T>(
         'La app se recargó en segundo plano. Refresca la página (F5) e inténtalo otra vez.'
       )
     }
+    if (message.includes('unexpected response')) {
+      throw new Error(
+        'No se pudo completar la subida. Si el archivo es un video grande, espera unos segundos e inténtalo de nuevo. Si persiste, recarga la página (F5).'
+      )
+    }
     throw error
   }
 
