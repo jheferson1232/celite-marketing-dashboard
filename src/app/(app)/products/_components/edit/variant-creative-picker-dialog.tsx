@@ -16,10 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
 import type { CreativeRecord } from "@/lib/services/creative"
-import { uploadCreativeFileClient } from "@/lib/services/blob/creative-client-upload"
 import { CreativeCard } from "@/app/(app)/baul/_components/creative-card"
 import { CreativeUploadField } from "@/app/(app)/baul/_components/creative-upload-field"
-import { createCreativeAction } from "@/app/(app)/baul/_actions/creatives"
+import { uploadCreativeToBaul } from "@/app/(app)/baul/_lib/upload-creative-to-baul"
 import { listCreativesAction } from "../../_actions/creatives"
 
 interface VariantCreativePickerDialogProps {
@@ -28,20 +27,6 @@ interface VariantCreativePickerDialogProps {
   assignedCreativeIds: Set<string>
   onConfirm: (creativeIds: string[]) => Promise<string | null>
   isPending?: boolean
-}
-
-async function uploadCreativeFile(file: File): Promise<CreativeRecord> {
-  const uploaded = await uploadCreativeFileClient(file)
-  const created = await runServerAction(
-    createCreativeAction({
-      url: uploaded.url,
-      type: uploaded.type,
-    })
-  )
-  if (!created) {
-    throw new Error("No se pudo registrar el creative en el baúl.")
-  }
-  return created
 }
 
 export function VariantCreativePickerDialog({
@@ -71,7 +56,7 @@ export function VariantCreativePickerDialog({
     mutationFn: async (files: File[]) => {
       const created: CreativeRecord[] = []
       for (const file of files) {
-        created.push(await uploadCreativeFile(file))
+        created.push(await uploadCreativeToBaul(file))
       }
       return created
     },

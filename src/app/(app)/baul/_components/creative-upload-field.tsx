@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { RiAddLine, RiLoader4Line } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { CREATIVE_MEDIA_ACCEPT } from "@/lib/services/blob/media-utils"
@@ -11,8 +11,16 @@ interface CreativeUploadFieldProps {
   label?: string
   uploadingLabel?: string
   variant?: "default" | "outline"
+  error?: string | null
   onUpload: (file: File) => Promise<void>
   onUploadMany?: (files: File[]) => Promise<void>
+}
+
+function getUploadErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return "No se pudo subir el creative"
 }
 
 export function CreativeUploadField({
@@ -21,26 +29,32 @@ export function CreativeUploadField({
   label = "Subir creative",
   uploadingLabel = "Subiendo…",
   variant = "default",
+  error: externalError = null,
   onUpload,
   onUploadMany,
 }: CreativeUploadFieldProps) {
+  const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const error = externalError ?? localError
+  const isDisabled = disabled || uploading
 
-  const handlePickFile = () => {
-    if (disabled || uploading) return
+  const openFilePicker = () => {
+    if (isDisabled) return
     inputRef.current?.click()
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files
-    event.target.value = ""
-    if (!fileList?.length || disabled || uploading) return
+    if (!fileList?.length) return
 
     const files = [...fileList]
+    event.target.value = ""
+    if (isDisabled) return
+
     setUploading(true)
-    setError(null)
+    setLocalError(null)
 
     try {
       if (multiple && files.length > 1 && onUploadMany) {
@@ -51,24 +65,31 @@ export function CreativeUploadField({
         }
       }
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "No se pudo subir el creative"
-      )
+      setLocalError(getUploadErrorMessage(uploadError))
     } finally {
       setUploading(false)
     }
   }
 
   return (
-    <div className="flex shrink-0 flex-col items-end gap-1">
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <input
+        id={inputId}
+        ref={inputRef}
+        type="file"
+        accept={CREATIVE_MEDIA_ACCEPT}
+        multiple={multiple}
+        className="sr-only"
+        disabled={isDisabled}
+        onChange={(event) => void handleFileChange(event)}
+      />
+
       <Button
         type="button"
         variant={variant}
-        onClick={handlePickFile}
-        disabled={disabled || uploading}
+        disabled={isDisabled}
         className="shrink-0"
+        onClick={openFilePicker}
       >
         {uploading ? (
           <RiLoader4Line className="size-4 animate-spin" />
@@ -78,17 +99,18 @@ export function CreativeUploadField({
         {uploading ? uploadingLabel : label}
       </Button>
 
-      {error ? <p className="max-w-xs text-xs text-destructive">{error}</p> : null}
+      <p className="max-w-xs text-right text-[11px] leading-snug text-muted-foreground">
+        JPG, PNG, WebP, GIF, MP4, MOV, WebM, M4V · máx. 100 MB
+      </p>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept={CREATIVE_MEDIA_ACCEPT}
-        multiple={multiple}
-        className="hidden"
-        disabled={disabled || uploading}
-        onChange={(event) => void handleFileChange(event)}
-      />
+      {error ? (
+        <p
+          role="alert"
+          className="max-w-sm text-right text-xs leading-snug text-destructive"
+        >
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

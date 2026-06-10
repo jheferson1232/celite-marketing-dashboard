@@ -5,14 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
 import type { CreativeRecord } from "@/lib/services/creative"
-import { uploadCreativeFileClient } from "@/lib/services/blob/creative-client-upload"
 import { listProductsAction } from "@/app/(app)/products/_actions/products"
 import {
-  createCreativeAction,
   deleteCreativeAction,
   listCreativesAction,
   updateCreativeAction,
 } from "../_actions/creatives"
+import { uploadCreativeToBaul } from "../_lib/upload-creative-to-baul"
 import { CreativeCard } from "./creative-card"
 import { CreativeDeleteDialog } from "./creative-delete-dialog"
 import { CreativeEditDialog } from "./creative-edit-dialog"
@@ -23,6 +22,7 @@ export function BaulContent() {
   const [selectedCreative, setSelectedCreative] = useState<CreativeRecord | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const {
     data: creatives = [],
@@ -46,30 +46,50 @@ export function BaulContent() {
     void queryClient.invalidateQueries({ queryKey: ["products"] })
   }
 
+  const mergeCreativesIntoCache = (created: CreativeRecord[]) => {
+    if (created.length === 0) return
+
+    queryClient.setQueryData<CreativeRecord[]>(["creatives"], (current = []) => {
+      const byId = new Map(current.map((creative) => [creative.id, creative]))
+      for (const creative of created) {
+        byId.set(creative.id, creative)
+      }
+
+      return [...byId.values()].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+    })
+  }
+
   const uploadMutation = useMutation({
     mutationFn: async (files: File[]) => {
+      setUploadError(null)
       const created: CreativeRecord[] = []
 
       for (const file of files) {
-        const uploaded = await uploadCreativeFileClient(file)
-        const record = await runServerAction(
-          createCreativeAction({
-            url: uploaded.url,
-            type: uploaded.type,
-          })
-        )
-        if (!record) throw new Error("No se pudo crear el creative")
+        const record = await uploadCreativeToBaul(file)
         created.push(record)
+        mergeCreativesIntoCache([record])
       }
 
       return created
     },
     onSuccess: (created) => {
+      setUploadError(null)
       invalidate()
-      if (created.length === 1) {
-        setSelectedCreative(created[0]!)
+      const latest = created.at(-1)
+      if (latest) {
+        setSelectedCreative(latest)
         setEditOpen(true)
       }
+    },
+    onError: (mutationError) => {
+      setUploadError(
+        mutationError instanceof Error
+          ? mutationError.message
+          : "No se pudo subir el archivo al baúl"
+      )
     },
   })
 
@@ -128,6 +148,7 @@ export function BaulContent() {
           multiple
           label="Subir archivos"
           uploadingLabel="Subiendo…"
+          error={uploadError}
           onUpload={async (file) => {
             await uploadMutation.mutateAsync([file])
           }}
@@ -136,6 +157,15 @@ export function BaulContent() {
           }}
         />
       </div>
+
+      {uploadError ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {uploadError}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

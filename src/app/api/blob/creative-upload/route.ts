@@ -64,9 +64,6 @@ export async function POST(request: Request): Promise<NextResponse> {
           tokenPayload: clientPayload,
         }
       },
-      onUploadCompleted: async ({ blob }) => {
-        console.info("Creative subido a Blob:", blob.url)
-      },
     })
 
     return NextResponse.json(jsonResponse)

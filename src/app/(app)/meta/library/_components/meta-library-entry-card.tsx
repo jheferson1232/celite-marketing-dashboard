@@ -144,10 +144,10 @@ export function MetaLibraryEntryCard({
 
   const storeHref = entry.url ?? (domain ? `https://${domain}` : null)
   const adLibraryHref = facebookAdLibrarySearchUrl({
+    entryUrl: entry.url,
     facebookPage: entry.facebookPage,
-    pageId: company?.pageId,
-    storeDomain: domain,
-    companyName: company?.name,
+    resolvedPageId: company?.pageId,
+    resolvedCompanyName: company?.name,
   })
   const facebookPageHref = facebookPageProfileUrl({
     facebookPage: entry.facebookPage,

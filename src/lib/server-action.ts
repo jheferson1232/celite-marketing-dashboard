@@ -57,7 +57,23 @@ export function createServerAction<R, A = void>(action: (args: A) => Promise<R>)
 export async function runServerAction<T>(
   createdAction: Promise<readonly [Promise<ServerActionResponse<T>>]>
 ) {
-  const data = await (await createdAction)[0]
+  let data: ServerActionResponse<T>
+
+  try {
+    data = await (await createdAction)[0]
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (
+      message.includes('Server Action') ||
+      message.includes('server action') ||
+      message.includes('404')
+    ) {
+      throw new Error(
+        'La app se recargó en segundo plano. Refresca la página (F5) e inténtalo otra vez.'
+      )
+    }
+    throw error
+  }
 
   if (data.ok === false) {
     throw new Error(data.errorMessage || 'Error desconocido')

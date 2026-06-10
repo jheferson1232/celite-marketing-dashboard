@@ -5,6 +5,7 @@ import { buildCreativeBlobPath } from "@/lib/services/blob/creative-paths"
 import {
   assertBlobConfigured,
   detectCreativeType,
+  normalizeCreativeFile,
   validateMediaFile,
 } from "@/lib/services/blob/media-utils"
 
@@ -23,14 +24,16 @@ export async function uploadCreativeMedia(
     throw new ServerActionError("No se recibió ningún archivo")
   }
 
-  for (const file of input.files) {
+  const normalizedFiles = input.files.map((file) => normalizeCreativeFile(file))
+
+  for (const file of normalizedFiles) {
     validateMediaFile(file, input.type)
   }
 
   const token = process.env.BLOB_READ_WRITE_TOKEN!
 
   return Promise.all(
-    input.files.map(async (file) => {
+    normalizedFiles.map(async (file) => {
       const blob = await put(
         buildCreativeBlobPath(input.type, input.creativeId, file.name),
         file,
@@ -64,10 +67,11 @@ export function formDataToCreativeUploadInput(
 
   const fileEntry = formData.get("file")
   if (fileEntry instanceof File && fileEntry.size > 0) {
+    const file = normalizeCreativeFile(fileEntry)
     return {
       creativeId,
-      type: detectCreativeType(fileEntry),
-      files: [fileEntry],
+      type: detectCreativeType(file),
+      files: [file],
     }
   }
 

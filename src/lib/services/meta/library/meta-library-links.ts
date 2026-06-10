@@ -34,42 +34,19 @@ function parseFacebookPageInput(raw: string): {
   return { companyName: trimmed.replace(/^@/, "") }
 }
 
-export function facebookAdLibrarySearchUrl(input: {
-  facebookPage?: string | null
-  pageId?: string | null
-  storeDomain?: string | null
-  companyName?: string | null
-}): string | null {
-  const pageId =
-    input.pageId?.trim() ||
-    (input.facebookPage ? parseFacebookPageInput(input.facebookPage).pageId : undefined)
+function buildAdLibraryPageUrl(pageId: string): string {
+  const params = new URLSearchParams({
+    active_status: "all",
+    ad_type: "all",
+    country: "ALL",
+    view_all_page_id: pageId,
+    search_type: "page",
+    media_type: "all",
+  })
+  return `https://www.facebook.com/ads/library/?${params.toString()}`
+}
 
-  if (pageId) {
-    const params = new URLSearchParams({
-      active_status: "all",
-      ad_type: "all",
-      country: "ALL",
-      view_all_page_id: pageId,
-      search_type: "page",
-      media_type: "all",
-    })
-    return `https://www.facebook.com/ads/library/?${params.toString()}`
-  }
-
-  const parsedPage = input.facebookPage
-    ? parseFacebookPageInput(input.facebookPage)
-    : {}
-
-  const query =
-    input.companyName?.trim() ||
-    parsedPage.companyName ||
-    input.storeDomain?.trim() ||
-    (input.facebookPage && !/facebook\.com|fb\.com/i.test(input.facebookPage)
-      ? input.facebookPage.trim().replace(/^@/, "")
-      : undefined)
-
-  if (!query) return null
-
+function buildAdLibraryKeywordUrl(query: string): string {
   const params = new URLSearchParams({
     active_status: "all",
     ad_type: "all",
@@ -79,6 +56,82 @@ export function facebookAdLibrarySearchUrl(input: {
     media_type: "all",
   })
   return `https://www.facebook.com/ads/library/?${params.toString()}`
+}
+
+/** Término de búsqueda según lo que el usuario registró (tienda / página). */
+export function adLibraryQueryFromEntry(input: {
+  entryUrl?: string | null
+  facebookPage?: string | null
+}): string | null {
+  const entryUrl = input.entryUrl?.trim()
+  if (entryUrl) {
+    try {
+      const host = new URL(
+        entryUrl.startsWith("http") ? entryUrl : `https://${entryUrl}`
+      ).hostname.replace(/^www\./i, "")
+      if (host) return host
+    } catch {
+      return entryUrl.replace(/^@/, "")
+    }
+  }
+
+  const facebookPage = input.facebookPage?.trim()
+  if (!facebookPage) return null
+
+  const parsed = parseFacebookPageInput(facebookPage)
+  if (parsed.companyName) return parsed.companyName
+
+  if (!/facebook\.com|fb\.com/i.test(facebookPage)) {
+    return facebookPage.replace(/^@/, "")
+  }
+
+  return null
+}
+
+export function facebookAdLibrarySearchUrl(input: {
+  entryUrl?: string | null
+  facebookPage?: string | null
+  /** Solo para fallback si el usuario no dejó tienda ni keyword en página. */
+  resolvedPageId?: string | null
+  resolvedCompanyName?: string | null
+  /** @deprecated Usa entryUrl. Se mantiene por compatibilidad interna. */
+  pageId?: string | null
+  storeDomain?: string | null
+  companyName?: string | null
+}): string | null {
+  const userFacebookPage = input.facebookPage?.trim()
+  const userPageId = userFacebookPage
+    ? parseFacebookPageInput(userFacebookPage).pageId
+    : undefined
+
+  if (userPageId) {
+    return buildAdLibraryPageUrl(userPageId)
+  }
+
+  const userQuery =
+    adLibraryQueryFromEntry({
+      entryUrl: input.entryUrl ?? input.storeDomain,
+      facebookPage: input.facebookPage,
+    }) ??
+    input.storeDomain?.trim().replace(/^www\./i, "") ??
+    null
+
+  if (userQuery) {
+    return buildAdLibraryKeywordUrl(userQuery)
+  }
+
+  const resolvedPageId = input.resolvedPageId?.trim() || input.pageId?.trim()
+  if (resolvedPageId) {
+    return buildAdLibraryPageUrl(resolvedPageId)
+  }
+
+  const resolvedName =
+    input.resolvedCompanyName?.trim() || input.companyName?.trim()
+  if (resolvedName) {
+    return buildAdLibraryKeywordUrl(resolvedName)
+  }
+
+  return null
 }
 
 export function facebookPageProfileUrl(input: {
