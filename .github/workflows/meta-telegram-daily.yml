@@ -1,15 +1,12 @@
-# Informe Meta → Telegram cada hora (plan Vercel Hobby no permite cron horario en vercel.json).
+# Informe Meta → Telegram 1×/día a las 8:00 America/Lima (13:00 UTC).
 # Requiere secrets: CRON_SECRET (mismo valor que en Vercel).
 # Opcional: META_CRON_APP_URL (default: producción en Vercel).
 
-name: Meta Telegram hourly
+name: Meta Telegram daily
 
 on:
   schedule:
-    # GitHub Actions no garantiza ejecución cada hora (a veces salta horas).
-    # Dos disparos por hora aumentan la probabilidad de al menos un informe.
-    - cron: "17 * * * *"
-    - cron: "47 * * * *"
+    - cron: "0 13 * * *"
   workflow_dispatch:
 
 jobs:
@@ -26,7 +23,6 @@ jobs:
             echo "::error::Falta el secret CRON_SECRET en GitHub (Settings → Secrets → Actions)"
             exit 1
           fi
-          # Sin espacios/saltos (evita 401 si se pegó mal al crear el secret)
           CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
           BASE="${BASE%/}"

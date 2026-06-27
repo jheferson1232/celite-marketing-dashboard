@@ -6,8 +6,8 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 
 1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
-3. **Cron** — Cada hora (GitHub Actions → `/api/cron/meta-telegram-reports`): resumen + sugerencias de apagar conjuntos/campañas sin ventas.
-4. **Cierre 23:00** (America/Lima) — Informe nocturno adicional con sin ventas y CPA alto.
+3. **Cron** — 1×/día a las 8:00 (America/Lima) vía GitHub Actions → `/api/cron/meta-telegram-reports`: conjuntos ON en Crítico.
+4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule diario 8:00 no se envía solo.
 
 OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`; el informe horario y los umbrales son reglas fijas en código.
 
@@ -22,7 +22,8 @@ OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe
 | `TELEGRAM_BOT_TOKEN` | Sí (alertas) | Bot de @BotFather |
 | `TELEGRAM_ALLOWED_USER_IDS` | Sí (alertas) | IDs separados por coma |
 | `OPENAI_API_KEY` | No | Texto más natural en Telegram |
-| `META_INFORME_START_DATE` | No | Primer día del historial (`YYYY-MM-DD`, Lima). La tabla muestra una columna por cada día desde esa fecha hasta hoy. |
+| `META_INFORME_MAX_DAYS` | No | Ventana en tabla/sync (default **7** días, Lima). |
+| `META_INFORME_START_DATE` | No | Inicio fijo opcional (`YYYY-MM-DD`, Lima), acotado por `META_INFORME_MAX_DAYS`. |
 
 Copia `.env.example` y rellena los valores.
 
@@ -43,11 +44,11 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 2. Obtén tu ID con @userinfobot → `TELEGRAM_ALLOWED_USER_IDS`.
 3. En la app: **Vista previa** (no envía) o **Enviar a Telegram** (mismo mensaje que el cron).
 
-## Cron horario (GitHub Actions — recomendado en Hobby)
+## Cron diario (GitHub Actions — recomendado en Hobby)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe **cada hora** lo dispara el workflow [`.github/workflows/meta-telegram-hourly.yml`](../.github/workflows/meta-telegram-hourly.yml) (`17` y `47` de cada hora UTC; si ambos corren en la misma hora Lima, el segundo se omite para no duplicar Telegram).
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe lo dispara [`.github/workflows/meta-telegram-daily.yml`](../.github/workflows/meta-telegram-daily.yml) **1×/día a las 8:00 America/Lima** (`0 13 * * *` UTC).
 
-> **Fiabilidad:** GitHub Actions **no garantiza** una ejecución cada hora (a menudo **salta horas**). Revisa **Actions → Meta Telegram hourly** en el repo: si ves huecos, el cron no falló tu app — no se disparó. Para horario estricto, usa [cron-job.org](#alternativa-cron-joborg) cada hora (`0 * * * *`).
+> Para reducir uso de Neon Free, el historial en BD/sync está limitado a **7 días** (`META_INFORME_MAX_DAYS`).
 
 ### Configuración (una vez)
 
@@ -59,9 +60,9 @@ El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe
 
 Probar sin esperar la hora:
 
-- GitHub → **Actions** → **Meta Telegram hourly** → **Run workflow**.
+- GitHub → **Actions** → **Meta Telegram daily** → **Run workflow**.
 
-El endpoint ejecuta el informe operativo en cada llamada y el **cierre nocturno** solo cuando la hora en **America/Lima** es 23.
+El endpoint sincroniza el informe (ventana de 7 días) y envía Telegram. El **cierre nocturno** (23:00 Lima) solo corre si la llamada cae en esa hora.
 
 ### Alternativa: cron-job.org
 
@@ -72,7 +73,7 @@ Si prefieres no usar GitHub Actions:
 | URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
 | Método | GET |
 | Cabecera | `Authorization: Bearer <CRON_SECRET>` |
-| Intervalo | Cada 1 hora |
+| Intervalo | 1×/día (p. ej. `0 13 * * *` UTC = 8:00 Lima) |
 
 ### Plan Vercel Pro
 

@@ -6,9 +6,16 @@ import {
 import { getAllowedTelegramUserIds } from "@/lib/telegram/config"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
 import { getAccountKpis } from "./account-kpis"
-import { formatCop, getMetaInformePayload } from "./meta-operative-service"
+import {
+  formatCop,
+  getMetaInformePayload,
+  type MetaInformePayload,
+} from "./meta-operative-service"
 import { generateNightlyCommentary } from "./meta-cron-commentary"
-import { sendMetaHourlyReportToTelegram } from "./meta-hourly-report"
+import {
+  buildMetaHourlyReportPayload,
+  sendMetaHourlyReportToTelegram,
+} from "./meta-hourly-report"
 
 export function getCronSecret(): string | undefined {
   return process.env.CRON_SECRET?.trim()
@@ -40,8 +47,10 @@ async function sendToAllowedUsers(text: string): Promise<number> {
   return sent
 }
 
-/** Cada hora: conjuntos ON en estado Crítico (para desactivar). */
-export async function runMetaHourlyOperativeReport(): Promise<{
+/** Informe operativo (conjuntos ON en Crítico). Reutiliza payload si ya se sincronizó. */
+export async function runMetaHourlyOperativeReport(
+  cachedInforme?: MetaInformePayload
+): Promise<{
   skipped: boolean
   hour: number
   sent: number
@@ -49,7 +58,8 @@ export async function runMetaHourlyOperativeReport(): Promise<{
   campaignsToPause: number
 }> {
   const hour = getDashboardHour()
-  const result = await sendMetaHourlyReportToTelegram()
+  const payload = await buildMetaHourlyReportPayload(cachedInforme)
+  const result = await sendMetaHourlyReportToTelegram(payload)
 
   return {
     skipped: false,
@@ -60,7 +70,9 @@ export async function runMetaHourlyOperativeReport(): Promise<{
   }
 }
 
-export async function runMetaNightlyReport(): Promise<{
+export async function runMetaNightlyReport(
+  cachedInforme?: MetaInformePayload
+): Promise<{
   skipped: boolean
   sent: number
 }> {
@@ -70,7 +82,7 @@ export async function runMetaNightlyReport(): Promise<{
   }
 
   const today = getDashboardToday()
-  const informe = await getMetaInformePayload()
+  const informe = cachedInforme ?? (await getMetaInformePayload())
   const kpis = await getAccountKpis(getTodayDateRange())
 
   const soldAdsets: {
@@ -130,8 +142,9 @@ export async function runMetaTelegramCron(): Promise<{
   nightly: Awaited<ReturnType<typeof runMetaNightlyReport>>
 }> {
   const hour = getDashboardHour()
-  const hourly = await runMetaHourlyOperativeReport()
-  const nightly = await runMetaNightlyReport()
+  const informe = await getMetaInformePayload()
+  const hourly = await runMetaHourlyOperativeReport(informe)
+  const nightly = await runMetaNightlyReport(informe)
   return { hour, hourly, nightly }
 }
 
