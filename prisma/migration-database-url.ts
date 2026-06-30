@@ -3,7 +3,10 @@ function withConnectTimeout(url: string): string {
   try {
     const parsed = new URL(url)
     if (!parsed.searchParams.has("connect_timeout")) {
-      parsed.searchParams.set("connect_timeout", "30")
+      parsed.searchParams.set("connect_timeout", "60")
+    }
+    if (!parsed.searchParams.has("sslmode")) {
+      parsed.searchParams.set("sslmode", "require")
     }
     return parsed.toString()
   } catch {
@@ -24,6 +27,23 @@ export function isPoolerDatabaseUrl(url: string): boolean {
     return false
   }
   return false
+}
+
+function normalizeNeonEndpoint(hostname: string): string | null {
+  const head = hostname.toLowerCase().split(".")[0] ?? ""
+  if (!head.startsWith("ep-")) return null
+  return head.replace(/-pooler$/u, "")
+}
+
+function sameNeonProject(a: string, b: string): boolean {
+  try {
+    const idA = normalizeNeonEndpoint(new URL(a).hostname)
+    const idB = normalizeNeonEndpoint(new URL(b).hostname)
+    if (!idA || !idB) return true
+    return idA === idB
+  } catch {
+    return true
+  }
 }
 
 function fromPgEnvUnpooled(): string | null {
@@ -60,43 +80,85 @@ function deriveDirectFromPooled(pooled: string): string {
   return withConnectTimeout(parsed.toString())
 }
 
+function pooledDatabaseUrl(): string | null {
+  return (
+    process.env.DATABASE_URL?.trim() ??
+    process.env.POSTGRES_URL?.trim() ??
+    null
+  )
+}
+
+function addCandidate(
+  candidates: string[],
+  seen: Set<string>,
+  url: string | null | undefined,
+  referencePooled: string | null
+) {
+  if (!url?.trim()) return
+
+  const trimmed = url.trim()
+  if (referencePooled && !sameNeonProject(trimmed, referencePooled)) {
+    if (process.env.VERCEL === "1") {
+      console.warn(
+        `[prisma migrate] omitiendo URL directa (${new URL(trimmed).hostname}) distinta a DATABASE_URL (${new URL(referencePooled).hostname})`
+      )
+    }
+    return
+  }
+
+  const normalized = withConnectTimeout(trimmed)
+  if (isPoolerDatabaseUrl(normalized)) return
+  if (seen.has(normalized)) return
+
+  seen.add(normalized)
+  candidates.push(normalized)
+}
+
 /**
- * URL para Prisma CLI (migrate deploy). Advisory locks fallan con pooler.
+ * URLs directas para Prisma CLI (migrate deploy), en orden de preferencia.
+ * Prioriza derivar desde DATABASE_URL pooled (integración Vercel+Neon actual)
+ * y descarta UNPOOLED obsoletos de un proyecto Neon distinto.
  */
-export function migrationDatabaseUrl(): string {
+export function migrationDatabaseUrlCandidates(): string[] {
+  const candidates: string[] = []
+  const seen = new Set<string>()
+  const pooled = pooledDatabaseUrl()
+
+  if (pooled && isPoolerDatabaseUrl(pooled)) {
+    addCandidate(candidates, seen, deriveDirectFromPooled(pooled), null)
+  }
+
   const explicit = [
     process.env.DIRECT_URL,
     process.env.DATABASE_DIRECT_URL,
     process.env.DATABASE_URL_UNPOOLED,
-    process.env.POSTGRES_PRISMA_URL,
     process.env.POSTGRES_URL_NON_POOLING,
     fromPgEnvUnpooled(),
+    process.env.POSTGRES_PRISMA_URL,
   ]
 
   for (const value of explicit) {
-    if (!value?.trim()) continue
-    const url = withConnectTimeout(value.trim())
-    if (!isPoolerDatabaseUrl(url)) return url
+    addCandidate(candidates, seen, value, pooled)
   }
 
-  const pooled =
-    process.env.DATABASE_URL?.trim() ?? process.env.POSTGRES_URL?.trim()
-  if (!pooled) {
+  if (pooled && !isPoolerDatabaseUrl(pooled)) {
+    addCandidate(candidates, seen, pooled, null)
+  }
+
+  if (candidates.length === 0) {
     throw new Error(
       "Falta DATABASE_URL o DATABASE_URL_UNPOOLED en Vercel (Build + Production). " +
         "Neon: copia la connection string «Direct» como DATABASE_URL_UNPOOLED."
     )
   }
 
-  if (!isPoolerDatabaseUrl(pooled)) {
-    return withConnectTimeout(pooled)
-  }
+  return candidates
+}
 
-  const direct = deriveDirectFromPooled(pooled)
-  if (process.env.VERCEL === "1") {
-    console.log(
-      `[prisma migrate] URL directa derivada → host ${new URL(direct).hostname}`
-    )
-  }
-  return direct
+/**
+ * URL para Prisma CLI (migrate deploy). Advisory locks fallan con pooler.
+ */
+export function migrationDatabaseUrl(): string {
+  const [first] = migrationDatabaseUrlCandidates()
+  return first!
 }
