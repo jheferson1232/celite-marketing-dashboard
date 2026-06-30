@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { AppPageScrollShell } from "@/components/app-page-scroll-shell"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CAMPAIGN_KANBAN_STATUS_VALUES } from "@/lib/campaigns/status"
+import { CAMPAIGN_KANBAN_COLUMN_SKELETON_CLASS } from "./_components/campaigns-kanban-column"
 import { CampaignsKanbanContent } from "./_components/campaigns-kanban-content"
 
 export const metadata = {
@@ -20,7 +21,7 @@ export default function CampaignsPage() {
               {CAMPAIGN_KANBAN_STATUS_VALUES.map((status) => (
                 <Skeleton
                   key={status}
-                  className="h-[420px] w-[280px] shrink-0 rounded-xl"
+                  className={CAMPAIGN_KANBAN_COLUMN_SKELETON_CLASS}
                 />
               ))}
             </div>

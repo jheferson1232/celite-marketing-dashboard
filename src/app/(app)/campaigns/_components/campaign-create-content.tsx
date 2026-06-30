@@ -37,6 +37,9 @@ export function CampaignCreateContent() {
   const [pendingAbo, setPendingAbo] = useState<AboStrategyFormPayload | null>(null)
   const [isAboValid, setIsAboValid] = useState(true)
   const [aboErrors, setAboErrors] = useState<ABODynamicFieldErrors>({})
+  const [pendingPixelId, setPendingPixelId] = useState(
+    () => buildEmptyABOStrategyConfig("").campaign.pixel_id
+  )
 
   const { data: strategies = [] } = useQuery({
     queryKey: ["tiktok-strategies"],
@@ -72,6 +75,7 @@ export function CampaignCreateContent() {
           name: pendingName.trim(),
           status: pendingStatus,
           strategy,
+          pixelId: pendingPixelId,
           aboDynamic: {
             ...pendingAbo.dynamic,
             variantId: pendingVariantId,
@@ -91,6 +95,7 @@ export function CampaignCreateContent() {
 
   const canSave =
     pendingName.trim().length > 0 &&
+    pendingPixelId.trim().length > 0 &&
     strategy === "ABO" &&
     pendingAbo !== null &&
     isAboValid &&
@@ -137,9 +142,11 @@ export function CampaignCreateContent() {
       <CampaignGeneralSection
         name={pendingName}
         status={pendingStatus}
+        pixelId={pendingPixelId}
         disabled={createMutation.isPending}
         onNameChange={setPendingName}
         onStatusChange={setPendingStatus}
+        onPixelIdChange={setPendingPixelId}
       />
 
       <section className="max-w-2xl space-y-4 rounded-xl border bg-muted/10 p-4">

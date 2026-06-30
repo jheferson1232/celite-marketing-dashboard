@@ -246,27 +246,37 @@ export function TikTokCuentasContent() {
         </p>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base uppercase tracking-wide">
+      <Card size={accounts.length === 0 ? "sm" : "default"}>
+        <CardHeader className={accounts.length === 0 ? "pb-2" : "pb-3"}>
+          <CardTitle
+            className={
+              accounts.length === 0
+                ? "text-sm uppercase tracking-wide"
+                : "text-base uppercase tracking-wide"
+            }
+          >
             {isLoading ? (
               <Skeleton className="h-5 w-48" />
             ) : (
               `${accounts.length} cuenta${accounts.length === 1 ? "" : "s"} conectada${accounts.length === 1 ? "" : "s"}`
             )}
           </CardTitle>
-          <CardDescription>
-            La cuenta default para testeos alimenta el dashboard, lanzamientos y
-            agente.
-          </CardDescription>
+          {accounts.length > 0 ? (
+            <CardDescription>
+              La cuenta default para testeos alimenta el dashboard, lanzamientos y
+              agente.
+            </CardDescription>
+          ) : null}
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent
+          className={accounts.length === 0 ? "flex flex-col gap-2" : "flex flex-col gap-3"}
+        >
           {isLoading ? (
             Array.from({ length: 2 }).map((_, i) => (
               <Skeleton key={i} className="h-36 w-full rounded-lg" />
             ))
           ) : accounts.length === 0 ? (
-            <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-center text-sm">
               No hay cuentas en la base de datos. Conectá una con el botón de arriba
               o importá la configurada en .env.
             </div>
@@ -363,7 +373,13 @@ export function TikTokCuentasContent() {
           )}
 
           {envAccount && !envAccount.alreadyImported ? (
-            <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className={
+                accounts.length === 0
+                  ? "bg-muted/40 flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  : "bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+              }
+            >
               <div className="space-y-1">
                 <p className="font-medium">{envAccount.name}</p>
                 <p className="text-muted-foreground font-mono text-xs">

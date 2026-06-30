@@ -88,7 +88,8 @@ function buildABOAdgroups(
 export function rebuildABOStrategyConfig(
   campaignName: string,
   dynamic: ABODynamicFields,
-  context: ABODynamicCampaignContext
+  context: ABODynamicCampaignContext,
+  options?: { pixelId?: string }
 ): ABOStrategyConfig {
   const strategy = getTikTokStrategy("ABO")
   const normalizedDynamic = normalizeABODynamicFields(dynamic, context)
@@ -104,6 +105,7 @@ export function rebuildABOStrategyConfig(
       daily_budget: normalizedDynamic.budgetPerAdgroup,
       ad_text: normalizedDynamic.adText,
       default_url: normalizedDynamic.landingPageUrl || undefined,
+      pixel_id: options?.pixelId ?? strategy.staticDefaults.campaign.pixel_id,
     },
     ctas: strategy.staticDefaults.ctas,
     adgroups,

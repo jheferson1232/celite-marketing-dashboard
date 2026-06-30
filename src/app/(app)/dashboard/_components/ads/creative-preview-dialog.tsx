@@ -14,12 +14,25 @@ import { runServerAction } from "@/lib/server-action"
 import type { CreativeRow } from "@/lib/services/meta/types"
 import { getAdVideoSource } from "../../_actions/ad-video-source"
 import { getCreativeVideoSource } from "../../_actions/creative-video-source"
+import { getTikTokVideoSourceAction } from "../../_actions/tiktok-video-source"
+import { isTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
 import { CreativePreviewImage } from "./creative-preview-image"
 
 interface CreativePreviewDialogProps {
   creative: CreativeRow | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  platform?: "meta" | "tiktok"
+}
+
+function toPlayableVideoUrl(
+  url: string,
+  platform: "meta" | "tiktok"
+): string {
+  if (platform === "tiktok" && isTikTokMediaUrl(url)) {
+    return `/api/tiktok-thumbnail?url=${encodeURIComponent(url)}`
+  }
+  return url
 }
 
 function getErrorMessage(error: unknown): string | null {
@@ -39,6 +52,7 @@ export function CreativePreviewDialog({
   creative,
   open,
   onOpenChange,
+  platform = "meta",
 }: CreativePreviewDialogProps) {
   const adId = creative?.adId
   const videoId = creative?.videoId
@@ -53,8 +67,13 @@ export function CreativePreviewDialog({
     error,
     isFetching,
   } = useQuery({
-    queryKey: ["video-preview", videoId, adId],
+    queryKey: ["video-preview", platform, videoId, adId],
     queryFn: async () => {
+      if (platform === "tiktok" && videoId) {
+        const sourceUrl = await runServerAction(getTikTokVideoSourceAction(videoId))
+        return { sourceUrl, embedUrl: null as string | null }
+      }
+
       if (videoId) {
         const fromVideoId = await runServerAction(
           getCreativeVideoSource(videoId)
@@ -83,7 +102,10 @@ export function CreativePreviewDialog({
     return null
   }
 
-  const videoSourceUrl = cachedVideoUrl || fetchedMedia?.sourceUrl
+  const rawVideoSourceUrl = cachedVideoUrl || fetchedMedia?.sourceUrl
+  const videoSourceUrl = rawVideoSourceUrl
+    ? toPlayableVideoUrl(rawVideoSourceUrl, platform)
+    : undefined
   const embedUrl = fetchedMedia?.embedUrl
   const rateLimitMessage = isError ? getErrorMessage(error) : null
   const imageUrl = creative.imageUrl || creative.thumbnailUrl

@@ -105,6 +105,7 @@ export async function createCampaign(input: {
   name: string
   status?: CampaignStatus
   strategy: TikTokStrategyId
+  pixelId?: string
   abo?: UpdateCampaignABOInput
 }): Promise<CampaignRecord> {
   if (!isTikTokStrategyId(input.strategy)) {
@@ -141,9 +142,14 @@ export async function createCampaign(input: {
       throw new Error(firstError ?? "Configuración ABO inválida")
     }
 
-    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context)
+    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context, {
+      pixelId: input.pixelId,
+    })
   } else {
     config = buildEmptyABOStrategyConfig(trimmedName)
+    if (input.pixelId?.trim()) {
+      config.campaign.pixel_id = input.pixelId.trim()
+    }
   }
 
   const row = await prisma.campaign.create({
@@ -270,10 +276,18 @@ export async function updateCampaignABOConfig(
     throw new Error(firstError ?? "Configuración ABO inválida")
   }
 
+  const existingConfig =
+    existing.strategy === "ABO"
+      ? (parseCampaignStrategyConfig(existing.config) as ABOStrategyConfig | null)
+      : null
+
   const config = rebuildABOStrategyConfig(
     existing.name,
     normalizedDynamic,
-    context
+    context,
+    {
+      pixelId: existingConfig?.campaign.pixel_id,
+    }
   )
 
   const row = await prisma.campaign.update({
@@ -289,6 +303,7 @@ export async function updateCampaignDetail(
   input: {
     name: string
     status: CampaignStatus
+    pixelId?: string
     abo?: UpdateCampaignABOInput
   }
 ): Promise<CampaignRecord> {
@@ -315,6 +330,10 @@ export async function updateCampaignDetail(
   }
 
   let config: CampaignStrategyConfig | undefined
+  const existingAboConfig =
+    existing.strategy === "ABO"
+      ? (parseCampaignStrategyConfig(existing.config) as ABOStrategyConfig | null)
+      : null
 
   if (existing.strategy === "ABO" && input.abo) {
     const context: ABODynamicCampaignContext = {
@@ -330,7 +349,17 @@ export async function updateCampaignDetail(
       throw new Error(firstError ?? "Configuración ABO inválida")
     }
 
-    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context)
+    config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context, {
+      pixelId: input.pixelId?.trim() || existingAboConfig?.campaign.pixel_id,
+    })
+  } else if (input.pixelId?.trim() && existingAboConfig) {
+    config = {
+      ...existingAboConfig,
+      campaign: {
+        ...existingAboConfig.campaign,
+        pixel_id: input.pixelId.trim(),
+      },
+    }
   }
 
   const row = await prisma.campaign.update({

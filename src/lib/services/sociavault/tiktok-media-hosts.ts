@@ -4,6 +4,7 @@ export function isTikTokMediaHostname(hostname: string): boolean {
   return (
     h.includes("tiktok") ||
     h.includes("byteimg") ||
+    h.includes("byteoversea") ||
     h.includes("muscdn") ||
     h.includes("ibyteimg")
   )

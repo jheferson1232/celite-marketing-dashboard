@@ -31,7 +31,69 @@ El asistente en Meta/TikTok y el historial de chats usan **PostgreSQL** vía Pri
 ## Comprobar conexión local
 
 ```bash
-npm run db:check
+pnpm exec tsx scripts/check-db.ts
 ```
 
 Si ves aviso de `localhost`, actualiza `.env` y las variables en Vercel antes de desplegar.
+
+## Cambiar de cuenta o proyecto Neon
+
+Útil si agotaste la cuota Free (5 GB/mes) y quieres una base nueva con cuota limpia.
+
+### Variables en Vercel (Settings → Environment Variables)
+
+Actualiza **las mismas claves** con las URLs del proyecto Neon nuevo. Marca **Production**, **Preview** y **Build** en cada una.
+
+| Variable | Obligatoria | Valor en Neon Console |
+|----------|-------------|------------------------|
+| `DATABASE_URL` | Sí | Connection string **Pooled** (host con `-pooler`, puerto 6543) |
+| `DATABASE_URL_UNPOOLED` | Recomendada | Connection string **Direct** (sin `pooler`, puerto 5432) |
+
+Alternativas que también entiende el build (solo si ya las usabas): `DIRECT_URL`, `DATABASE_DIRECT_URL`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`.
+
+**No hace falta cambiar** para el cambio de BD: `CRON_SECRET`, tokens Meta/TikTok, `TELEGRAM_*`, `BLOB_READ_WRITE_TOKEN`, etc.
+
+### Desconectar la integración vieja (opcional)
+
+Vercel → **Storage** → base Neon anterior → desconectar o dejar de usar sus variables. Evita que un redeploy vuelva a inyectar la URL bloqueada.
+
+### Crear tablas en la BD nueva
+
+En tu máquina, con la URL **Direct** del proyecto nuevo:
+
+```bash
+DATABASE_URL="postgresql://..." pnpm exec prisma migrate deploy
+```
+
+Comprobar:
+
+```bash
+DATABASE_URL="postgresql://..." pnpm exec tsx scripts/check-db.ts
+```
+
+Debe responder: `OK: conexión a la base de datos correcta.`
+
+### Redeploy
+
+Vercel → **Deployments** → **Redeploy** (Production). El script `scripts/vercel-build.mjs` ejecuta `prisma migrate deploy` antes de `next build`.
+
+### Datos que no se migran solos
+
+La BD nueva empieza **vacía**. Tendrás que volver a configurar lo que vivía en Postgres:
+
+- Cuentas **TikTok Ads** (`/tiktok/cuentas`) o `TIKTOK_ACCESS_TOKEN` + `TIKTOK_ADVERTISER_ID` en env
+- **Productos**, campañas internas, historial **Informe IA**
+- OAuth **Comentarios Meta**, chats del asistente, productos pendientes
+
+**Sigue funcionando** sin migrar: dashboard **Meta** (solo API), archivos en **Vercel Blob**.
+
+### Migrar datos de la BD vieja (opcional)
+
+Si Neon antiguo aún permite conexión puntual:
+
+```bash
+pg_dump "$OLD_DATABASE_URL" --no-owner --no-acl -Fc -f backup.dump
+pg_restore --no-owner --no-acl -d "$NEW_DATABASE_URL" backup.dump
+```
+
+Si la cuenta vieja está suspendida por cuota, contacta `support@neon.tech` para exportar o espera al reinicio del ciclo.

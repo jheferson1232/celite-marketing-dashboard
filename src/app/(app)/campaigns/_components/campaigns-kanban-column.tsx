@@ -11,6 +11,9 @@ import {
 } from "../_lib/status-labels"
 import { CampaignsKanbanCard } from "./campaigns-kanban-card"
 
+export const CAMPAIGN_KANBAN_COLUMN_SKELETON_CLASS =
+  "h-[min(720px,calc(100dvh-10rem))] w-[420px] shrink-0 rounded-xl"
+
 interface CampaignsKanbanColumnProps {
   status: CampaignKanbanStatus
   campaigns: CampaignRecord[]
@@ -36,13 +39,13 @@ export function CampaignsKanbanColumn({
       ref={setNodeRef}
       aria-label={`Columna ${CAMPAIGN_STATUS_LABELS[status]}`}
       className={cn(
-        "flex w-[280px] max-w-[280px] shrink-0 min-h-[420px] flex-col rounded-xl border bg-muted/20",
+        "flex w-[420px] max-w-[420px] shrink-0 min-h-[min(720px,calc(100dvh-10rem))] flex-col rounded-xl border bg-muted/20",
         highlight && "border-primary/50 bg-primary/5 ring-2 ring-primary/20"
       )}
     >
-      <header className="px-4 pt-3 pb-0">
+      <header className="px-4 pt-4 pb-1">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">{CAMPAIGN_STATUS_LABELS[status]}</h2>
+          <h2 className="text-base font-semibold">{CAMPAIGN_STATUS_LABELS[status]}</h2>
           <Badge
             variant="outline"
             className={cn(
@@ -55,25 +58,14 @@ export function CampaignsKanbanColumn({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        {campaigns.length === 0 ? (
-          <div
-            className={cn(
-              "flex flex-1 items-center justify-center rounded-lg border border-dashed px-3 py-8 text-center text-xs text-muted-foreground",
-              highlight && "border-primary/40 text-primary"
-            )}
-          >
-            Suelta campañas aquí
-          </div>
-        ) : (
-          campaigns.map((campaign) => (
-            <CampaignsKanbanCard
-              key={campaign.id}
-              campaign={campaign}
-              isDragging={activeCampaignId === campaign.id}
-            />
-          ))
-        )}
+      <div className="flex min-h-[280px] flex-1 flex-col gap-3 p-4">
+        {campaigns.map((campaign) => (
+          <CampaignsKanbanCard
+            key={campaign.id}
+            campaign={campaign}
+            isDragging={activeCampaignId === campaign.id}
+          />
+        ))}
       </div>
     </section>
   )

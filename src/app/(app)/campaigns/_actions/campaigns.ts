@@ -31,6 +31,7 @@ export const createCampaignAction = createServerAction(
     name: string
     status?: CampaignStatus
     strategy: TikTokStrategyId
+    pixelId?: string
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
@@ -39,6 +40,7 @@ export const createCampaignAction = createServerAction(
       name: input.name,
       status: input.status,
       strategy: input.strategy,
+      pixelId: input.pixelId,
       ...(input.aboDynamic &&
       input.aboLandingPages &&
       input.aboCreatives
@@ -97,6 +99,7 @@ export const updateCampaignDetailAction = createServerAction(
     campaignId: string
     name: string
     status: CampaignStatus
+    pixelId?: string
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
@@ -104,6 +107,7 @@ export const updateCampaignDetailAction = createServerAction(
     updateCampaignDetail(input.campaignId, {
       name: input.name,
       status: input.status,
+      pixelId: input.pixelId,
       ...(input.aboDynamic &&
       input.aboLandingPages &&
       input.aboCreatives
@@ -129,6 +133,11 @@ export const listTikTokStrategiesAction = createServerAction(async () => {
     label: strategy.label,
     description: strategy.description,
   }))
+})
+
+export const listTikTokPixelsAction = createServerAction(async () => {
+  const { listTikTokPixels } = await import("@/lib/services/tiktok/pixels")
+  return listTikTokPixels()
 })
 
 export const previewLaunchFromCampaignAction = createServerAction(

@@ -37,6 +37,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const [pendingStatus, setPendingStatus] = useState<CampaignStatus>("draft")
   const [pendingVariantId, setPendingVariantId] = useState("")
   const [pendingVariantName, setPendingVariantName] = useState("")
+  const [pendingPixelId, setPendingPixelId] = useState("")
   const [pendingAbo, setPendingAbo] = useState<AboStrategyFormPayload | null>(null)
   const [isAboValid, setIsAboValid] = useState(true)
   const [aboErrors, setAboErrors] = useState<ABODynamicFieldErrors>({})
@@ -76,6 +77,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
     })
     setPendingVariantId(config.dynamic.variantId)
     setPendingVariantName(config.dynamic.variantName)
+    setPendingPixelId(config.campaign.pixel_id)
   }, [campaign])
 
   const isDirty = useMemo(() => {
@@ -86,6 +88,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
     const config = campaign.config as ABOStrategyConfig
     const dynamic = config.dynamic
+
+    const pixelDirty = pendingPixelId !== config.campaign.pixel_id
 
     const strategyDirty =
       pendingVariantId !== dynamic.variantId ||
@@ -101,8 +105,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
       pendingAbo.landingPages.map((p) => p.url).join("|") !==
         config.landingPages.map((p) => p.url).join("|")
 
-    return generalDirty || strategyDirty
-  }, [campaign, pendingAbo, pendingName, pendingStatus, pendingVariantId, pendingVariantName])
+    return generalDirty || pixelDirty || strategyDirty
+  }, [campaign, pendingAbo, pendingName, pendingPixelId, pendingStatus, pendingVariantId, pendingVariantName])
 
   const handleAboChange = useCallback((payload: AboStrategyFormPayload) => {
     setPendingAbo(payload)
@@ -126,6 +130,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
           campaignId,
           name: pendingName.trim(),
           status: pendingStatus,
+          pixelId: pendingPixelId,
           ...(campaign.strategy === "ABO" && pendingAbo
             ? {
                 aboDynamic: {
@@ -200,6 +205,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const canSave =
     isDirty &&
     pendingName.trim().length > 0 &&
+    pendingPixelId.trim().length > 0 &&
     (campaign.strategy !== "ABO" || (pendingAbo !== null && isAboValid)) &&
     !saveMutation.isPending &&
     !strategyMutation.isPending
@@ -282,6 +288,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
       <CampaignGeneralSection
         name={pendingName}
         status={pendingStatus}
+        pixelId={pendingPixelId}
         disabled={saveMutation.isPending || strategyMutation.isPending}
         onNameChange={(name) => {
           setPendingName(name)
@@ -289,6 +296,10 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
         }}
         onStatusChange={(status) => {
           setPendingStatus(status)
+          setSaveNotice(null)
+        }}
+        onPixelIdChange={(pixelId) => {
+          setPendingPixelId(pixelId)
           setSaveNotice(null)
         }}
       />

@@ -19,13 +19,17 @@ import {
   CAMPAIGN_KANBAN_STATUS_VALUES,
   getCampaignKanbanColumn,
   isCampaignKanbanStatus,
+  isCampaignVisibleOnKanban,
   type CampaignKanbanStatus,
 } from "@/lib/campaigns/status"
 import type { CampaignRecord } from "@/lib/services/campaign"
 import { listCampaignsAction, updateCampaignStatusAction } from "../_actions/campaigns"
 import { CampaignCreateButton } from "./campaign-create-dialog"
 import { CampaignKanbanCardView, CampaignsKanbanCard } from "./campaigns-kanban-card"
-import { CampaignsKanbanColumn } from "./campaigns-kanban-column"
+import {
+  CAMPAIGN_KANBAN_COLUMN_SKELETON_CLASS,
+  CampaignsKanbanColumn,
+} from "./campaigns-kanban-column"
 
 function groupCampaignsByKanbanColumn(campaigns: CampaignRecord[]) {
   const grouped = Object.fromEntries(
@@ -33,6 +37,7 @@ function groupCampaignsByKanbanColumn(campaigns: CampaignRecord[]) {
   ) as Record<CampaignKanbanStatus, CampaignRecord[]>
 
   for (const campaign of campaigns) {
+    if (!isCampaignVisibleOnKanban(campaign.status)) continue
     grouped[getCampaignKanbanColumn(campaign.status)].push(campaign)
   }
 
@@ -145,7 +150,7 @@ export function CampaignsKanbanContent() {
       {isLoading ? (
         <div className="flex gap-4 overflow-x-auto pb-2">
           {CAMPAIGN_KANBAN_STATUS_VALUES.map((status) => (
-            <Skeleton key={status} className="h-[420px] w-[280px] shrink-0 rounded-xl" />
+            <Skeleton key={status} className={CAMPAIGN_KANBAN_COLUMN_SKELETON_CLASS} />
           ))}
         </div>
       ) : isError ? (

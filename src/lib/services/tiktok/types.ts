@@ -72,4 +72,7 @@ export interface TikTokAdVideo {
   video_id: string
   video_cover_url?: string
   poster_url?: string
+  video_url?: string
+  preview_url?: string
+  playable_url?: string
 }

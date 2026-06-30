@@ -7,11 +7,10 @@ export const CAMPAIGN_STATUS_VALUES = [
 
 export type CampaignStatus = (typeof CAMPAIGN_STATUS_VALUES)[number]
 
-/** Columnas visibles en el tablero Kanban (sin «Listo»). */
+/** Columnas visibles en el tablero Kanban (sin «Listo» ni «Archivado»). */
 export const CAMPAIGN_KANBAN_STATUS_VALUES = [
   "draft",
   "running",
-  "archived",
 ] as const satisfies readonly CampaignStatus[]
 
 export type CampaignKanbanStatus = (typeof CAMPAIGN_KANBAN_STATUS_VALUES)[number]
@@ -26,10 +25,15 @@ export function isCampaignKanbanStatus(
   return (CAMPAIGN_KANBAN_STATUS_VALUES as readonly string[]).includes(value)
 }
 
-/** «ready» se mueve a Borrador en el tablero. */
+/** «ready» se mueve a Borrador en el tablero. «archived» no aparece en el tablero. */
 export function getCampaignKanbanColumn(
   status: CampaignStatus
 ): CampaignKanbanStatus {
   if (status === "ready") return "draft"
-  return status
+  if (status === "running") return "running"
+  return "draft"
+}
+
+export function isCampaignVisibleOnKanban(status: CampaignStatus): boolean {
+  return status !== "archived"
 }

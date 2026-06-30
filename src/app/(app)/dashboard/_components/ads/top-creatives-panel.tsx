@@ -249,6 +249,7 @@ function CreativeCard({
         creative={creativeRowAdapter}
         open={isPreviewOpen}
         onOpenChange={setIsPreviewOpen}
+        platform={platform}
       />
     </>
   )
