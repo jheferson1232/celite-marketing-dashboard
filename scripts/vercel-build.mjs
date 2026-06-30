@@ -2,7 +2,7 @@ import "dotenv/config"
 import { execSync } from "node:child_process"
 import {
   migrationDatabaseUrlCandidates,
-  pooledDatabaseUrl,
+  pooledDatabaseUrlForPush,
 } from "../prisma/migration-database-url.ts"
 
 const RETRY_DELAYS_MS = [0, 10_000, 20_000, 30_000]
@@ -54,7 +54,7 @@ function migrateWithRetries(directUrl) {
 }
 
 function tryDbPushFallback() {
-  const pooled = pooledDatabaseUrl()
+  const pooled = pooledDatabaseUrlForPush()
   if (!pooled) {
     console.warn("[build] sin URL pooled para db push fallback")
     return false

@@ -107,6 +107,17 @@ function deriveDirectFromPooled(pooled: string): string {
   return withConnectTimeout(parsed.toString())
 }
 
+function derivePooledFromDirect(direct: string): string {
+  const parsed = new URL(direct)
+  const [head, ...rest] = parsed.hostname.split(".")
+  if (head && !head.includes("-pooler")) {
+    parsed.hostname = [`${head}-pooler`, ...rest].join(".")
+  }
+  parsed.port = "6543"
+  parsed.searchParams.set("pgbouncer", "true")
+  return withConnectTimeout(parsed.toString())
+}
+
 /** URL pooled de runtime (integración Vercel + Neon). */
 export function pooledDatabaseUrl(): string | null {
   const explicit = [
@@ -122,6 +133,18 @@ export function pooledDatabaseUrl(): string | null {
   }
 
   return null
+}
+
+/** URL pooled para db push cuando solo hay conexión directa en env. */
+export function pooledDatabaseUrlForPush(): string | null {
+  const pooled = pooledDatabaseUrl()
+  if (pooled && isPoolerDatabaseUrl(pooled)) return pooled
+
+  for (const direct of migrationDatabaseUrlCandidates()) {
+    return derivePooledFromDirect(direct)
+  }
+
+  return pooled
 }
 
 function addCandidate(
