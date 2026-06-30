@@ -16,8 +16,11 @@ function runMigrate(env) {
   execSync("pnpm exec prisma migrate deploy", { stdio: "inherit", env })
 }
 
-function runDbPush(env) {
-  execSync("pnpm exec prisma db push --skip-generate", { stdio: "inherit", env })
+function runDbPush(pooledUrl) {
+  execSync(`pnpm exec prisma db push --accept-data-loss --url ${JSON.stringify(pooledUrl)}`, {
+    stdio: "inherit",
+    env: process.env,
+  })
 }
 
 function migrateWithRetries(directUrl) {
@@ -60,14 +63,8 @@ function tryDbPushFallback() {
   const host = new URL(pooled).hostname
   console.log(`[build] fallback prisma db push → ${host}`)
 
-  const env = {
-    ...process.env,
-    DATABASE_URL: pooled,
-    DIRECT_URL: pooled,
-  }
-
   try {
-    runDbPush(env)
+    runDbPush(pooled)
     return true
   } catch (error) {
     console.warn("[build] db push fallback falló:", error instanceof Error ? error.message : error)
