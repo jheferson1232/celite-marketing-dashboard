@@ -46,20 +46,47 @@ function sameNeonProject(a: string, b: string): boolean {
   }
 }
 
-function fromPgEnvUnpooled(): string | null {
-  const host = process.env.PGHOST_UNPOOLED?.trim()
-  if (!host || host.toLowerCase().includes("pooler")) return null
-
-  const user = process.env.PGUSER?.trim()
-  const password = process.env.PGPASSWORD
-  const database = process.env.PGDATABASE?.trim()
-  if (!user || password === undefined || !database) return null
+function buildPostgresUrl(
+  host: string | undefined,
+  user: string | undefined,
+  password: string | undefined,
+  database: string | undefined
+): string | null {
+  if (!host?.trim() || !user?.trim() || password === undefined || !database?.trim()) {
+    return null
+  }
 
   const parsed = new URL(
-    `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}/${database}`
+    `postgresql://${encodeURIComponent(user.trim())}:${encodeURIComponent(password)}@${host.trim()}/${database.trim()}`
   )
   parsed.searchParams.set("sslmode", "require")
   return withConnectTimeout(parsed.toString())
+}
+
+function fromPgEnvUnpooled(): string | null {
+  const host =
+    process.env.PGHOST_UNPOOLED?.trim() ??
+    process.env.POSTGRES_HOST?.trim()
+  if (!host || host.toLowerCase().includes("pooler")) return null
+
+  return buildPostgresUrl(
+    host,
+    process.env.PGUSER ?? process.env.POSTGRES_USER,
+    process.env.PGPASSWORD ?? process.env.POSTGRES_PASSWORD,
+    process.env.PGDATABASE ?? process.env.POSTGRES_DATABASE
+  )
+}
+
+function fromPgEnvPooled(): string | null {
+  const host = process.env.PGHOST?.trim()
+  if (!host) return null
+
+  return buildPostgresUrl(
+    host,
+    process.env.PGUSER ?? process.env.POSTGRES_USER,
+    process.env.PGPASSWORD ?? process.env.POSTGRES_PASSWORD,
+    process.env.PGDATABASE ?? process.env.POSTGRES_DATABASE
+  )
 }
 
 function deriveDirectFromPooled(pooled: string): string {
@@ -80,12 +107,21 @@ function deriveDirectFromPooled(pooled: string): string {
   return withConnectTimeout(parsed.toString())
 }
 
-function pooledDatabaseUrl(): string | null {
-  return (
-    process.env.DATABASE_URL?.trim() ??
-    process.env.POSTGRES_URL?.trim() ??
-    null
-  )
+/** URL pooled de runtime (integración Vercel + Neon). */
+export function pooledDatabaseUrl(): string | null {
+  const explicit = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    fromPgEnvPooled(),
+  ]
+
+  for (const value of explicit) {
+    if (!value?.trim()) continue
+    return withConnectTimeout(value.trim())
+  }
+
+  return null
 }
 
 function addCandidate(
