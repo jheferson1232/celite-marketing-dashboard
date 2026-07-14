@@ -1,7 +1,7 @@
 import {
-  loadCampaignConfigByName,
+  buildBaseConfigFromDraft,
   mergeNotionIntoCampaignConfig,
-} from "./campaign-config-loader"
+} from "./launch-base-config"
 import type { TikTokLaunchDraft } from "./launch-draft"
 import { buildLaunchPreflight, type LaunchPreflightResult } from "./launch-preflight"
 import { launchTikTokCampaign } from "./launch-campaign"
@@ -44,7 +44,7 @@ function prepareConfigFromLaunchDraft(
   variantSummary: ReturnType<typeof buildVariantFolderSummary>
   skippedAds: number
 } {
-  const baseConfig = loadCampaignConfigByName(draft.name)
+  const baseConfig = buildBaseConfigFromDraft(draft)
   let cfg = mergeNotionIntoCampaignConfig(baseConfig, {
     dailyBudget: draft.dailyBudget,
     urls: draft.urls,

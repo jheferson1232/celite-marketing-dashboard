@@ -7,10 +7,7 @@ import {
   sanitizeFilename,
 } from "@/lib/services/blob/media-utils"
 
-export {
-  isManagedMediaUrl,
-  isVercelBlobUrl,
-} from "@/lib/services/blob/managed-media-url"
+export { isManagedMediaUrl } from "@/lib/services/blob/managed-media-url"
 
 const DEFAULT_TIMEOUT_MS = 60_000
 

@@ -121,11 +121,3 @@ No incluye resumen de cuenta, campañas activas ni listas “a apagar”. Si no 
 | `src/lib/services/meta/meta-hourly-report.ts` | Mensaje horario + envío |
 | `src/lib/services/meta/meta-telegram-cron.ts` | Orquestación cron |
 | `src/app/(app)/informe-ia/` | UI |
-
-## Script local (opcional)
-
-```bash
-pnpm tsx scripts/test-meta-hourly-cron.ts
-```
-
-Requiere `.env` cargado y credenciales Meta/Telegram válidas.

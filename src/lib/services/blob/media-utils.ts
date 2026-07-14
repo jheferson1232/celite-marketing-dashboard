@@ -90,19 +90,6 @@ export function getCreativeUploadLimits(type: CreativeType): {
   }
 }
 
-export function assertBlobConfigured() {
-  if (
-    !process.env.R2_ACCOUNT_ID?.trim() ||
-    !process.env.R2_ACCESS_KEY_ID?.trim() ||
-    !process.env.R2_SECRET_ACCESS_KEY?.trim() ||
-    !process.env.R2_BUCKET_NAME?.trim()
-  ) {
-    throw new ServerActionError(
-      "Cloudflare R2 no está configurado. Añadí R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME y R2_PUBLIC_BASE_URL en .env."
-    )
-  }
-}
-
 export function sanitizeFilename(name: string): string {
   return name
     .trim()

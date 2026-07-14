@@ -1,14 +1,7 @@
 /**
  * Utilidades client-safe para identificar URLs gestionadas por nuestro storage
- * (Vercel Blob legacy o Cloudflare R2). No importar nada server-only aquí.
+ * (Cloudflare R2). No importar nada server-only aquí.
  */
-
-const BLOB_HOST_RE = /blob\.vercel-storage\.com/i
-
-export function isVercelBlobUrl(url: string | null | undefined): boolean {
-  if (!url?.trim()) return false
-  return BLOB_HOST_RE.test(url.trim())
-}
 
 function getR2PublicBaseUrl(): string | null {
   const raw = (
@@ -19,11 +12,10 @@ function getR2PublicBaseUrl(): string | null {
   return raw ? raw.replace(/\/$/, "") : null
 }
 
-/** Identifica URLs gestionadas por nuestro storage (Vercel Blob legacy o R2). */
+/** Identifica URLs gestionadas por nuestro storage (Cloudflare R2). */
 export function isManagedMediaUrl(url: string | null | undefined): boolean {
   if (!url?.trim()) return false
   const trimmed = url.trim()
-  if (isVercelBlobUrl(trimmed)) return true
   const base = getR2PublicBaseUrl()
   if (!base) return false
   return trimmed.startsWith(`${base}/`)

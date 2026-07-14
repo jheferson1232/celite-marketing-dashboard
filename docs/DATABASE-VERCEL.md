@@ -24,17 +24,9 @@ El asistente en Meta/TikTok y el historial de chats usan **PostgreSQL** vía Pri
 1. [Vercel](https://vercel.com) → proyecto → **Settings** → **Environment Variables**.
 2. Añade **`SOCIAVAULT_API_KEY`** = tu clave `sk_live_…` de [sociavault.com/dashboard](https://sociavault.com/dashboard).
 3. Activa **Production** (y Preview si usas previews). Sin comillas en el valor.
-4. Opcional: `SOCIAVAULT_SEARCH_TIKTOK=true`, `SOCIAVAULT_AD_LIBRARY_COUNTRY=VE`, `BLOB_READ_WRITE_TOKEN`.
+4. Opcional: `SOCIAVAULT_SEARCH_TIKTOK=true`, `SOCIAVAULT_AD_LIBRARY_COUNTRY=VE`.
 5. **Redeploy** obligatorio tras guardar variables.
 6. Comprueba: `https://TU-DOMINIO.vercel.app/api/health/sociavault` debe responder `{"configured":true}`.
-
-## Comprobar conexión local
-
-```bash
-pnpm exec tsx scripts/check-db.ts
-```
-
-Si ves aviso de `localhost`, actualiza `.env` y las variables en Vercel antes de desplegar.
 
 ## Cambiar de cuenta o proyecto Neon
 
@@ -51,7 +43,7 @@ Actualiza **las mismas claves** con las URLs del proyecto Neon nuevo. Marca **Pr
 
 Alternativas que también entiende el build (solo si ya las usabas): `DIRECT_URL`, `DATABASE_DIRECT_URL`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`.
 
-**No hace falta cambiar** para el cambio de BD: `CRON_SECRET`, tokens Meta/TikTok, `TELEGRAM_*`, `BLOB_READ_WRITE_TOKEN`, etc.
+**No hace falta cambiar** para el cambio de BD: `CRON_SECRET`, tokens Meta/TikTok, `TELEGRAM_*`, etc.
 
 ### Desconectar la integración vieja (opcional)
 
@@ -65,17 +57,9 @@ En tu máquina, con la URL **Direct** del proyecto nuevo:
 DATABASE_URL="postgresql://..." pnpm exec prisma migrate deploy
 ```
 
-Comprobar:
-
-```bash
-DATABASE_URL="postgresql://..." pnpm exec tsx scripts/check-db.ts
-```
-
-Debe responder: `OK: conexión a la base de datos correcta.`
-
 ### Redeploy
 
-Vercel → **Deployments** → **Redeploy** (Production). El script `scripts/vercel-build.mjs` ejecuta `prisma migrate deploy` antes de `next build`.
+Vercel → **Deployments** → **Redeploy** (Production). El build (`pnpm build`) ejecuta `prisma migrate deploy` antes de `next build`.
 
 ### Datos que no se migran solos
 
@@ -85,7 +69,7 @@ La BD nueva empieza **vacía**. Tendrás que volver a configurar lo que vivía e
 - **Productos**, campañas internas, historial **Informe IA**
 - OAuth **Comentarios Meta**, chats del asistente, productos pendientes
 
-**Sigue funcionando** sin migrar: dashboard **Meta** (solo API), archivos en **Vercel Blob**.
+**Sigue funcionando** sin migrar: dashboard **Meta** (solo API), archivos en **Cloudflare R2** (vars `R2_*` y `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` en env).
 
 ### Migrar datos de la BD vieja (opcional)
 

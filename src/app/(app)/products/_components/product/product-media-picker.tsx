@@ -216,7 +216,7 @@ export function ProductMediaPicker({
           <RiUploadCloud2Line className="mb-2 size-8 text-muted-foreground/60" />
           <p className="text-sm font-medium">{emptyLabel}</p>
           <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            Los archivos se suben a Vercel Blob al guardar el producto.
+            Los archivos se suben a R2 al guardar el producto.
           </p>
         </div>
       ) : (

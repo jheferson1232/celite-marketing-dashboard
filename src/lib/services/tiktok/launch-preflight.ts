@@ -2,9 +2,9 @@ import fs from "fs"
 import { isCloudHosted } from "@/lib/deployment/cloud-host"
 import type { TikTokLaunchDraft } from "./launch-draft"
 import {
-  loadCampaignConfigByName,
+  buildBaseConfigFromDraft,
   mergeNotionIntoCampaignConfig,
-} from "./campaign-config-loader"
+} from "./launch-base-config"
 import type { TikTokLaunchCampaignConfig } from "./launch-campaign-types"
 import {
   applyVideosDirectoryToConfig,
@@ -71,30 +71,12 @@ export function buildLaunchPreflight(
     })
   }
 
-  let baseConfig: TikTokLaunchCampaignConfig
-  try {
-    baseConfig = loadCampaignConfigByName(draft.name)
-    checks.push({
-      ok: true,
-      label: "Config JSON",
-      detail: baseConfig.campaign.name,
-    })
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Config no encontrado"
-    checks.push({ ok: false, label: "Config JSON", detail: msg })
-    return {
-      ready: false,
-      draftName: draft.name,
-      configCampaignName: "",
-      videosDirectory: normalizedDir,
-      checks,
-      variants: [],
-      launchableAds: 0,
-      skippedAds: 0,
-      adGroupCount: 0,
-      urlGroupsNeeded: 0,
-    }
-  }
+  const baseConfig = buildBaseConfigFromDraft(draft)
+  checks.push({
+    ok: true,
+    label: "Config base",
+    detail: baseConfig.campaign.name,
+  })
 
   const cfg = mergeNotionIntoCampaignConfig(baseConfig, {
     dailyBudget: draft.dailyBudget,
@@ -148,15 +130,15 @@ export function buildLaunchPreflight(
       label: "Videos del producto",
       detail:
         urlCount > 0
-          ? `${videoCount} video(s) en Vercel Blob → ${videoCount} conjunto(s) (1 por video, misma landing si hay 1 URL)`
-          : `${videoCount} video(s) en Vercel Blob (se usarán al lanzar)`,
+          ? `${videoCount} video(s) en R2 → ${videoCount} conjunto(s) (1 por video, misma landing si hay 1 URL)`
+          : `${videoCount} video(s) en R2 (se usarán al lanzar)`,
     })
   } else if (productOnCloud && !hasBlobVideos) {
     checks.push({
       ok: false,
       label: "Videos del producto",
       detail:
-        "Sube archivos .mp4 en Editar producto (sección Videos). Vercel Blob; la carpeta del PC no funciona en la web.",
+        "Sube archivos .mp4 en Editar producto (sección Videos). Se guardan en R2; la carpeta del PC no funciona en la web.",
     })
   }
 
@@ -223,7 +205,7 @@ export function buildLaunchPreflight(
     launchableAds > 0
       ? `${launchableAds} conjunto(s) (= ${launchableAds} video(s), 1 por conjunto)${skippedAds > 0 ? ` · ${skippedAds} URL(s) sin video` : ""}`
       : hasBlobVideos && draft.urls.length > 0
-        ? "Los videos de Vercel Blob se emparejarán al lanzar"
+        ? "Los videos de R2 se emparejarán al lanzar"
         : productOnCloud
           ? "Sube videos .mp4 al producto antes de publicar"
           : "Ningún video en carpeta para las URLs"
