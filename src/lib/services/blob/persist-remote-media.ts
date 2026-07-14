@@ -1,19 +1,18 @@
-import { put } from "@vercel/blob"
+import { putR2Object } from "@/lib/services/r2/server"
+import { assertR2Configured, isR2Configured } from "@/lib/services/r2/client"
+import { isManagedMediaUrl } from "@/lib/services/blob/managed-media-url"
 import {
-  assertBlobConfigured,
   MAX_IMAGE_BYTES,
   MAX_VIDEO_BYTES,
   sanitizeFilename,
 } from "@/lib/services/blob/media-utils"
 
+export {
+  isManagedMediaUrl,
+  isVercelBlobUrl,
+} from "@/lib/services/blob/managed-media-url"
+
 const DEFAULT_TIMEOUT_MS = 60_000
-
-const BLOB_HOST_RE = /blob\.vercel-storage\.com/i
-
-export function isVercelBlobUrl(url: string | null | undefined): boolean {
-  if (!url?.trim()) return false
-  return BLOB_HOST_RE.test(url.trim())
-}
 
 export type PersistRemoteMediaInput = {
   remoteUrl: string
@@ -63,16 +62,16 @@ export async function persistRemoteMediaToBlob(
 ): Promise<string | null> {
   const remoteUrl = input.remoteUrl.trim()
   if (!remoteUrl) return null
-  if (isVercelBlobUrl(remoteUrl)) return remoteUrl
+  if (isManagedMediaUrl(remoteUrl)) return remoteUrl
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
+  if (!isR2Configured()) {
     console.warn(
-      "[persist-remote-media] BLOB_READ_WRITE_TOKEN no configurado; se omite persistencia."
+      "[persist-remote-media] R2 no configurado; se omite persistencia."
     )
     return null
   }
 
-  assertBlobConfigured()
+  assertR2Configured()
 
   const maxBytes = input.kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES
   const controller = new AbortController()
@@ -118,17 +117,15 @@ export async function persistRemoteMediaToBlob(
     const ext = extensionForContentType(contentType, input.kind)
     const pathBase = input.blobPath.replace(/\.[a-z0-9]+$/i, "")
     const pathname = `${pathBase}${ext}`
+    const finalContentType =
+      contentType?.split(";")[0]?.trim() ||
+      (input.kind === "image" ? "image/jpeg" : "video/mp4")
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN!
-    const blob = await put(pathname, buffer, {
-      access: "public",
-      token,
-      contentType:
-        contentType?.split(";")[0]?.trim() ||
-        (input.kind === "image" ? "image/jpeg" : "video/mp4"),
+    const url = await putR2Object(pathname, buffer, {
+      contentType: finalContentType,
     })
 
-    return blob.url
+    return url
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.warn(

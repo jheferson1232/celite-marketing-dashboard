@@ -12,6 +12,7 @@ export type ABODynamicFieldErrors = Partial<
   Record<
     | "budgetPerAdgroup"
     | "selectedCreativeIds"
+    | "selectedTikTokVideoIds"
     | "landingPageId"
     | "landingPageUrl"
     | "adText",
@@ -46,6 +47,10 @@ export function normalizeABODynamicFields(
       ? legacyVideoIds
       : pickDefaultCreativeIds(context)
 
+  const selectedTikTokVideoIds = Array.isArray(raw.selectedTikTokVideoIds)
+    ? raw.selectedTikTokVideoIds.filter((id): id is string => typeof id === "string")
+    : []
+
   const landingPageId =
     typeof raw.landingPageId === "string" || raw.landingPageId === null
       ? raw.landingPageId
@@ -74,6 +79,7 @@ export function normalizeABODynamicFields(
     budgetPerAdgroup,
     autoCreateAdgroupsFromCreatives,
     selectedCreativeIds,
+    selectedTikTokVideoIds,
     landingPageId,
     landingPageUrl,
     adText,
@@ -121,14 +127,21 @@ export function validateABODynamicFields(
   }
 
   const effectiveCreatives = resolveEffectiveCreativeIds(context, dynamic)
-  if (!dynamic.autoCreateAdgroupsFromCreatives && effectiveCreatives.length === 0) {
-    errors.selectedCreativeIds = "Selecciona al menos un creativo"
+  const tikTokVideoCount = dynamic.selectedTikTokVideoIds.length
+  const effectiveVideos = resolveEffectiveVideoCreatives(context, dynamic)
+
+  if (
+    !dynamic.autoCreateAdgroupsFromCreatives &&
+    effectiveCreatives.length === 0 &&
+    tikTokVideoCount === 0
+  ) {
+    errors.selectedCreativeIds =
+      "Selecciona al menos un creativo del Baúl o de la cuenta TikTok"
   }
 
-  const effectiveVideos = resolveEffectiveVideoCreatives(context, dynamic)
-  if (effectiveVideos.length === 0) {
+  if (effectiveVideos.length === 0 && tikTokVideoCount === 0) {
     errors.selectedCreativeIds =
-      "Se requiere al menos un video para crear conjuntos en TikTok"
+      "Se requiere al menos un video (Baúl o biblioteca TikTok) para crear conjuntos"
   }
 
   return {

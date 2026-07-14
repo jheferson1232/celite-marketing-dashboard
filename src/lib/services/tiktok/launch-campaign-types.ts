@@ -13,6 +13,8 @@ export type TikTokLaunchCampaignConfig = {
     ad_text?: string
     default_url?: string
     identity_id?: string
+    /** Código de autorización Spark Ads (video orgánico). */
+    auth_code?: string
     utm?: Record<string, string>
     launch?: boolean
   }

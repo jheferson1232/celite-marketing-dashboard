@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { proxiedInstagramMediaUrl } from "@/lib/instagram-media-url"
-import { isVercelBlobUrl } from "@/lib/services/blob/persist-remote-media"
+import { isManagedMediaUrl } from "@/lib/services/blob/persist-remote-media"
 import {
   fetchInstagramReelMedia,
   instagramReelUrl,
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
   const stored = await persistInstagramReelMedia(media)
 
   const coverUrl = stored.coverUrl
-    ? isVercelBlobUrl(stored.coverUrl)
+    ? isManagedMediaUrl(stored.coverUrl)
       ? stored.coverUrl
       : proxiedInstagramMediaUrl(stored.coverUrl)
     : null
   const videoUrl = stored.videoUrl
-    ? isVercelBlobUrl(stored.videoUrl)
+    ? isManagedMediaUrl(stored.videoUrl)
       ? stored.videoUrl
       : proxiedInstagramMediaUrl(stored.videoUrl)
     : null

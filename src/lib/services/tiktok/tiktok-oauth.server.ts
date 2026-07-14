@@ -81,10 +81,36 @@ export function buildTikTokOAuthLoginUrl(state: string): string {
   return loginUrl.toString()
 }
 
+/** Acepta el auth_code crudo o una URL de callback que lo incluya. */
+export function parseTikTokAuthCode(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    throw new Error("Pegá el código de autorización de TikTok.")
+  }
+
+  try {
+    const fromUrl = new URL(trimmed)
+    const code =
+      fromUrl.searchParams.get("auth_code")?.trim() ||
+      fromUrl.searchParams.get("code")?.trim()
+    if (code) return code
+  } catch {
+    // no es URL; tratar como código directo
+  }
+
+  const queryMatch = trimmed.match(/[?&#]auth_code=([^&#\s]+)/i)
+  if (queryMatch?.[1]) {
+    return decodeURIComponent(queryMatch[1])
+  }
+
+  return trimmed
+}
+
 export async function exchangeTikTokOAuthCode(
   authCode: string
 ): Promise<TikTokOAuthTokenResult> {
   const { appId, appSecret } = getTikTokOAuthConfig()
+  const code = parseTikTokAuthCode(authCode)
 
   const { data } = await axios.post<{
     code?: number
@@ -99,7 +125,7 @@ export async function exchangeTikTokOAuthCode(
     {
       app_id: appId,
       secret: appSecret,
-      auth_code: authCode,
+      auth_code: code,
     },
     { headers: { "Content-Type": "application/json" } }
   )

@@ -32,6 +32,7 @@ export const createCampaignAction = createServerAction(
     status?: CampaignStatus
     strategy: TikTokStrategyId
     pixelId?: string
+    authCode?: string
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
@@ -41,6 +42,7 @@ export const createCampaignAction = createServerAction(
       status: input.status,
       strategy: input.strategy,
       pixelId: input.pixelId,
+      authCode: input.authCode,
       ...(input.aboDynamic &&
       input.aboLandingPages &&
       input.aboCreatives
@@ -100,6 +102,7 @@ export const updateCampaignDetailAction = createServerAction(
     name: string
     status: CampaignStatus
     pixelId?: string
+    authCode?: string
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
@@ -108,6 +111,7 @@ export const updateCampaignDetailAction = createServerAction(
       name: input.name,
       status: input.status,
       pixelId: input.pixelId,
+      authCode: input.authCode,
       ...(input.aboDynamic &&
       input.aboLandingPages &&
       input.aboCreatives
@@ -139,6 +143,20 @@ export const listTikTokPixelsAction = createServerAction(async () => {
   const { listTikTokPixels } = await import("@/lib/services/tiktok/pixels")
   return listTikTokPixels()
 })
+
+export const listTikTokAdVideosAction = createServerAction(async () => {
+  const { listTikTokAdVideos } = await import("@/lib/services/tiktok/ad-videos")
+  return listTikTokAdVideos()
+})
+
+export const previewSparkAuthCodeAction = createServerAction(
+  async (authCode: string) => {
+    const { getSparkVideoFromAuthCode } = await import(
+      "@/lib/services/tiktok/spark-auth-video"
+    )
+    return getSparkVideoFromAuthCode(authCode)
+  }
+)
 
 export const previewLaunchFromCampaignAction = createServerAction(
   async (campaignId: string) => {

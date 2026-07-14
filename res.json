@@ -1,0 +1,993 @@
+{
+    "isSuccess": true,
+    "objects": {
+        "id": 2085998,
+        "id_lista": 0,
+        "name": "CHAQUETA REFLECTIVA DOBLE FAZ CAMUFLADA",
+        "name_in_order": "CHAQUETA REFLECTIVA DOBLE FAZ CAMUFLADA - $100000.00 - Stock ",
+        "description": "<p><span style=\"color: rgba(0, 0, 0, 0.75);\">La&nbsp;</span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">chaqueta reflectiva doble faz camuflada </span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\">es una prenda diseñada para brindar </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">seguridad, versatilidad y estilo</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\"> en cualquier momento del día. Su diseño reversible combina una cara </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">reflectiva de alta visibilidad</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\"> para uso nocturno y otra en </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">color verde urbano</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\">, ideal para el día a día.<br>Fabricada en </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">poliéster liviano tipo cortavientos</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\">, ofrece comodidad y protección en climas templados o frescos. Incluye </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">capucha ajustable</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\">, </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">cierre frontal con cremallera completa</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\"> y </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">acabados elásticos en puños y cintura</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\">, proporcionando un ajuste práctico y seguro. Su diseño </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">unisex</span></strong><span style=\"color: rgba(0, 0, 0, 0.75);\"> la hace perfecta para motociclistas, ciclistas y peatones que buscan visibilidad sin perder estilo.<br>✅ </span><strong><span style=\"color: rgba(0, 0, 0, 0.75);\">Características destacadas:</span></strong></p><ul><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Tipo: Chaqueta reflectiva reversible (doble faz)</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Diseño: Cara reflectiva / cara verde urbana</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Material: Poliéster reflectivo de alta visibilidad</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Resistente al viento</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Capucha ajustable</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Cierre frontal con cremallera completa</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Puños y cintura con ajuste elástico</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Estilo: Urbano, ciclismo y carretera</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Género: Unisex</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Tallas: S, M, L, XL, XXL</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Uso recomendado: Día y noche</span></p></li><li><p><span style=\"color: rgba(0, 0, 0, 0.75);\">Lavado: A mano o en máquina (ciclo delicado)</span></p></li></ul>",
+        "type": "VARIABLE",
+        "sale_price": "80000.00",
+        "suggested_price": "100000.00",
+        "user_id": 412303,
+        "privated_product": false,
+        "active": true,
+        "sku": null,
+        "weight": "100.00",
+        "length": "5.00",
+        "width": "5.00",
+        "height": "5.00",
+        "shipping_method": null,
+        "bar_code": null,
+        "deleted_at": null,
+        "created_at": "2026-02-16T23:17:47.000000Z",
+        "dropi_app_description": null,
+        "updated_at": null,
+        "is_warehouse_white_brand": false,
+        "dropi_percent_product_supplier": null,
+        "dropi_percent_product_drops": null,
+        "user": {
+            "id": 412303,
+            "plan": {
+                "id": 4,
+                "name": "SUPPLIER PREMIUM",
+                "description": "El proveedor gestiona su logística pero genera la guía con el sistema de dropi, y no se le cobra comision",
+                "active": true,
+                "created_at": null,
+                "updated_at": "2022-07-05T23:12:09.000000Z",
+                "auto_manage_delivery": true,
+                "type": "SUPPLIER",
+                "use_fullfillment": false,
+                "dropi_shipping_increment_amount": "1000.00",
+                "dropi_percent_product_supplier": "0.00",
+                "commission_product_supplier": "0.00",
+                "dropi_percent_product_drops": "5.00",
+                "deleted_at": null,
+                "profit_percentage_orders_influencers": "0.00",
+                "white_brand_id": 1,
+                "ignore_dropi_percent_product_supplier": false,
+                "dropi_product_supplier_increment_fixed": false,
+                "wb_comission_amount": null,
+                "wb_pay_comission_to": null,
+                "supplier_commission": null
+            },
+            "surname": "LONDOÑO",
+            "name": "JAVIER",
+            "email": "markalinemanizales@gmail.com",
+            "phone": "3207601324",
+            "white_brand": {
+                "id": 1,
+                "name": "Dropi",
+                "product_increment_another_white_brands": "0.00"
+            },
+            "category_user": null
+        },
+        "attributes": [
+            {
+                "id": 252970,
+                "description": "TALLA Y COLOR",
+                "product_id": 2085998,
+                "isVariation": true,
+                "deleted_at": null,
+                "values": [
+                    {
+                        "id": 1113806,
+                        "value": "AZUL TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113805,
+                        "value": "AZUL TALLA XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113804,
+                        "value": "AZUL TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113803,
+                        "value": "AZUL TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113802,
+                        "value": "AZUL TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113801,
+                        "value": "GRIS TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113800,
+                        "value": "GRIS TALLA  XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113799,
+                        "value": "GRIS TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113798,
+                        "value": "GRIS TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113797,
+                        "value": "GRIS TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113796,
+                        "value": "VERDE TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113795,
+                        "value": "VERDE TALLA XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113794,
+                        "value": "VERDE TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113793,
+                        "value": "VERDE TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    },
+                    {
+                        "id": 1113792,
+                        "value": "VERDE TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ]
+            }
+        ],
+        "variations": [
+            {
+                "id": 2000280,
+                "sku": "null-13",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113805,
+                        "value": "AZUL TALLA XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958104,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000280,
+                        "stock": 98,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 98
+            },
+            {
+                "id": 2000272,
+                "sku": "null-5",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113797,
+                        "value": "GRIS TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958096,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000272,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000273,
+                "sku": "null-6",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113798,
+                        "value": "GRIS TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958097,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000273,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000279,
+                "sku": "null-12",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113804,
+                        "value": "AZUL TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958103,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000279,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000281,
+                "sku": "null-14",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113806,
+                        "value": "AZUL TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958105,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000281,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000267,
+                "sku": "null-0",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113792,
+                        "value": "VERDE TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958091,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000267,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000268,
+                "sku": "null-1",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113793,
+                        "value": "VERDE TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958092,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000268,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000274,
+                "sku": "null-7",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113799,
+                        "value": "GRIS TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958098,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000274,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000275,
+                "sku": "null-8",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113800,
+                        "value": "GRIS TALLA  XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958099,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000275,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000276,
+                "sku": "null-9",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113801,
+                        "value": "GRIS TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958100,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000276,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000277,
+                "sku": "null-10",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113802,
+                        "value": "AZUL TALLA S",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958101,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000277,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000278,
+                "sku": "null-11",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113803,
+                        "value": "AZUL TALLA M",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958102,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000278,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000269,
+                "sku": "null-2",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113794,
+                        "value": "VERDE TALLA L",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958093,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000269,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000270,
+                "sku": "null-3",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113795,
+                        "value": "VERDE TALLA XL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958094,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000270,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            },
+            {
+                "id": 2000271,
+                "sku": "null-4",
+                "suggested_price": "115000.00",
+                "sale_price": "75000.00",
+                "product_id": 2085998,
+                "deleted_at": null,
+                "attribute_values": [
+                    {
+                        "id": 1113796,
+                        "value": "VERDE TALLA XXL",
+                        "attribute_id": 252970,
+                        "attribute_name": "TALLA Y COLOR",
+                        "deleted_at": null
+                    }
+                ],
+                "external_id": null,
+                "warehouse_product_variation": [
+                    {
+                        "id": 1958095,
+                        "warehouse_id": 21745,
+                        "variation_id": 2000271,
+                        "stock": 100,
+                        "warehouse": {
+                            "id": 21745,
+                            "name": "MARKZLINE MANIZALES",
+                            "city": {
+                                "id": 259,
+                                "department_id": 5,
+                                "name": "MANIZALES",
+                                "rate_type": "[\"CON RECAUDO\",\"SIN RECAUDO\"]",
+                                "trajectory_type": "NACIONAL",
+                                "created_at": "2020-02-18T02:46:14.000000Z",
+                                "updated_at": "2021-01-22T15:14:26.000000Z",
+                                "cod_dane": "17001000",
+                                "zip_code": null,
+                                "deleted_at": null,
+                                "delivery_code": null
+                            },
+                            "warehouse_white_brand": false,
+                            "commission_fulfillment": null,
+                            "sucursal_id": "157454"
+                        }
+                    }
+                ],
+                "private_product_inventories_rest": 0,
+                "stock": 100
+            }
+        ],
+        "gallery": [
+            {
+                "id": 2350844,
+                "url": null,
+                "main": false,
+                "product_id": 2085998,
+                "variation_id": null,
+                "product_hunter_id": null,
+                "urlS3": "colombia/products/2085998/177128387213.png",
+                "external_id": null
+            },
+            {
+                "id": 2350843,
+                "url": null,
+                "main": false,
+                "product_id": 2085998,
+                "variation_id": null,
+                "product_hunter_id": null,
+                "urlS3": "colombia/products/2085998/177128387211.png",
+                "external_id": null
+            },
+            {
+                "id": 2350842,
+                "url": null,
+                "main": true,
+                "product_id": 2085998,
+                "variation_id": null,
+                "product_hunter_id": null,
+                "urlS3": "colombia/products/2085998/17712838721.png",
+                "external_id": null
+            },
+            {
+                "id": 2350841,
+                "url": null,
+                "main": false,
+                "product_id": 2085998,
+                "variation_id": null,
+                "product_hunter_id": null,
+                "urlS3": "colombia/products/2085998/17712838729.png",
+                "external_id": null
+            },
+            {
+                "id": 2350840,
+                "url": null,
+                "main": false,
+                "product_id": 2085998,
+                "variation_id": null,
+                "product_hunter_id": null,
+                "urlS3": "colombia/products/2085998/17712838723.png",
+                "external_id": null
+            }
+        ],
+        "categories": [
+            {
+                "id": 1248,
+                "name": "Ropa Deportiva",
+                "parent_category": 0
+            },
+            {
+                "id": 3,
+                "name": "Moda",
+                "parent_category": 0
+            },
+            {
+                "id": 20,
+                "name": "Vehículos",
+                "parent_category": 0
+            }
+        ],
+        "private_product_inventories": [],
+        "user_profit_percentage_product": [],
+        "persistanceState": "Unchanged",
+        "external_code": null,
+        "add_stock_in_return": false,
+        "import_list": [],
+        "favorite_product": [],
+        "name_in_guide": null,
+        "dropi_product_supplier_increment_fixed": false,
+        "external_id": null,
+        "warehouse_product": [],
+        "private_product_inventories_rest": 0,
+        "stock": null,
+        "orders": false,
+        "archived": null,
+        "combo_combinations": null,
+        "shared_warehouses": null
+    },
+    "message": "",
+    "status": 200,
+    "count": null
+}

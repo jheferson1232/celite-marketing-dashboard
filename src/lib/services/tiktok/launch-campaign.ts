@@ -357,6 +357,12 @@ async function createAdgroupAndAd(
     cfg.campaign.utm
   )
 
+  const optimizationEvent =
+    cfg.campaign.optimization_event === "COMPLETE_PAYMENT" ||
+    !cfg.campaign.optimization_event
+      ? "SHOPPING"
+      : cfg.campaign.optimization_event
+
   const agData = await tiktokPost<{ adgroup_id: string }>("/adgroup/create/", {
     advertiser_id: advertiserId,
     campaign_id: campaignId,
@@ -365,7 +371,7 @@ async function createAdgroupAndAd(
     promotion_type: "WEBSITE",
     landing_page_url: landingUrl,
     pixel_id: cfg.campaign.pixel_id,
-    optimization_event: cfg.campaign.optimization_event ?? "ON_WEB_ORDER",
+    optimization_event: optimizationEvent,
     optimization_goal: "CONVERT",
     billing_event: "OCPM",
     placements: ["PLACEMENT_TIKTOK"],

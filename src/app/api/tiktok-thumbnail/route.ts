@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { isTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
+import {
+  isTikTokMediaUrl,
+  normalizeTikTokMediaUrl,
+} from "@/lib/services/sociavault/tiktok-media-hosts"
 
 export async function GET(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get("url")?.trim()
@@ -11,8 +14,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Host not allowed" }, { status: 400 })
   }
 
+  const target = normalizeTikTokMediaUrl(raw)
+
   try {
-    const upstream = await fetch(raw, {
+    const upstream = await fetch(target, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",

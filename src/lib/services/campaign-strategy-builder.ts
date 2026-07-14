@@ -41,6 +41,7 @@ export function buildEmptyABOStrategyConfig(campaignName: string): ABOStrategyCo
       budgetPerAdgroup: 0,
       autoCreateAdgroupsFromCreatives: true,
       selectedCreativeIds: [],
+      selectedTikTokVideoIds: [],
       landingPageId: null,
       landingPageUrl: "",
       adText: strategy.staticDefaults.adTextDefault,
@@ -71,31 +72,39 @@ function buildABOAdgroups(
 ): ABOStrategyConfig["adgroups"] {
   const strategy = getTikTokStrategy("ABO")
   const selectedVideos = resolveEffectiveVideoCreatives(context, dynamic)
-
-  if (selectedVideos.length === 0) {
-    return []
-  }
-
   const variantLabel = resolveVariantNameForAdgroups(dynamic, context)
+  const landingUrl = dynamic.landingPageUrl || undefined
 
-  return selectedVideos.map((video, index) => ({
+  const fromBaul = selectedVideos.map((video, index) => ({
     name: strategy.buildAdgroupName(variantLabel, index),
     video: video.url,
-    url: dynamic.landingPageUrl || undefined,
+    url: landingUrl,
   }))
+
+  const fromTikTok = dynamic.selectedTikTokVideoIds.map((videoId, index) => ({
+    name: strategy.buildAdgroupName(
+      variantLabel,
+      selectedVideos.length + index
+    ),
+    video_id: videoId,
+    url: landingUrl,
+  }))
+
+  return [...fromBaul, ...fromTikTok]
 }
 
 export function rebuildABOStrategyConfig(
   campaignName: string,
   dynamic: ABODynamicFields,
   context: ABODynamicCampaignContext,
-  options?: { pixelId?: string }
+  options?: { pixelId?: string; authCode?: string }
 ): ABOStrategyConfig {
   const strategy = getTikTokStrategy("ABO")
   const normalizedDynamic = normalizeABODynamicFields(dynamic, context)
   const variantName = resolveVariantNameForAdgroups(normalizedDynamic, context)
   const dynamicWithVariant = { ...normalizedDynamic, variantName }
   const adgroups = buildABOAdgroups(dynamicWithVariant, context)
+  const authCode = options?.authCode?.trim()
 
   return {
     strategy: "ABO",
@@ -106,6 +115,7 @@ export function rebuildABOStrategyConfig(
       ad_text: normalizedDynamic.adText,
       default_url: normalizedDynamic.landingPageUrl || undefined,
       pixel_id: options?.pixelId ?? strategy.staticDefaults.campaign.pixel_id,
+      ...(authCode ? { auth_code: authCode } : {}),
     },
     ctas: strategy.staticDefaults.ctas,
     adgroups,

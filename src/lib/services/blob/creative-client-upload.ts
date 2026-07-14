@@ -1,4 +1,3 @@
-import { upload } from "@vercel/blob/client"
 import type { CreativeType } from "@/lib/services/creative"
 import { buildCreativeBlobPath } from "@/lib/services/blob/creative-paths"
 import {
@@ -14,6 +13,32 @@ export type CreativeClientUploadResult = {
   type: CreativeType
 }
 
+type PresignResponse = {
+  uploadUrl: string
+  publicUrl: string
+}
+
+async function requestPresign(params: {
+  pathname: string
+  contentType: string
+  type: CreativeType
+}): Promise<PresignResponse> {
+  const response = await fetch(CREATIVE_UPLOAD_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  })
+
+  if (!response.ok) {
+    const message =
+      (await response.json().catch(() => null))?.error ??
+      "No se pudo preparar la subida"
+    throw new Error(message)
+  }
+
+  return (await response.json()) as PresignResponse
+}
+
 export async function uploadCreativeFileClient(
   file: File
 ): Promise<CreativeClientUploadResult> {
@@ -22,15 +47,25 @@ export async function uploadCreativeFileClient(
   validateMediaFile(normalizedFile, type)
 
   const pathname = buildCreativeBlobPath(type, undefined, normalizedFile.name)
-  const useMultipart =
-    type === "video" || normalizedFile.size > 5 * 1024 * 1024
+  const contentType = normalizedFile.type || undefined
 
-  const blob = await upload(pathname, normalizedFile, {
-    access: "public",
-    handleUploadUrl: CREATIVE_UPLOAD_URL,
-    clientPayload: JSON.stringify({ type }),
-    multipart: useMultipart,
+  const { uploadUrl, publicUrl } = await requestPresign({
+    pathname,
+    contentType: contentType ?? "",
+    type,
   })
 
-  return { url: blob.url, type }
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: contentType ? { "Content-Type": contentType } : undefined,
+    body: normalizedFile,
+  })
+
+  if (!uploadResponse.ok) {
+    throw new Error(
+      `Falló la subida a R2 (HTTP ${uploadResponse.status})`
+    )
+  }
+
+  return { url: publicUrl, type }
 }

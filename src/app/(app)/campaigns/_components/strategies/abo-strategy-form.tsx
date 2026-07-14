@@ -34,6 +34,7 @@ interface AboStrategyFormProps {
   config: ABOStrategyConfig
   variantId: string
   variantName: string
+  selectedTikTokVideoIds?: string[]
   disabled?: boolean
   onChange: (payload: AboStrategyFormPayload) => void
   onValidationChange?: (valid: boolean, errors: ABODynamicFieldErrors) => void
@@ -43,6 +44,7 @@ export function AboStrategyForm({
   config,
   variantId,
   variantName,
+  selectedTikTokVideoIds = [],
   disabled = false,
   onChange,
   onValidationChange,
@@ -161,6 +163,7 @@ export function AboStrategyForm({
       budgetPerAdgroup: Number.isFinite(parsedBudget) ? parsedBudget : 0,
       autoCreateAdgroupsFromCreatives,
       selectedCreativeIds,
+      selectedTikTokVideoIds,
       landingPageId:
         landing?.id === "legacy-landing" ? initialDynamic.landingPageId : landing?.id ?? null,
       landingPageUrl: landing?.url ?? initialDynamic.landingPageUrl,
@@ -204,6 +207,7 @@ export function AboStrategyForm({
     landingOptions,
     landingPageId,
     selectedCreativeIds,
+    selectedTikTokVideoIds,
     variantId,
     variantName,
     videoCreatives,
@@ -221,6 +225,7 @@ export function AboStrategyForm({
       budgetPerAdgroup: Number.parseFloat(budgetPerAdgroup) || 0,
       autoCreateAdgroupsFromCreatives,
       selectedCreativeIds,
+      selectedTikTokVideoIds,
       landingPageId:
         selectedLanding?.id === "legacy-landing"
           ? initialDynamic.landingPageId
@@ -243,6 +248,7 @@ export function AboStrategyForm({
     landingPageId,
     landingPages,
     selectedCreativeIds,
+    selectedTikTokVideoIds,
     variantId,
     variantName,
     videoCreatives,

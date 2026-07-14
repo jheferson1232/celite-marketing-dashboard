@@ -11,7 +11,7 @@ export const ABO_STRATEGY: TikTokStrategyDefinition = {
       objective: "WEB_CONVERSIONS",
       daily_budget: 0,
       pixel_id: "7558647730210488328",
-      optimization_event: "ON_WEB_ORDER",
+      optimization_event: "SHOPPING",
       location_ids: ["3686110"],
       age_groups: [
         "AGE_18_24",

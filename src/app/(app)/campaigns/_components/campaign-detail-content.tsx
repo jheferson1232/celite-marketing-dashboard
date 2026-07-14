@@ -38,6 +38,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const [pendingVariantId, setPendingVariantId] = useState("")
   const [pendingVariantName, setPendingVariantName] = useState("")
   const [pendingPixelId, setPendingPixelId] = useState("")
+  const [pendingAuthCode, setPendingAuthCode] = useState("")
+  const [pendingTikTokVideoIds, setPendingTikTokVideoIds] = useState<string[]>([])
   const [pendingAbo, setPendingAbo] = useState<AboStrategyFormPayload | null>(null)
   const [isAboValid, setIsAboValid] = useState(true)
   const [aboErrors, setAboErrors] = useState<ABODynamicFieldErrors>({})
@@ -78,6 +80,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
     setPendingVariantId(config.dynamic.variantId)
     setPendingVariantName(config.dynamic.variantName)
     setPendingPixelId(config.campaign.pixel_id)
+    setPendingAuthCode(config.campaign.auth_code ?? "")
+    setPendingTikTokVideoIds(config.dynamic.selectedTikTokVideoIds ?? [])
   }, [campaign])
 
   const isDirty = useMemo(() => {
@@ -90,6 +94,11 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
     const dynamic = config.dynamic
 
     const pixelDirty = pendingPixelId !== config.campaign.pixel_id
+    const authDirty =
+      pendingAuthCode.trim() !== (config.campaign.auth_code ?? "").trim()
+    const tikTokVideosDirty =
+      pendingTikTokVideoIds.join(",") !==
+      (config.dynamic.selectedTikTokVideoIds ?? []).join(",")
 
     const strategyDirty =
       pendingVariantId !== dynamic.variantId ||
@@ -105,8 +114,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
       pendingAbo.landingPages.map((p) => p.url).join("|") !==
         config.landingPages.map((p) => p.url).join("|")
 
-    return generalDirty || pixelDirty || strategyDirty
-  }, [campaign, pendingAbo, pendingName, pendingPixelId, pendingStatus, pendingVariantId, pendingVariantName])
+    return generalDirty || pixelDirty || authDirty || tikTokVideosDirty || strategyDirty
+  }, [campaign, pendingAbo, pendingAuthCode, pendingName, pendingPixelId, pendingStatus, pendingTikTokVideoIds, pendingVariantId, pendingVariantName])
 
   const handleAboChange = useCallback((payload: AboStrategyFormPayload) => {
     setPendingAbo(payload)
@@ -131,12 +140,14 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
           name: pendingName.trim(),
           status: pendingStatus,
           pixelId: pendingPixelId,
+          authCode: pendingAuthCode.trim(),
           ...(campaign.strategy === "ABO" && pendingAbo
             ? {
                 aboDynamic: {
                   ...pendingAbo.dynamic,
                   variantId: pendingVariantId,
                   variantName: pendingVariantName,
+                  selectedTikTokVideoIds: pendingTikTokVideoIds,
                 },
                 aboLandingPages: pendingAbo.landingPages,
                 aboCreatives: pendingAbo.creatives,
@@ -289,6 +300,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
         name={pendingName}
         status={pendingStatus}
         pixelId={pendingPixelId}
+        authCode={pendingAuthCode}
+        selectedTikTokVideoIds={pendingTikTokVideoIds}
         disabled={saveMutation.isPending || strategyMutation.isPending}
         onNameChange={(name) => {
           setPendingName(name)
@@ -300,6 +313,14 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
         }}
         onPixelIdChange={(pixelId) => {
           setPendingPixelId(pixelId)
+          setSaveNotice(null)
+        }}
+        onAuthCodeChange={(code) => {
+          setPendingAuthCode(code)
+          setSaveNotice(null)
+        }}
+        onSelectedTikTokVideoIdsChange={(ids) => {
+          setPendingTikTokVideoIds(ids)
           setSaveNotice(null)
         }}
       />
@@ -357,6 +378,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
               config={aboConfig}
               variantId={pendingVariantId}
               variantName={pendingVariantName}
+              selectedTikTokVideoIds={pendingTikTokVideoIds}
               disabled={saveMutation.isPending || strategyMutation.isPending}
               onChange={handleAboChange}
               onValidationChange={handleValidationChange}

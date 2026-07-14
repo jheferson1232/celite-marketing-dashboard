@@ -40,6 +40,8 @@ export function CampaignCreateContent() {
   const [pendingPixelId, setPendingPixelId] = useState(
     () => buildEmptyABOStrategyConfig("").campaign.pixel_id
   )
+  const [pendingAuthCode, setPendingAuthCode] = useState("")
+  const [pendingTikTokVideoIds, setPendingTikTokVideoIds] = useState<string[]>([])
 
   const { data: strategies = [] } = useQuery({
     queryKey: ["tiktok-strategies"],
@@ -76,10 +78,12 @@ export function CampaignCreateContent() {
           status: pendingStatus,
           strategy,
           pixelId: pendingPixelId,
+          authCode: pendingAuthCode.trim() || undefined,
           aboDynamic: {
             ...pendingAbo.dynamic,
             variantId: pendingVariantId,
             variantName: pendingVariantName,
+            selectedTikTokVideoIds: pendingTikTokVideoIds,
           },
           aboLandingPages: pendingAbo.landingPages,
           aboCreatives: pendingAbo.creatives,
@@ -143,10 +147,14 @@ export function CampaignCreateContent() {
         name={pendingName}
         status={pendingStatus}
         pixelId={pendingPixelId}
+        authCode={pendingAuthCode}
+        selectedTikTokVideoIds={pendingTikTokVideoIds}
         disabled={createMutation.isPending}
         onNameChange={setPendingName}
         onStatusChange={setPendingStatus}
         onPixelIdChange={setPendingPixelId}
+        onAuthCodeChange={setPendingAuthCode}
+        onSelectedTikTokVideoIdsChange={setPendingTikTokVideoIds}
       />
 
       <section className="max-w-2xl space-y-4 rounded-xl border bg-muted/10 p-4">
@@ -205,6 +213,7 @@ export function CampaignCreateContent() {
               config={aboConfig as ABOStrategyConfig}
               variantId={pendingVariantId}
               variantName={pendingVariantName}
+              selectedTikTokVideoIds={pendingTikTokVideoIds}
               disabled={createMutation.isPending}
               onChange={handleAboChange}
               onValidationChange={handleValidationChange}

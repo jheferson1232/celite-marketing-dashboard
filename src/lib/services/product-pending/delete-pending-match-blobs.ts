@@ -1,13 +1,13 @@
 import prisma from "@/lib/prisma"
 import { deleteProductMedia } from "@/lib/services/blob/product-media"
-import { isVercelBlobUrl } from "@/lib/services/blob/persist-remote-media"
+import { isManagedMediaUrl } from "@/lib/services/blob/persist-remote-media"
 import { collectBlobUrlsFromMatchPayload } from "./persist-pending-match-media"
 
 function uniqueBlobUrls(urls: string[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []
   for (const url of urls) {
-    if (!isVercelBlobUrl(url) || seen.has(url)) continue
+    if (!isManagedMediaUrl(url) || seen.has(url)) continue
     seen.add(url)
     result.push(url)
   }

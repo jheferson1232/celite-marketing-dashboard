@@ -3,6 +3,7 @@
 import { createServerAction } from "@/lib/server-action"
 import {
   connectTikTokAdAccount,
+  connectTikTokAdAccountsFromAuthCode,
   disconnectTikTokAdAccount,
   getTikTokEnvAccountSummary,
   importTikTokEnvAccount,
@@ -23,6 +24,21 @@ export const getTikTokOAuthStatusAction = createServerAction(async () => ({
   configured: isTikTokOAuthConfigured(),
   redirectUri: getTikTokOAuthRedirectUri(),
 }))
+
+export const connectTikTokWithAuthCodeAction = createServerAction(
+  async (authCode: string) => {
+    const connected = await connectTikTokAdAccountsFromAuthCode(authCode)
+    clearTikTokCache()
+    return {
+      count: connected.length,
+      accounts: connected.map((account) => ({
+        id: account.id,
+        name: account.name,
+        advertiserId: account.advertiserId,
+      })),
+    }
+  }
+)
 
 export const listTikTokAdAccountsAction = createServerAction(async () =>
   listTikTokAdAccounts()

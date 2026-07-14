@@ -4,6 +4,7 @@ import {
   assertTikTokAdAccountPrisma,
 } from "./tiktok-credentials.server"
 import { createTikTokClient } from "./tiktok-client"
+import { exchangeTikTokOAuthCode } from "./tiktok-oauth.server"
 import {
   parseTikTokAdvertiserStatus,
   type TikTokAdvertiserStatusKind,
@@ -252,6 +253,17 @@ export async function importTikTokEnvAccount(): Promise<TikTokAdAccountSummary> 
     accessToken: env.accessToken,
     identityId: process.env.TIKTOK_IDENTITY_ID?.trim(),
     setAsDefault: true,
+  })
+}
+
+export async function connectTikTokAdAccountsFromAuthCode(
+  authCode: string
+): Promise<TikTokAdAccountSummary[]> {
+  const token = await exchangeTikTokOAuthCode(authCode)
+  return connectTikTokAdAccountsFromOAuth({
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken,
+    advertiserIds: token.advertiserIds,
   })
 }
 

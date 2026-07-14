@@ -1,9 +1,11 @@
-import { del, put } from "@vercel/blob"
 import { ServerActionError } from "@/lib/server-action"
 import type { CreativeType } from "@/lib/services/creative"
 import { buildCreativeBlobPath } from "@/lib/services/blob/creative-paths"
 import {
-  assertBlobConfigured,
+  assertR2Configured,
+} from "@/lib/services/r2/client"
+import { deleteR2Object, putR2Object } from "@/lib/services/r2/server"
+import {
   detectCreativeType,
   normalizeCreativeFile,
   validateMediaFile,
@@ -18,7 +20,7 @@ export type CreativeMediaUploadInput = {
 export async function uploadCreativeMedia(
   input: CreativeMediaUploadInput
 ): Promise<string[]> {
-  assertBlobConfigured()
+  assertR2Configured()
 
   if (input.files.length === 0) {
     throw new ServerActionError("No se recibió ningún archivo")
@@ -30,30 +32,20 @@ export async function uploadCreativeMedia(
     validateMediaFile(file, input.type)
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN!
-
   return Promise.all(
     normalizedFiles.map(async (file) => {
-      const blob = await put(
-        buildCreativeBlobPath(input.type, input.creativeId, file.name),
-        file,
-        { access: "public", token }
-      )
-      return blob.url
+      const key = buildCreativeBlobPath(input.type, input.creativeId, file.name)
+      return putR2Object(key, file, { contentType: file.type || undefined })
     })
   )
 }
 
 export async function deleteCreativeMedia(url: string): Promise<void> {
   const trimmed = url.trim()
-  if (!trimmed || !trimmed.includes("blob.vercel-storage.com")) return
+  if (!trimmed) return
 
-  assertBlobConfigured()
-
-  const token = process.env.BLOB_READ_WRITE_TOKEN!
-  await del(trimmed, { token }).catch((error) => {
-    console.error("No se pudo eliminar blob:", trimmed, error)
-  })
+  assertR2Configured()
+  await deleteR2Object(trimmed)
 }
 
 export function formDataToCreativeUploadInput(

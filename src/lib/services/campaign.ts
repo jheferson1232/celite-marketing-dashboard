@@ -106,6 +106,7 @@ export async function createCampaign(input: {
   status?: CampaignStatus
   strategy: TikTokStrategyId
   pixelId?: string
+  authCode?: string
   abo?: UpdateCampaignABOInput
 }): Promise<CampaignRecord> {
   if (!isTikTokStrategyId(input.strategy)) {
@@ -144,11 +145,15 @@ export async function createCampaign(input: {
 
     config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context, {
       pixelId: input.pixelId,
+      authCode: input.authCode,
     })
   } else {
     config = buildEmptyABOStrategyConfig(trimmedName)
     if (input.pixelId?.trim()) {
       config.campaign.pixel_id = input.pixelId.trim()
+    }
+    if (input.authCode?.trim()) {
+      config.campaign.auth_code = input.authCode.trim()
     }
   }
 
@@ -287,6 +292,7 @@ export async function updateCampaignABOConfig(
     context,
     {
       pixelId: existingConfig?.campaign.pixel_id,
+      authCode: existingConfig?.campaign.auth_code,
     }
   )
 
@@ -304,6 +310,7 @@ export async function updateCampaignDetail(
     name: string
     status: CampaignStatus
     pixelId?: string
+    authCode?: string
     abo?: UpdateCampaignABOInput
   }
 ): Promise<CampaignRecord> {
@@ -351,13 +358,29 @@ export async function updateCampaignDetail(
 
     config = rebuildABOStrategyConfig(trimmedName, normalizedDynamic, context, {
       pixelId: input.pixelId?.trim() || existingAboConfig?.campaign.pixel_id,
+      authCode:
+        input.authCode !== undefined
+          ? input.authCode
+          : existingAboConfig?.campaign.auth_code,
     })
-  } else if (input.pixelId?.trim() && existingAboConfig) {
+  } else if (
+    (input.pixelId?.trim() || input.authCode !== undefined) &&
+    existingAboConfig
+  ) {
+    const nextAuthCode =
+      input.authCode !== undefined
+        ? input.authCode.trim() || undefined
+        : existingAboConfig.campaign.auth_code
     config = {
       ...existingAboConfig,
       campaign: {
         ...existingAboConfig.campaign,
-        pixel_id: input.pixelId.trim(),
+        ...(input.pixelId?.trim()
+          ? { pixel_id: input.pixelId.trim() }
+          : {}),
+        ...(nextAuthCode
+          ? { auth_code: nextAuthCode }
+          : { auth_code: undefined }),
       },
     }
   }

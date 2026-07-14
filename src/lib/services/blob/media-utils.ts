@@ -91,9 +91,14 @@ export function getCreativeUploadLimits(type: CreativeType): {
 }
 
 export function assertBlobConfigured() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
+  if (
+    !process.env.R2_ACCOUNT_ID?.trim() ||
+    !process.env.R2_ACCESS_KEY_ID?.trim() ||
+    !process.env.R2_SECRET_ACCESS_KEY?.trim() ||
+    !process.env.R2_BUCKET_NAME?.trim()
+  ) {
     throw new ServerActionError(
-      "BLOB_READ_WRITE_TOKEN no está configurado. Añádelo en Vercel o .env local."
+      "Cloudflare R2 no está configurado. Añadí R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME y R2_PUBLIC_BASE_URL en .env."
     )
   }
 }

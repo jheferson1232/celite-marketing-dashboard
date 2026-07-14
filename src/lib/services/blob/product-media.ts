@@ -1,7 +1,7 @@
-import { del, put } from "@vercel/blob"
 import { ServerActionError } from "@/lib/server-action"
+import { assertR2Configured } from "@/lib/services/r2/client"
+import { deleteR2Object, putR2Object } from "@/lib/services/r2/server"
 import {
-  assertBlobConfigured,
   sanitizeFilename,
   sanitizeMediaUrls,
   validateMediaFile,
@@ -33,7 +33,7 @@ function buildBlobPath(
 export async function uploadProductMedia(
   input: ProductMediaUploadInput
 ): Promise<ProductMediaUploadResult> {
-  assertBlobConfigured()
+  assertR2Configured()
 
   if (input.imageFiles.length > MAX_IMAGES) {
     throw new ServerActionError(`Máximo ${MAX_IMAGES} imágenes por producto`)
@@ -46,27 +46,23 @@ export async function uploadProductMedia(
   for (const file of input.imageFiles) validateMediaFile(file, "image")
   for (const file of input.videoFiles) validateMediaFile(file, "video")
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN!
-
   const [images, videos] = await Promise.all([
     Promise.all(
       input.imageFiles.map(async (file) => {
-        const blob = await put(
+        return putR2Object(
           buildBlobPath("images", input.productId, file.name),
           file,
-          { access: "public", token }
+          { contentType: file.type || undefined }
         )
-        return blob.url
       })
     ),
     Promise.all(
       input.videoFiles.map(async (file) => {
-        const blob = await put(
+        return putR2Object(
           buildBlobPath("videos", input.productId, file.name),
           file,
-          { access: "public", token }
+          { contentType: file.type || undefined }
         )
-        return blob.url
       })
     ),
   ])
@@ -78,22 +74,9 @@ export async function deleteProductMedia(urls: string[]): Promise<void> {
   const sanitized = sanitizeMediaUrls(urls)
   if (sanitized.length === 0) return
 
-  assertBlobConfigured()
+  assertR2Configured()
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN!
-  const blobUrls = sanitized.filter((url) =>
-    url.includes("blob.vercel-storage.com")
-  )
-
-  if (blobUrls.length === 0) return
-
-  await Promise.all(
-    blobUrls.map((url) =>
-      del(url, { token }).catch((error) => {
-        console.error("No se pudo eliminar blob:", url, error)
-      })
-    )
-  )
+  await Promise.all(sanitized.map((url) => deleteR2Object(url)))
 }
 
 export function formDataToUploadInput(

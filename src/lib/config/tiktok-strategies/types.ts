@@ -10,6 +10,8 @@ export type ABODynamicFields = {
   budgetPerAdgroup: number
   autoCreateAdgroupsFromCreatives: boolean
   selectedCreativeIds: string[]
+  /** Videos ya subidos a la biblioteca de la cuenta TikTok Ads. */
+  selectedTikTokVideoIds: string[]
   landingPageId: string | null
   landingPageUrl: string
   adText: string

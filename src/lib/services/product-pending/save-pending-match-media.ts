@@ -1,9 +1,9 @@
 import type { Prisma } from "@/app/generated/prisma/client"
 import prisma from "@/lib/prisma"
 import { ServerActionError } from "@/lib/server-action"
-import { isVercelBlobUrl } from "@/lib/services/blob/persist-remote-media"
 import {
   buildScrapedMediaPath,
+  isManagedMediaUrl,
   persistRemoteMediaToBlob,
 } from "@/lib/services/blob/persist-remote-media"
 
@@ -39,7 +39,7 @@ export async function savePendingMatchMedia(
     "media"
   )
 
-  if (coverUrl && !isVercelBlobUrl(coverUrl)) {
+  if (coverUrl && !isManagedMediaUrl(coverUrl)) {
     const stored = await persistRemoteMediaToBlob({
       remoteUrl: coverUrl,
       blobPath: `${basePath}-cover`,
@@ -51,7 +51,7 @@ export async function savePendingMatchMedia(
     }
   }
 
-  if (videoUrl && !isVercelBlobUrl(videoUrl)) {
+  if (videoUrl && !isManagedMediaUrl(videoUrl)) {
     const stored = await persistRemoteMediaToBlob({
       remoteUrl: videoUrl,
       blobPath: `${basePath}-video`,
