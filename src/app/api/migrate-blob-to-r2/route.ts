@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
-import fs from "node:fs/promises"
 import {
-  defaultMapPath,
   migrateBlobsToR2,
   rewriteDbUrls,
 } from "@/lib/services/r2/migrate-from-vercel-blob"
@@ -31,11 +29,9 @@ export async function GET(request: Request) {
     const result: Record<string, unknown> = { phase, dryRun }
 
     if (phase === "copy" || phase === "all") {
-      const copy = await migrateBlobsToR2({
-        dryRun,
-        persistMapPath: defaultMapPath(),
-        onProgress,
-      })
+      // Sin persistMapPath: el mapa vive en memoria (Vercel tiene FS read-only).
+      // Para reanudar localmente usá el script CLI, que sí lo persiste.
+      const copy = await migrateBlobsToR2({ dryRun, onProgress })
       result.copy = {
         listed: copy.listed,
         copied: copy.copied,
@@ -54,23 +50,13 @@ export async function GET(request: Request) {
         }
       }
     } else if (phase === "rewrite") {
-      const mapPath = defaultMapPath()
-      let map
-      try {
-        map = JSON.parse(await fs.readFile(mapPath, "utf8"))
-      } catch {
-        return NextResponse.json(
-          {
-            error: "No se encontró el mapa de migración. Ejecutá ?phase=copy primero.",
-          },
-          { status: 400 }
-        )
-      }
-      const rewrite = await rewriteDbUrls({ map, dryRun, onProgress })
-      result.rewrite = {
-        scalarUpdated: rewrite.scalarUpdated,
-        jsonUpdated: rewrite.jsonUpdated,
-      }
+      return NextResponse.json(
+        {
+          error:
+            "phase=rewrite no es válido en serverless (no hay FS persistente). Usá ?phase=all para copiar+reescribir en una sola petición.",
+        },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json({ ok: true, ...result, logs })
@@ -83,3 +69,4 @@ export async function GET(request: Request) {
     )
   }
 }
+
