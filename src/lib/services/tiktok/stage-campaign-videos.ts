@@ -4,10 +4,7 @@ import path from "path"
 import { mapWithConcurrency } from "./concurrency"
 import { fetchWithRetry } from "./fetch-with-retry"
 import type { TikTokLaunchCampaignConfig } from "./launch-campaign-types"
-import {
-  launchProgressMessage,
-  setLaunchProgress,
-} from "./launch-progress"
+import { launchProgressMessage, setLaunchProgress } from "./launch-progress"
 import type { LaunchMetrics } from "./launch-metrics"
 import type { StagedVideosDirectory } from "./stage-product-videos"
 
@@ -56,7 +53,17 @@ export async function stageCampaignAdgroupVideosFromBlob(
   }
 
   if (remoteTasks.length === 0) {
-    throw new Error("No hay videos remotos para descargar desde los creativos.")
+    // No hay URLs remotas que descargar: ocurre cuando los conjuntos usan
+    // videos existentes de la biblioteca de TikTok (video_id), que no
+    // requieren descarga local. No es un error.
+    return {
+      staged: {
+        dir: "",
+        staged: false,
+        cleanup: () => {},
+      },
+      adgroups,
+    }
   }
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "celite-campaign-tiktok-"))
@@ -94,10 +101,14 @@ export async function stageCampaignAdgroupVideosFromBlob(
       })
     }
 
-    const res = await fetchWithRetry(task.videoUrl, {}, {
-      label: `descarga video "${task.name}"`,
-      timeoutMs: 180_000,
-    })
+    const res = await fetchWithRetry(
+      task.videoUrl,
+      {},
+      {
+        label: `descarga video "${task.name}"`,
+        timeoutMs: 180_000,
+      }
+    )
     if (!res.ok) {
       throw new Error(
         `No se pudo descargar el video "${task.name}" (${res.status})`

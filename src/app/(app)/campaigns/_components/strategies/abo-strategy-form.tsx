@@ -64,7 +64,12 @@ export function AboStrategyForm({
   )
   const [landingPages, setLandingPages] = useState(config.landingPages)
   const [adText, setAdText] = useState(initialDynamic.adText)
-  const [previewCreative, setPreviewCreative] = useState<CreativeRecord | null>(null)
+  const [previewCreative, setPreviewCreative] = useState<CreativeRecord | null>(
+    null
+  )
+
+  /** Si hay videos seleccionados de la biblioteca TikTok, el Baúl no aporta conjuntos. */
+  const usingTikTokVideos = selectedTikTokVideoIds.length > 0
 
   const onChangeRef = useRef(onChange)
   const onValidationChangeRef = useRef(onValidationChange)
@@ -110,7 +115,10 @@ export function AboStrategyForm({
       return
     }
 
-    if (!landingPageId || !landingPages.some((page) => page.id === landingPageId)) {
+    if (
+      !landingPageId ||
+      !landingPages.some((page) => page.id === landingPageId)
+    ) {
       setLandingPageId(landingPages[0]?.id ?? "")
     }
   }, [landingPageId, landingPages])
@@ -127,11 +135,17 @@ export function AboStrategyForm({
       })
     }
     return pages
-  }, [initialDynamic.landingPageId, initialDynamic.landingPageUrl, landingPages])
+  }, [
+    initialDynamic.landingPageId,
+    initialDynamic.landingPageUrl,
+    landingPages,
+  ])
 
   useEffect(() => {
     setSelectedCreativeIds((current) =>
-      current.filter((id) => videoCreativeRecords.some((creative) => creative.id === id))
+      current.filter((id) =>
+        videoCreativeRecords.some((creative) => creative.id === id)
+      )
     )
   }, [variantId, videoCreativeRecords])
 
@@ -161,11 +175,15 @@ export function AboStrategyForm({
       variantId,
       variantName,
       budgetPerAdgroup: Number.isFinite(parsedBudget) ? parsedBudget : 0,
-      autoCreateAdgroupsFromCreatives,
-      selectedCreativeIds,
+      autoCreateAdgroupsFromCreatives: usingTikTokVideos
+        ? false
+        : autoCreateAdgroupsFromCreatives,
+      selectedCreativeIds: usingTikTokVideos ? [] : selectedCreativeIds,
       selectedTikTokVideoIds,
       landingPageId:
-        landing?.id === "legacy-landing" ? initialDynamic.landingPageId : landing?.id ?? null,
+        landing?.id === "legacy-landing"
+          ? initialDynamic.landingPageId
+          : (landing?.id ?? null),
       landingPageUrl: landing?.url ?? initialDynamic.landingPageUrl,
       adText: adText.trim(),
     }
@@ -208,6 +226,7 @@ export function AboStrategyForm({
     landingPageId,
     selectedCreativeIds,
     selectedTikTokVideoIds,
+    usingTikTokVideos,
     variantId,
     variantName,
     videoCreatives,
@@ -223,13 +242,15 @@ export function AboStrategyForm({
       variantId,
       variantName,
       budgetPerAdgroup: Number.parseFloat(budgetPerAdgroup) || 0,
-      autoCreateAdgroupsFromCreatives,
-      selectedCreativeIds,
+      autoCreateAdgroupsFromCreatives: usingTikTokVideos
+        ? false
+        : autoCreateAdgroupsFromCreatives,
+      selectedCreativeIds: usingTikTokVideos ? [] : selectedCreativeIds,
       selectedTikTokVideoIds,
       landingPageId:
         selectedLanding?.id === "legacy-landing"
           ? initialDynamic.landingPageId
-          : selectedLanding?.id ?? null,
+          : (selectedLanding?.id ?? null),
       landingPageUrl: selectedLanding?.url ?? initialDynamic.landingPageUrl,
       adText,
     }
@@ -249,6 +270,7 @@ export function AboStrategyForm({
     landingPages,
     selectedCreativeIds,
     selectedTikTokVideoIds,
+    usingTikTokVideos,
     variantId,
     variantName,
     videoCreatives,
@@ -281,31 +303,36 @@ export function AboStrategyForm({
         />
       </div>
 
-      <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-3">
-        <div className="space-y-1">
-          <p className="text-sm font-medium">
-            ¿Crear {videoCreatives.length} conjunto(s) con los videos del Baúl?
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Si está activo, se generará un conjunto por cada video del Baúl.
-            Si no, podrás elegir manualmente los creativos.
-          </p>
+      {!usingTikTokVideos && (
+        <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-3">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">
+              ¿Crear {videoCreatives.length} conjunto(s) con los videos del
+              Baúl?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Si está activo, se generará un conjunto por cada video del Baúl.
+              Si no, podrás elegir manualmente los creativos.
+            </p>
+          </div>
+          <Switch
+            checked={autoCreateAdgroupsFromCreatives}
+            disabled={disabled || videoCreatives.length === 0}
+            onCheckedChange={(checked) =>
+              setAutoCreateAdgroupsFromCreatives(checked === true)
+            }
+            aria-label="Crear conjuntos automáticamente con los videos del Baúl"
+          />
         </div>
-        <Switch
-          checked={autoCreateAdgroupsFromCreatives}
-          disabled={disabled || videoCreatives.length === 0}
-          onCheckedChange={(checked) => setAutoCreateAdgroupsFromCreatives(checked === true)}
-          aria-label="Crear conjuntos automáticamente con los videos del Baúl"
-        />
-      </div>
+      )}
 
-      {!autoCreateAdgroupsFromCreatives ? (
+      {!usingTikTokVideos && !autoCreateAdgroupsFromCreatives ? (
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium">Videos del Baúl</label>
             <p className="text-xs text-muted-foreground">
-              Selecciona los videos para crear un conjunto por cada uno. Haz clic en
-              una tarjeta para verla en grande.
+              Selecciona los videos para crear un conjunto por cada uno. Haz
+              clic en una tarjeta para verla en grande.
             </p>
           </div>
 
@@ -335,8 +362,9 @@ export function AboStrategyForm({
                       disabled={disabled}
                       aria-label={`Seleccionar ${creative.name ?? "video"}`}
                       className={cn(
-                        "absolute right-2 top-2 z-10 border-background bg-background/90 shadow-sm",
-                        checked && "border-primary data-[state=checked]:bg-primary"
+                        "absolute top-2 right-2 z-10 border-background bg-background/90 shadow-sm",
+                        checked &&
+                          "border-primary data-[state=checked]:bg-primary"
                       )}
                       onCheckedChange={(value) =>
                         toggleCreative(creative.id, value === true)
@@ -358,6 +386,18 @@ export function AboStrategyForm({
         </div>
       ) : null}
 
+      {usingTikTokVideos && (
+        <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">
+            {selectedTikTokVideoIds.length} video(s) de la biblioteca TikTok
+          </p>
+          <p className="mt-1">
+            Se generará un conjunto por cada video de TikTok. No se necesitan
+            videos del Baúl.
+          </p>
+        </div>
+      )}
+
       <CampaignLandingPagesSection
         landingPages={landingPages}
         selectedLandingPageId={landingPageId}
@@ -377,8 +417,8 @@ export function AboStrategyForm({
           disabled={disabled}
           onChange={(event) => setAdText(event.target.value)}
           className={cn(
-            "border-input bg-background w-full rounded-md border px-3 py-2 text-sm shadow-xs",
-            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
+            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs",
+            "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
             "disabled:cursor-not-allowed disabled:opacity-50"
           )}
         />
@@ -387,10 +427,16 @@ export function AboStrategyForm({
       <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
         <p className="font-medium text-foreground">Vista previa de conjuntos</p>
         <p className="mt-1">
-          {previewVideos.length} conjunto(s) · presupuesto {budgetPerAdgroup || "0"}{" "}
-          COP c/u
+          {usingTikTokVideos
+            ? selectedTikTokVideoIds.length
+            : previewVideos.length}{" "}
+          conjunto(s) · presupuesto {budgetPerAdgroup || "0"} COP c/u
         </p>
-        {previewVideos.length > 0 ? (
+        {usingTikTokVideos ? (
+          <p className="mt-2">
+            Desde la biblioteca TikTok (un conjunto por video).
+          </p>
+        ) : previewVideos.length > 0 ? (
           <ul className="mt-2 space-y-1">
             {previewVideos.map((video, index) => (
               <li key={video.id} className="truncate">

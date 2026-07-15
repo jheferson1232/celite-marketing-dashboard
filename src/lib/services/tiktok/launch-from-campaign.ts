@@ -79,7 +79,9 @@ export async function getCampaignForTikTokLaunch(
     )
   }
   if (campaign.strategy !== "ABO") {
-    throw new Error(`Estrategia no soportada para lanzamiento: ${campaign.strategy}`)
+    throw new Error(
+      `Estrategia no soportada para lanzamiento: ${campaign.strategy}`
+    )
   }
   return campaign
 }
@@ -160,16 +162,30 @@ async function buildCampaignLaunchPreflight(
     detail: adText.trim() ? "Configurado" : "Falta texto",
   })
 
-  const videoAdgroups = launchCfg.adgroups.filter((ag) =>
-    Boolean(ag.video?.trim() || ag.video_id)
+  const baulVideoAdgroups = launchCfg.adgroups.filter((ag) =>
+    Boolean(ag.video?.trim())
   )
+  const tiktokVideoAdgroups = launchCfg.adgroups.filter((ag) =>
+    Boolean(ag.video_id)
+  )
+  const videoAdgroupCount =
+    baulVideoAdgroups.length + tiktokVideoAdgroups.length
   checks.push({
-    ok: videoAdgroups.length > 0,
+    ok: videoAdgroupCount > 0,
     label: "Videos de creativos",
     detail:
-      videoAdgroups.length > 0
-        ? `${videoAdgroups.length} video(s) en Blob listos para subir`
-        : "Se requiere al menos un video asociado",
+      videoAdgroupCount === 0
+        ? "Se requiere al menos un video asociado"
+        : [
+            baulVideoAdgroups.length > 0
+              ? `${baulVideoAdgroups.length} del Baúl`
+              : null,
+            tiktokVideoAdgroups.length > 0
+              ? `${tiktokVideoAdgroups.length} de la biblioteca TikTok`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
   })
 
   checks.push(await checkTikTokEnv())
@@ -186,7 +202,7 @@ async function buildCampaignLaunchPreflight(
     strategy: campaign.strategy,
     dailyBudget: budget,
     adGroupCount: launchCfg.adgroups.length,
-    videoCount: videoAdgroups.length,
+    videoCount: videoAdgroupCount,
     landingPageUrl: landingUrl,
     adText,
     adgroups: launchCfg.adgroups.map((ag) => ({
