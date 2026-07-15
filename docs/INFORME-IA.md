@@ -25,7 +25,8 @@ OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe
 | `META_INFORME_MAX_DAYS` | No | Ventana en tabla/sync (default **7** días, Lima). |
 | `META_INFORME_START_DATE` | No | Inicio fijo opcional (`YYYY-MM-DD`, Lima), acotado por `META_INFORME_MAX_DAYS`. |
 
-Copia `.env.example` y rellena los valores.
+Configura estas variables en tu archivo `.env` (local) o en Vercel →
+Settings → Environment Variables (entorno Production).
 
 ## Base de datos
 

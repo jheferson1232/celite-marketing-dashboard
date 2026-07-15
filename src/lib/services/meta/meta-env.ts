@@ -30,8 +30,8 @@ export function getMetaEnvSetupMessage(missing?: string[]): string {
 
   return (
     `Faltan variables de entorno: ${vars.join(", ")}. ` +
-    "En local, copia .env.example a .env.local, pega el token y el ID de cuenta de Meta Ads, y reinicia `pnpm dev`. " +
-    "En Vercel, configúralas en Settings → Environment Variables y vuelve a desplegar."
+    "En local, agrega el token y el ID de cuenta de Meta Ads en tu archivo `.env` y reinicia `pnpm dev`. " +
+    "En Vercel, configúralas en Settings → Environment Variables (entorno Production) y vuelve a desplegar."
   )
 }
 

@@ -7,16 +7,15 @@ export function MetaConfigErrorHint({ className }: { className?: string }) {
       }
     >
       <li>
-        Copia <code className="text-foreground">.env.example</code> a{" "}
-        <code className="text-foreground">.env.local</code> (o restaura desde{" "}
-        <code className="text-foreground">.env.bak</code> si ya tenías las
-        claves).
-      </li>
-      <li>
-        Completa <code className="text-foreground">META_ACCESS_TOKEN</code> y{" "}
+        En tu archivo <code className="text-foreground">.env</code>, completa{" "}
+        <code className="text-foreground">META_ACCESS_TOKEN</code> y{" "}
         <code className="text-foreground">META_AD_ACCOUNT_ID</code>.
       </li>
       <li>Reinicia el servidor con `pnpm dev`.</li>
+      <li>
+        En Vercel, configúralas en Settings → Environment Variables (Production)
+        y vuelve a desplegar.
+      </li>
     </ol>
   )
 }
