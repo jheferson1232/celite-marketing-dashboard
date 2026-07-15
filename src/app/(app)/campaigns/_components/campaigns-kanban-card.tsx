@@ -1,14 +1,22 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { RiDeleteBinLine } from "@remixicon/react"
+import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/format"
 import {
   CAMPAIGN_OUTCOME_MIN_SPEND_PEN,
+  canDeleteCampaign,
 } from "@/lib/campaigns/status"
+import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import type { CampaignKanbanRecord } from "@/lib/services/campaign-kanban-outcomes"
+import { deleteCampaignAction } from "../_actions/campaigns"
+import { CampaignDeleteDialog } from "./campaign-delete-dialog"
 
 interface CampaignsKanbanCardProps {
   campaign: CampaignKanbanRecord
@@ -27,13 +35,17 @@ function formatUpdatedAt(date: Date) {
 export function CampaignKanbanCardView({
   campaign,
   isDragging = false,
-}: CampaignsKanbanCardProps) {
+  onDeleteClick,
+}: CampaignsKanbanCardProps & {
+  onDeleteClick?: () => void
+}) {
   const metrics = campaign.metrics
   const spend = metrics?.totalSpend ?? 0
   const purchases = metrics?.totalPurchases ?? 0
   const cpa = metrics?.totalCpa ?? 0
   const belowMinSpend =
     campaign.status === "running" && spend < CAMPAIGN_OUTCOME_MIN_SPEND_PEN
+  const showDelete = Boolean(onDeleteClick)
 
   return (
     <div
@@ -76,6 +88,26 @@ export function CampaignKanbanCardView({
           </p>
         ) : null}
       </Link>
+
+      {showDelete ? (
+        <div className="flex shrink-0 items-center pr-1.5">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-8 text-muted-foreground hover:text-destructive"
+            aria-label={`Eliminar ${campaign.name}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onDeleteClick?.()
+            }}
+          >
+            <RiDeleteBinLine className="size-4" />
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -84,14 +116,28 @@ export function CampaignsKanbanCard({
   campaign,
   isDragging = false,
 }: CampaignsKanbanCardProps) {
+  const queryClient = useQueryClient()
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: campaign.id,
     data: { campaign, status: campaign.status },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async () =>
+      runServerAction(deleteCampaignAction(campaign.id)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] })
+      void queryClient.invalidateQueries({ queryKey: ["campaigns-kanban"] })
+      setDeleteOpen(false)
+    },
+  })
+
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
     : undefined
+
+  const showDelete = canDeleteCampaign(campaign.status)
 
   return (
     <div
@@ -100,8 +146,29 @@ export function CampaignsKanbanCard({
       className={cn(isDragging && "opacity-40")}
     >
       <div {...listeners} {...attributes}>
-        <CampaignKanbanCardView campaign={campaign} />
+        <CampaignKanbanCardView
+          campaign={campaign}
+          onDeleteClick={showDelete ? () => setDeleteOpen(true) : undefined}
+        />
       </div>
+
+      {showDelete ? (
+        <CampaignDeleteDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          campaignName={campaign.name}
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate()}
+        />
+      ) : null}
+
+      {deleteMutation.isError ? (
+        <p className="mt-1 px-1 text-[11px] text-destructive">
+          {deleteMutation.error instanceof Error
+            ? deleteMutation.error.message
+            : "No se pudo eliminar"}
+        </p>
+      ) : null}
     </div>
   )
 }

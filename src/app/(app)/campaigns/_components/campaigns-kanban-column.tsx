@@ -66,7 +66,7 @@ export function CampaignsKanbanColumn({
         {status === "running" ? (
           <p className="mt-1 text-[11px] text-muted-foreground">
             Se clasifica al superar S/ {CAMPAIGN_OUTCOME_MIN_SPEND_PEN} de gasto
-            total
+            total. Podés editar o eliminar mientras estén aquí.
           </p>
         ) : null}
         {status === "winner" ? (

@@ -4,22 +4,13 @@ import { buildTikTokCacheKey, getTikTokRequestContext } from "./tiktok-api.serve
 import { withTikTokCache } from "./tiktok-cache"
 import { normalizeTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
 import type { TikTokApiResponse, TikTokPageInfo } from "./types"
+import type { TikTokAdVideoAsset } from "./ad-video-asset"
+
+export type { TikTokAdVideoAsset } from "./ad-video-asset"
 
 const VIDEOS_TTL_MS = 2 * 60 * 1000
 const PAGE_SIZE = 50
 const MAX_PAGES = 20
-
-export type TikTokAdVideoAsset = {
-  id: string
-  name: string
-  coverUrl: string | null
-  previewUrl: string | null
-  durationMs: number | null
-  width: number | null
-  height: number | null
-  format: string | null
-  createTime: string | null
-}
 
 interface TikTokVideoSearchRow {
   video_id?: string
@@ -73,6 +64,7 @@ function mapVideoRow(row: TikTokVideoSearchRow): TikTokAdVideoAsset | null {
   return {
     id,
     name,
+    profileName: null,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs:

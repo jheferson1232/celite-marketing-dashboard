@@ -32,6 +32,11 @@ type LaunchOptions = {
   /** ID interno de campaña (para progreso en UI). */
   progressCampaignId?: string
   metrics?: LaunchMetrics
+  /**
+   * Siempre crea una campaña nueva en TikTok (no reutiliza por nombre ni campaign_id).
+   * Útil al relanzar una campaña interna ya «En curso».
+   */
+  forceNewCampaign?: boolean
 }
 
 type LaunchContext = {
@@ -295,15 +300,18 @@ async function findCampaignIdByName(
 async function resolveCampaignId(
   campaignName: string,
   configuredId: string | null | undefined,
-  objective: string
+  objective: string,
+  options?: { forceNew?: boolean }
 ): Promise<{ campaignId: string; reusedExisting: boolean }> {
-  if (configuredId) {
+  if (!options?.forceNew && configuredId) {
     return { campaignId: configuredId, reusedExisting: true }
   }
 
-  const existing = await findCampaignIdByName(campaignName)
-  if (existing) {
-    return { campaignId: existing, reusedExisting: true }
+  if (!options?.forceNew) {
+    const existing = await findCampaignIdByName(campaignName)
+    if (existing) {
+      return { campaignId: existing, reusedExisting: true }
+    }
   }
 
   const { advertiserId } = await getTikTokRequestContext()
@@ -325,11 +333,69 @@ async function resolveVideoIdForAdgroup(
   ag: TikTokLaunchCampaignConfig["adgroups"][number],
   ctx: LaunchContext
 ): Promise<string> {
-  if (ag.video_id) return ag.video_id
+  if (ag.video_id) {
+    const { parseSparkVideoSelectionId } = await import("./ad-video-asset")
+    const sparkItemId = parseSparkVideoSelectionId(ag.video_id)
+    if (sparkItemId) {
+      const { getTikTokSparkPostPreviewUrl } = await import("./spark-posts")
+      const previewUrl = await getTikTokSparkPostPreviewUrl(sparkItemId)
+      if (!previewUrl) {
+        throw new Error(
+          `Conjunto "${ag.name}": no se encontró el post Spark ${sparkItemId}`
+        )
+      }
+      // Reutilizar el flujo de video remoto: descargar preview y subir a biblioteca.
+      const staged = await stageSparkPreviewToTempFile(previewUrl, ag.name)
+      try {
+        return await uploadVideo(staged.path, ctx)
+      } finally {
+        staged.cleanup()
+      }
+    }
+    return ag.video_id
+  }
   if (!ag.video) {
     throw new Error(`Conjunto "${ag.name}": falta video o video_id`)
   }
   return uploadVideo(ag.video, ctx)
+}
+
+async function stageSparkPreviewToTempFile(
+  previewUrl: string,
+  adgroupName: string
+): Promise<{ path: string; cleanup: () => void }> {
+  const fs = await import("fs")
+  const os = await import("os")
+  const path = await import("path")
+  const { fetchWithRetry } = await import("./fetch-with-retry")
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "celite-spark-"))
+  const localPath = path.join(dir, "spark-preview.mp4")
+  const res = await fetchWithRetry(
+    previewUrl,
+    {},
+    {
+      label: `descarga post Spark "${adgroupName}"`,
+      timeoutMs: 180_000,
+    }
+  )
+  if (!res.ok) {
+    fs.rmSync(dir, { recursive: true, force: true })
+    throw new Error(
+      `No se pudo descargar el post Spark "${adgroupName}" (${res.status})`
+    )
+  }
+  fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()))
+  return {
+    path: localPath,
+    cleanup: () => {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true })
+      } catch {
+        // ignore
+      }
+    },
+  }
 }
 
 async function resolveCoverIdForVideo(
@@ -455,7 +521,12 @@ export async function launchTikTokCampaign(
   updateProgress(ctx, "resolve_campaign", 0, totalAdgroups)
 
   const resolveCampaign = async () =>
-    resolveCampaignId(campaignName, cfg.campaign.campaign_id, objective)
+    resolveCampaignId(
+      campaignName,
+      options.forceNewCampaign ? undefined : cfg.campaign.campaign_id,
+      objective,
+      { forceNew: options.forceNewCampaign === true }
+    )
 
   const { campaignId, reusedExisting } = options.metrics
     ? await options.metrics.time("resolve_campaign", resolveCampaign)

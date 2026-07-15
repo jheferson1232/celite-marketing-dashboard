@@ -389,7 +389,7 @@ export function AboStrategyForm({
       {usingTikTokVideos && (
         <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">
-            {selectedTikTokVideoIds.length} video(s) de la biblioteca TikTok
+            {selectedTikTokVideoIds.length} post(s) de TikTok
           </p>
           <p className="mt-1">
             Se generará un conjunto por cada video de TikTok. No se necesitan

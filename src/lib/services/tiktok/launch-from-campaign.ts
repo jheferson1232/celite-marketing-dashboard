@@ -1,3 +1,4 @@
+import { DASHBOARD_TIMEZONE } from "@/lib/date"
 import {
   validateABODynamicFields,
   type ABOStrategyConfig,
@@ -53,7 +54,7 @@ export type LaunchFromCampaignSummary = {
   metrics?: ReturnType<LaunchMetrics["finish"]>
 }
 
-const LAUNCHABLE_STATUSES = new Set(["draft", "ready"])
+const LAUNCHABLE_STATUSES = new Set(["draft", "ready", "running"])
 
 async function checkTikTokEnv(): Promise<LaunchCheckItem> {
   const ok = await hasTikTokCredentialsConfigured()
@@ -75,7 +76,7 @@ export async function getCampaignForTikTokLaunch(
   }
   if (!LAUNCHABLE_STATUSES.has(campaign.status)) {
     throw new Error(
-      `La campaña debe estar en Borrador o Listo para lanzar (estado actual: ${campaign.status}).`
+      `La campaña debe estar en Borrador, Listo o En curso para lanzar (estado actual: ${campaign.status}).`
     )
   }
   if (campaign.strategy !== "ABO") {
@@ -97,6 +98,37 @@ function buildLaunchConfigFromCampaign(
       name: campaign.name.trim() || launchConfig.campaign.name,
     },
   }
+}
+
+/** Nombre único en TikTok para no chocar con una campaña ya publicada. */
+function buildRelanzarTikTokCampaignName(baseName: string): string {
+  const stamp = new Intl.DateTimeFormat("es-CO", {
+    timeZone: DASHBOARD_TIMEZONE,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date())
+    .replace(/\//g, "-")
+    .replace(/,/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  const base = baseName.trim() || "campaña"
+  return `${base} ${stamp}`
+}
+
+function withUniqueAdgroupNames(
+  adgroups: TikTokLaunchCampaignConfig["adgroups"],
+  suffix: string
+): TikTokLaunchCampaignConfig["adgroups"] {
+  const short = suffix.replace(/\s+/g, "-").toLowerCase()
+  return adgroups.map((ag, index) => ({
+    ...ag,
+    name: `${ag.name} ${short}`.slice(0, 100) || `conjunto ${index + 1} ${short}`,
+  }))
 }
 
 async function buildCampaignLaunchPreflight(
@@ -225,13 +257,17 @@ export function formatLaunchFromCampaignMessage(
   summary: LaunchFromCampaignSummary
 ): string {
   const { result } = summary
-  const header = result.active
-    ? "Creada y activa en TikTok"
-    : "Creada en TikTok (en pausa)"
+  const header = result.reusedExistingCampaign
+    ? result.active
+      ? "Reutilizada y activa en TikTok"
+      : "Reutilizada en TikTok (en pausa)"
+    : result.active
+      ? "Nueva campaña creada y activa en TikTok"
+      : "Nueva campaña creada en TikTok (en pausa)"
 
   return [
     header,
-    `Campaña: ${summary.campaignName}`,
+    `Campaña TikTok: ${result.campaignName}`,
     `Conjuntos: ${summary.adGroupCount}`,
     summary.videosStagedFromBlob
       ? "Videos: descargados desde creativos (Blob)"
@@ -267,6 +303,25 @@ export async function launchTikTokCampaignFromCampaign(
     }
 
     let launchCfg = buildLaunchConfigFromCampaign(campaign)
+    const relanzar = campaign.status === "running"
+    if (relanzar) {
+      const tiktokCampaignName = buildRelanzarTikTokCampaignName(campaign.name)
+      const nameStamp = tiktokCampaignName.slice(campaign.name.trim().length).trim()
+      launchCfg = {
+        ...launchCfg,
+        campaign: {
+          ...launchCfg.campaign,
+          name: tiktokCampaignName,
+          // No reutilizar la campaña TikTok anterior ni su campaign_id guardado.
+          campaign_id: undefined,
+        },
+        adgroups: withUniqueAdgroupNames(
+          launchCfg.adgroups,
+          nameStamp || "relanzar"
+        ),
+      }
+    }
+
     const { staged, adgroups } = await stageCampaignAdgroupVideosFromBlob(
       launchCfg.adgroups,
       { campaignId, metrics }
@@ -277,6 +332,7 @@ export async function launchTikTokCampaignFromCampaign(
     const result = await launchTikTokCampaign(launchCfg, {
       progressCampaignId: campaignId,
       metrics,
+      forceNewCampaign: relanzar,
     })
 
     await metrics.time("update_status", async () => {

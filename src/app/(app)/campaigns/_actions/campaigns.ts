@@ -153,8 +153,10 @@ export const listTikTokPixelsAction = createServerAction(async () => {
 })
 
 export const listTikTokAdVideosAction = createServerAction(async () => {
-  const { listTikTokAdVideos } = await import("@/lib/services/tiktok/ad-videos")
-  return listTikTokAdVideos()
+  const { listTikTokSparkPosts } = await import(
+    "@/lib/services/tiktok/spark-posts"
+  )
+  return listTikTokSparkPosts()
 })
 
 export const previewSparkAuthCodeAction = createServerAction(

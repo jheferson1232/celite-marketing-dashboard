@@ -1,9 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { RiArrowLeftLine, RiRocketLine, RiSaveLine } from "@remixicon/react"
+import {
+  RiArrowLeftLine,
+  RiDeleteBinLine,
+  RiRocketLine,
+  RiSaveLine,
+} from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
@@ -12,13 +18,15 @@ import type {
   ABOStrategyConfig,
 } from "@/lib/config/tiktok-strategies"
 import type { TikTokStrategyId } from "@/lib/config/tiktok-strategies"
-import type { CampaignStatus } from "@/lib/campaigns/status"
+import { canDeleteCampaign, type CampaignStatus } from "@/lib/campaigns/status"
 import {
+  deleteCampaignAction,
   getCampaignByIdAction,
   listTikTokStrategiesAction,
   updateCampaignDetailAction,
   updateCampaignStrategyAction,
 } from "../_actions/campaigns"
+import { CampaignDeleteDialog } from "./campaign-delete-dialog"
 import { CampaignGeneralSection } from "./campaign-general-section"
 import { CampaignLaunchDialog } from "./campaign-launch-dialog"
 import { CampaignVariantSelect } from "./campaign-variant-select"
@@ -32,6 +40,7 @@ interface CampaignDetailContentProps {
 }
 
 export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [pendingName, setPendingName] = useState("")
   const [pendingStatus, setPendingStatus] = useState<CampaignStatus>("draft")
@@ -45,6 +54,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const [aboErrors, setAboErrors] = useState<ABODynamicFieldErrors>({})
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const {
     data: campaign,
@@ -178,6 +188,16 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => runServerAction(deleteCampaignAction(campaignId)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] })
+      void queryClient.invalidateQueries({ queryKey: ["campaigns-kanban"] })
+      queryClient.removeQueries({ queryKey: ["campaign", campaignId] })
+      router.push("/campaigns")
+    },
+  })
+
   const handleLaunchSuccess = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["campaign", campaignId] })
     void queryClient.invalidateQueries({ queryKey: ["campaigns"] })
@@ -221,13 +241,36 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
     !saveMutation.isPending &&
     !strategyMutation.isPending
 
+  const canLaunchByStatus =
+    campaign.status === "draft" ||
+    campaign.status === "ready" ||
+    campaign.status === "running"
+
   const canLaunch =
     !isDirty &&
     campaign.strategy === "ABO" &&
-    (campaign.status === "draft" || campaign.status === "ready") &&
+    canLaunchByStatus &&
     (pendingAbo === null || isAboValid) &&
     !saveMutation.isPending &&
     !strategyMutation.isPending
+
+  const launchBlockedReason = (() => {
+    if (canLaunch) return null
+    if (saveMutation.isPending || strategyMutation.isPending) {
+      return "Esperá a que terminen los cambios…"
+    }
+    if (isDirty) return "Guardá los cambios antes de lanzar"
+    if (campaign.strategy !== "ABO") return "Solo se puede lanzar con estrategia ABO"
+    if (!canLaunchByStatus) {
+      return "Solo se puede lanzar en Borrador, Listo o En curso"
+    }
+    if (pendingAbo !== null && !isAboValid) {
+      return Object.values(aboErrors)[0] ?? "Revisá la configuración ABO"
+    }
+    return null
+  })()
+
+  const showDelete = canDeleteCampaign(campaign.status)
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
@@ -251,6 +294,22 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
         <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap gap-2">
+            {showDelete ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={
+                  saveMutation.isPending ||
+                  strategyMutation.isPending ||
+                  deleteMutation.isPending
+                }
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <RiDeleteBinLine className="size-4" />
+                Eliminar
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -269,10 +328,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
               Guardar
             </Button>
           </div>
-          {isDirty ? (
-            <p className="text-muted-foreground text-xs">
-              Guarda cambios antes de lanzar
-            </p>
+          {launchBlockedReason ? (
+            <p className="text-muted-foreground text-xs">{launchBlockedReason}</p>
           ) : null}
         </div>
       </div>
@@ -284,6 +341,16 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
         onLaunchSuccess={handleLaunchSuccess}
       />
 
+      {showDelete ? (
+        <CampaignDeleteDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          campaignName={pendingName.trim() || campaign.name}
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate()}
+        />
+      ) : null}
+
       {saveNotice ? (
         <p className="text-sm text-emerald-600 dark:text-emerald-400">{saveNotice}</p>
       ) : null}
@@ -293,6 +360,14 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
           {saveMutation.error instanceof Error
             ? saveMutation.error.message
             : "No se pudo guardar"}
+        </p>
+      ) : null}
+
+      {deleteMutation.isError ? (
+        <p className="text-sm text-destructive">
+          {deleteMutation.error instanceof Error
+            ? deleteMutation.error.message
+            : "No se pudo eliminar"}
         </p>
       ) : null}
 

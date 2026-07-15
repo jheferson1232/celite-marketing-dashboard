@@ -19,7 +19,11 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getTikTokVideoSourceAction } from "@/app/(app)/dashboard/_actions/tiktok-video-source"
 import { isTikTokMediaHostname } from "@/lib/services/sociavault/tiktok-media-hosts"
-import type { TikTokAdVideoAsset } from "@/lib/services/tiktok/ad-videos"
+import {
+  formatTikTokVideoCreateTime,
+  isTikTokPostVideoAsset,
+  type TikTokAdVideoAsset,
+} from "@/lib/services/tiktok/ad-video-asset"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import {
@@ -111,6 +115,13 @@ function TikTokAdVideoPreviewDialog({
 }) {
   const videoId = video?.id
   const cachedPreview = video?.previewUrl?.trim() || ""
+  const isPost = video ? isTikTokPostVideoAsset(video) : false
+  const dateLabel = video ? formatTikTokVideoCreateTime(video.createTime) : null
+  const profileLabel =
+    video?.profileName?.trim() ||
+    (isPost ? video?.name : null) ||
+    video?.name ||
+    "Video TikTok"
 
   const {
     data: fetchedUrl,
@@ -138,12 +149,12 @@ function TikTokAdVideoPreviewDialog({
       <DialogContent className="max-w-sm gap-4 p-0 sm:max-w-md">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="truncate pr-8">
-            {video?.name ?? "Video TikTok"}
+            {profileLabel}
           </DialogTitle>
           <DialogDescription>
-            {durationLabel
-              ? `Duración ${durationLabel}`
-              : "Preview del creativo en la cuenta"}
+            {[durationLabel ? `Duración ${durationLabel}` : null, dateLabel]
+              .filter(Boolean)
+              .join(" · ") || "Preview del creativo en la cuenta"}
           </DialogDescription>
         </DialogHeader>
 
@@ -231,7 +242,7 @@ export function CampaignGeneralSection({
     isError: videosError,
     error: videosErrorDetail,
   } = useQuery({
-    queryKey: ["tiktok-ad-videos"],
+    queryKey: ["tiktok-spark-posts"],
     queryFn: () => runServerAction(listTikTokAdVideosAction()),
     staleTime: 2 * 60 * 1000,
   })
@@ -240,6 +251,42 @@ export function CampaignGeneralSection({
     () => new Set(selectedTikTokVideoIds),
     [selectedTikTokVideoIds]
   )
+
+  const tikTokPostVideos = useMemo(() => {
+    const posts = tikTokVideos.filter(isTikTokPostVideoAsset)
+    const byId = new Map(posts.map((video) => [video.id, video]))
+
+    for (const id of selectedTikTokVideoIds) {
+      if (byId.has(id)) continue
+      const fromList = tikTokVideos.find((video) => video.id === id)
+      if (fromList) {
+        byId.set(id, fromList)
+        continue
+      }
+      byId.set(id, {
+        id,
+        name: "Seleccionado",
+        profileName: null,
+        coverUrl: null,
+        previewUrl: null,
+        durationMs: null,
+        width: null,
+        height: null,
+        format: null,
+        createTime: null,
+      })
+    }
+
+    return [...byId.values()].sort((a, b) => {
+      const aTime = a.createTime ?? ""
+      const bTime = b.createTime ?? ""
+      if (aTime && bTime && aTime !== bTime) return bTime.localeCompare(aTime)
+      return (a.profileName ?? a.name).localeCompare(
+        b.profileName ?? b.name,
+        "es"
+      )
+    })
+  }, [selectedTikTokVideoIds, tikTokVideos])
 
   function toggleTikTokVideo(videoId: string, checked: boolean) {
     if (checked) {
@@ -384,37 +431,42 @@ export function CampaignGeneralSection({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <label className="text-sm font-medium">
-              Recursos creativos de TikTok Ads
+              Posts de TikTok
             </label>
             <p className="text-xs text-muted-foreground">
-              Videos de la biblioteca de la cuenta. Cada uno seleccionado crea un
-              conjunto al lanzar.
+              Solo posts orgánicos autorizados (originales). Cada uno seleccionado
+              crea un conjunto al lanzar.
             </p>
           </div>
-          {tikTokVideos.length > 0 ? (
+          {tikTokPostVideos.length > 0 ? (
             <span className="text-muted-foreground text-xs">
-              {selectedTikTokVideoIds.length}/{tikTokVideos.length} seleccionados
+              {selectedTikTokVideoIds.length}/{tikTokPostVideos.length}{" "}
+              seleccionados
             </span>
           ) : null}
         </div>
 
         {videosLoading ? (
-          <p className="text-muted-foreground text-sm">Cargando videos de la cuenta…</p>
+          <p className="text-muted-foreground text-sm">Cargando posts de TikTok…</p>
         ) : videosError ? (
           <p className="text-sm text-destructive">
             {videosErrorDetail instanceof Error
               ? videosErrorDetail.message
-              : "No se pudieron cargar los creativos de TikTok"}
+              : "No se pudieron cargar los posts de TikTok"}
           </p>
-        ) : tikTokVideos.length === 0 ? (
+        ) : tikTokPostVideos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No hay videos en la biblioteca de la cuenta conectada.
+            No hay posts orgánicos autorizados en la cuenta. Autorizá un post
+            Spark desde TikTok Ads.
           </p>
         ) : (
           <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3">
-            {tikTokVideos.map((video) => {
+            {tikTokPostVideos.map((video) => {
               const checked = selectedTikTokSet.has(video.id)
               const durationLabel = formatVideoDuration(video.durationMs)
+              const dateLabel = formatTikTokVideoCreateTime(video.createTime)
+              const profileLabel =
+                video.profileName?.trim() || video.name || "TikTok Post"
               return (
                 <div
                   key={video.id}
@@ -430,7 +482,7 @@ export function CampaignGeneralSection({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={proxyTikTokMedia(video.coverUrl)}
-                        alt={video.name}
+                        alt={profileLabel}
                         className="size-full object-cover"
                       />
                     ) : (
@@ -448,7 +500,7 @@ export function CampaignGeneralSection({
                     <Checkbox
                       checked={checked}
                       disabled={disabled}
-                      aria-label={`Seleccionar ${video.name}`}
+                      aria-label={`Seleccionar post de ${profileLabel}`}
                       className={cn(
                         "absolute right-1.5 top-1.5 z-10 border-background bg-background/90 shadow-sm",
                         checked && "border-primary data-[state=checked]:bg-primary"
@@ -463,7 +515,7 @@ export function CampaignGeneralSection({
                       size="icon"
                       variant="secondary"
                       className="absolute bottom-1.5 right-1.5 z-10 size-8 rounded-full shadow-sm"
-                      aria-label={`Reproducir ${video.name}`}
+                      aria-label={`Reproducir post de ${profileLabel}`}
                       onClick={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
@@ -473,9 +525,16 @@ export function CampaignGeneralSection({
                       <RiPlayFill className="size-4" />
                     </Button>
                   </div>
-                  <span className="line-clamp-2 text-xs font-medium leading-snug">
-                    {video.name}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="truncate text-xs font-medium leading-snug">
+                      @{profileLabel.replace(/^@/, "")}
+                    </span>
+                    {dateLabel ? (
+                      <span className="text-muted-foreground text-[11px] tabular-nums">
+                        {dateLabel}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               )
             })}

@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma"
 import {
   CAMPAIGN_STATUS_VALUES,
+  canDeleteCampaign,
   isCampaignStatus,
   type CampaignStatus,
 } from "@/lib/campaigns/status"
@@ -398,5 +399,17 @@ export async function updateCampaignDetail(
 }
 
 export async function deleteCampaign(campaignId: string): Promise<void> {
+  const existing = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, status: true },
+  })
+  if (!existing) {
+    throw new Error("Campaña no encontrada")
+  }
+  if (!canDeleteCampaign(existing.status)) {
+    throw new Error(
+      "Solo se pueden eliminar campañas en Borrador, Listo o En curso."
+    )
+  }
   await prisma.campaign.delete({ where: { id: campaignId } })
 }

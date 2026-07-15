@@ -53,6 +53,19 @@ export function isCampaignVisibleOnKanban(status: CampaignStatus): boolean {
   return status !== "archived"
 }
 
+/** Borrador / Listo / En curso: se pueden eliminar del tablero interno. */
+export const CAMPAIGN_DELETABLE_STATUSES = [
+  "draft",
+  "ready",
+  "running",
+] as const satisfies readonly CampaignStatus[]
+
+export function canDeleteCampaign(status: CampaignStatus): boolean {
+  return (CAMPAIGN_DELETABLE_STATUSES as readonly CampaignStatus[]).includes(
+    status
+  )
+}
+
 /**
  * Columna del kanban. Si el estado sigue en «running» pero el gasto/CPA
  * ya califican, usa winner/loser (para no depender solo del persist en DB).
