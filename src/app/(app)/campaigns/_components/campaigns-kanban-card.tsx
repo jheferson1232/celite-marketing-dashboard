@@ -3,11 +3,15 @@
 import Link from "next/link"
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
+import { formatCurrency } from "@/lib/format"
+import {
+  CAMPAIGN_OUTCOME_MIN_SPEND_PEN,
+} from "@/lib/campaigns/status"
 import { cn } from "@/lib/utils"
-import type { CampaignRecord } from "@/lib/services/campaign"
+import type { CampaignKanbanRecord } from "@/lib/services/campaign-kanban-outcomes"
 
 interface CampaignsKanbanCardProps {
-  campaign: CampaignRecord
+  campaign: CampaignKanbanRecord
   isDragging?: boolean
 }
 
@@ -24,6 +28,13 @@ export function CampaignKanbanCardView({
   campaign,
   isDragging = false,
 }: CampaignsKanbanCardProps) {
+  const metrics = campaign.metrics
+  const spend = metrics?.totalSpend ?? 0
+  const purchases = metrics?.totalPurchases ?? 0
+  const cpa = metrics?.totalCpa ?? 0
+  const belowMinSpend =
+    campaign.status === "running" && spend < CAMPAIGN_OUTCOME_MIN_SPEND_PEN
+
   return (
     <div
       className={cn(
@@ -48,10 +59,22 @@ export function CampaignKanbanCardView({
           "hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         )}
       >
-        <p className="truncate text-sm font-semibold leading-tight">{campaign.name}</p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {campaign.config.adgroups.length} conjuntos · {formatUpdatedAt(campaign.updatedAt)}
+        <p className="truncate text-sm font-semibold leading-tight">
+          {campaign.name}
         </p>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {campaign.config.adgroups.length} conjuntos ·{" "}
+          {formatUpdatedAt(campaign.updatedAt)}
+        </p>
+        {metrics ? (
+          <p className="truncate text-[11px] text-muted-foreground">
+            {formatCurrency(spend, "PEN")} · {purchases} ventas
+            {cpa > 0 ? ` · CPA ${formatCurrency(cpa, "PEN")}` : ""}
+            {belowMinSpend
+              ? ` · falta ${formatCurrency(CAMPAIGN_OUTCOME_MIN_SPEND_PEN - spend, "PEN")} p/ clasificar`
+              : ""}
+          </p>
+        ) : null}
       </Link>
     </div>
   )
@@ -71,7 +94,11 @@ export function CampaignsKanbanCard({
     : undefined
 
   return (
-    <div ref={setNodeRef} style={style} className={cn(isDragging && "opacity-40")}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(isDragging && "opacity-40")}
+    >
       <div {...listeners} {...attributes}>
         <CampaignKanbanCardView campaign={campaign} />
       </div>

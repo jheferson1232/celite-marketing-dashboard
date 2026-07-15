@@ -59,6 +59,10 @@ export interface TikTokAd {
   campaign_automation_type?: string
   image_ids?: string[]
   video_id?: string
+  /** Post orgánico usado en Spark Ads (sin video_id de biblioteca a veces). */
+  tiktok_item_id?: string
+  identity_id?: string
+  identity_type?: string
   ad_format?: string
   creative_authorized?: boolean
 }

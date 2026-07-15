@@ -143,9 +143,11 @@ export const META_CREATIVES_TABLE_METRICS: { key: MetricKey; label: string }[] =
     { key: "created_at", label: "Fecha de creación" },
   ]
 
-export function sumPurchasesByGender(
-  group: AdInsightRow[]
-): { male: number; female: number; unknown: number } {
+export function sumPurchasesByGender(group: AdInsightRow[]): {
+  male: number
+  female: number
+  unknown: number
+} {
   return group.reduce(
     (acc, row) => {
       const g = row.purchasesByGender
@@ -169,10 +171,7 @@ export function countUniqueIds(
   ).size
 }
 
-export function genderPurchasePercent(
-  count: number,
-  total: number
-): number {
+export function genderPurchasePercent(count: number, total: number): number {
   if (total <= 0) return 0
   return Math.round((count / total) * 100)
 }
@@ -306,6 +305,8 @@ export function getCreativeKey(row: AdInsightRow): string {
   const thumb = normThumb(row.thumbnail_url)
   if (row.video_id && thumb) return `vid:${row.video_id}:thumb:${thumb}`
   if (row.video_id) return `vid:${row.video_id}`
+  if (row.video_url && thumb)
+    return `vurl:${normThumb(row.video_url)}:thumb:${thumb}`
   if (thumb) return `thumb:${thumb}`
   return `name:${(row.ad_name || row.ad_id || "").trim().toLowerCase()}`
 }

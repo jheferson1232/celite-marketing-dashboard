@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { pickDisplayImageUrl } from "@/lib/services/meta/creative-media"
+import { isTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
 import { cn } from "@/lib/utils"
 import { RiImageLine } from "@remixicon/react"
 
@@ -12,12 +13,27 @@ interface CreativePreviewImageProps {
   className?: string
 }
 
-function buildSrcCandidates(thumbnailUrl?: string, imageUrl?: string): string[] {
+/** TikTok CDN bloquea hotlinking; el proxy añade Referer correcto. */
+function toDisplayableMediaUrl(url: string): string {
+  const trimmed = url.trim()
+  if (!trimmed) return trimmed
+  if (trimmed.startsWith("/api/tiktok-thumbnail?")) return trimmed
+  if (isTikTokMediaUrl(trimmed)) {
+    return `/api/tiktok-thumbnail?url=${encodeURIComponent(trimmed)}`
+  }
+  return trimmed
+}
+
+function buildSrcCandidates(
+  thumbnailUrl?: string,
+  imageUrl?: string
+): string[] {
   const raw = [imageUrl, thumbnailUrl].filter(Boolean) as string[]
   const upscaled = raw.map((url) => pickDisplayImageUrl(url, url))
   const unique = new Set<string>()
   for (const url of [...raw, ...upscaled]) {
-    if (url.trim()) unique.add(url.trim())
+    const displayable = toDisplayableMediaUrl(url)
+    if (displayable) unique.add(displayable)
   }
   return [...unique]
 }

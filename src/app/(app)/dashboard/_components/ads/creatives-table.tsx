@@ -18,10 +18,7 @@ import {
   RiPlayCircleLine,
   RiImageLine,
 } from "@remixicon/react"
-import {
-  META_DASHBOARD_CURRENCY,
-  type CurrencyCode,
-} from "@/lib/format"
+import { META_DASHBOARD_CURRENCY, type CurrencyCode } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
 import { CreativePreviewImage } from "./creative-preview-image"
 import {
@@ -50,7 +47,10 @@ interface CreativeAdsTableProps {
 function mergeGroup(group: AdInsightRow[]): AdInsightRow & { _count: number } {
   const base = { ...group[0] }
   const spend = group.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0)
-  const impressions = group.reduce((s, r) => s + (parseFloat(r.impressions) || 0), 0)
+  const impressions = group.reduce(
+    (s, r) => s + (parseFloat(r.impressions) || 0),
+    0
+  )
   const clicks = group.reduce((s, r) => s + (parseFloat(r.clicks) || 0), 0)
 
   base.spend = String(spend)
@@ -66,24 +66,53 @@ function mergeGroup(group: AdInsightRow[]): AdInsightRow & { _count: number } {
 
   for (const r of group) {
     for (const a of r.actions || []) {
-      am.set(a.action_type, (am.get(a.action_type) || 0) + (parseFloat(a.value) || 0))
+      am.set(
+        a.action_type,
+        (am.get(a.action_type) || 0) + (parseFloat(a.value) || 0)
+      )
     }
     for (const a of r.action_values || []) {
-      avm.set(a.action_type, (avm.get(a.action_type) || 0) + (parseFloat(a.value) || 0))
+      avm.set(
+        a.action_type,
+        (avm.get(a.action_type) || 0) + (parseFloat(a.value) || 0)
+      )
     }
     for (const a of r.cost_per_action_type || []) {
-      cm.set(a.action_type, (cm.get(a.action_type) || 0) + (parseFloat(a.value) || 0))
+      cm.set(
+        a.action_type,
+        (cm.get(a.action_type) || 0) + (parseFloat(a.value) || 0)
+      )
     }
   }
 
-  if (am.size) base.actions = Array.from(am.entries()).map(([t, v]) => ({ action_type: t, value: String(v) }))
-  if (avm.size) base.action_values = Array.from(avm.entries()).map(([t, v]) => ({ action_type: t, value: String(v) }))
-  if (cm.size) base.cost_per_action_type = Array.from(cm.entries()).map(([t, v]) => ({ action_type: t, value: String(v / group.length) }))
+  if (am.size)
+    base.actions = Array.from(am.entries()).map(([t, v]) => ({
+      action_type: t,
+      value: String(v),
+    }))
+  if (avm.size)
+    base.action_values = Array.from(avm.entries()).map(([t, v]) => ({
+      action_type: t,
+      value: String(v),
+    }))
+  if (cm.size)
+    base.cost_per_action_type = Array.from(cm.entries()).map(([t, v]) => ({
+      action_type: t,
+      value: String(v / group.length),
+    }))
 
   // Weighted ROAS
-  const totalPurchaseValue = group.reduce((s, r) => s + extractPurchaseValue(r), 0)
+  const totalPurchaseValue = group.reduce(
+    (s, r) => s + extractPurchaseValue(r),
+    0
+  )
   if (spend > 0) {
-    base.purchase_roas = [{ action_type: "omni_purchase_roas", value: String(totalPurchaseValue / spend) }]
+    base.purchase_roas = [
+      {
+        action_type: "omni_purchase_roas",
+        value: String(totalPurchaseValue / spend),
+      },
+    ]
   }
 
   const best = pickHighestSpendRow(group)
@@ -132,11 +161,26 @@ export function CreativeAdsTable({
   }, [visibleGrouped, sortKey, sortDir])
 
   const totals = React.useMemo(() => {
-    const totalSpend = visibleGrouped.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0)
-    const totalImpressions = visibleGrouped.reduce((s, r) => s + (parseFloat(r.impressions) || 0), 0)
-    const totalClicks = visibleGrouped.reduce((s, r) => s + (parseFloat(r.clicks) || 0), 0)
-    const totalPurchases = visibleGrouped.reduce((s, r) => s + extractPurchases(r), 0)
-    const totalPurchaseValue = visibleGrouped.reduce((s, r) => s + extractPurchaseValue(r), 0)
+    const totalSpend = visibleGrouped.reduce(
+      (s, r) => s + (parseFloat(r.spend) || 0),
+      0
+    )
+    const totalImpressions = visibleGrouped.reduce(
+      (s, r) => s + (parseFloat(r.impressions) || 0),
+      0
+    )
+    const totalClicks = visibleGrouped.reduce(
+      (s, r) => s + (parseFloat(r.clicks) || 0),
+      0
+    )
+    const totalPurchases = visibleGrouped.reduce(
+      (s, r) => s + extractPurchases(r),
+      0
+    )
+    const totalPurchaseValue = visibleGrouped.reduce(
+      (s, r) => s + extractPurchaseValue(r),
+      0
+    )
 
     return {
       spend: totalSpend,
@@ -174,9 +218,12 @@ export function CreativeAdsTable({
               >
                 <div className="flex items-center justify-end gap-1">
                   {m.label}
-                  {sortKey === m.key && (
-                    sortDir === "desc" ? <RiArrowDownLine className="size-3" /> : <RiArrowUpLine className="size-3" />
-                  )}
+                  {sortKey === m.key &&
+                    (sortDir === "desc" ? (
+                      <RiArrowDownLine className="size-3" />
+                    ) : (
+                      <RiArrowUpLine className="size-3" />
+                    ))}
                 </div>
               </TableHead>
             ))}
@@ -199,7 +246,7 @@ export function CreativeAdsTable({
                         />
                       ) : (
                         <div className="flex size-full items-center justify-center">
-                          {row.video_id ? (
+                          {row.video_id || row.video_url ? (
                             <RiPlayCircleLine className="size-6 text-muted-foreground" />
                           ) : (
                             <RiImageLine className="size-6 text-muted-foreground" />
@@ -236,14 +283,30 @@ export function CreativeAdsTable({
         <TableFooter className="bg-muted/50 font-medium">
           <TableRow>
             <TableCell>Totales / Promedios</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.spend, "spend", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.impressions, "impressions", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.clicks, "clicks", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.ctr, "ctr", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.cpc, "cpc", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.roas, "roas", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.purchases, "purchases", currency)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatMetricValue(totals.cpa, "cpa", currency)}</TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.spend, "spend", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.impressions, "impressions", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.clicks, "clicks", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.ctr, "ctr", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.cpc, "cpc", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.roas, "roas", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.purchases, "purchases", currency)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMetricValue(totals.cpa, "cpa", currency)}
+            </TableCell>
           </TableRow>
         </TableFooter>
       </Table>

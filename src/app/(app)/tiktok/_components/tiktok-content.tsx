@@ -44,7 +44,9 @@ export function TikTokContent() {
     isLoading: isLoadingAccounts,
   } = useTikTokDashboardAccount()
 
-  const accountCurrency = resolveTikTokAccountCurrency(selectedAccount?.currency)
+  const accountCurrency = resolveTikTokAccountCurrency(
+    selectedAccount?.currency
+  )
 
   const dashboardQueryOptions = {
     staleTime: 2 * 60 * 1000,
@@ -78,7 +80,10 @@ export function TikTokContent() {
     queryKey: ["tiktok-account-kpis", accountId, dateRange],
     queryFn: () =>
       runServerAction(
-        getTikTokAccountKpisSummary({ dateRange, accountId: accountId ?? undefined })
+        getTikTokAccountKpisSummary({
+          dateRange,
+          accountId: accountId ?? undefined,
+        })
       ),
     ...dashboardQueryOptions,
   })
@@ -87,7 +92,10 @@ export function TikTokContent() {
     queryKey: ["tiktok-campaigns", accountId, dateRange],
     queryFn: () =>
       runServerAction(
-        getTikTokCampaignsListAction({ dateRange, accountId: accountId ?? undefined })
+        getTikTokCampaignsListAction({
+          dateRange,
+          accountId: accountId ?? undefined,
+        })
       ),
     ...dashboardQueryOptions,
   })
@@ -108,17 +116,16 @@ export function TikTokContent() {
     queryKey: ["tiktok-ad-insights", accountId, dateRange],
     queryFn: () =>
       runServerAction(
-        getTikTokAdInsightsList({ dateRange, accountId: accountId ?? undefined })
+        getTikTokAdInsightsList({
+          dateRange,
+          accountId: accountId ?? undefined,
+        })
       ),
     ...dashboardQueryOptions,
   })
 
   const fetchCampaignAdSets = useCallback(
-    (input: {
-      campaignId: string
-      dateRange: DateRange
-      objective?: string
-    }) =>
+    (input: { campaignId: string; dateRange: DateRange; objective?: string }) =>
       getTikTokCampaignAdGroups({
         ...input,
         accountId: accountId ?? undefined,
@@ -169,7 +176,7 @@ export function TikTokContent() {
             <Button
               type="button"
               variant="outline"
-              className="h-8 min-w-0 flex-1 gap-2 px-3 sm:h-9 sm:flex-none sm:w-auto"
+              className="h-8 min-w-0 flex-1 gap-2 px-3 sm:h-9 sm:w-auto sm:flex-none"
               onClick={handleReload}
               disabled={isReloading || !accountId}
             >
@@ -182,7 +189,7 @@ export function TikTokContent() {
         </div>
       </div>
 
-      <div className="min-w-0 w-full">
+      <div className="w-full min-w-0">
         <KpiCards
           data={kpis}
           isLoading={isDashboardFetching}
@@ -192,7 +199,7 @@ export function TikTokContent() {
 
       <Tabs
         defaultValue="campaigns"
-        className="flex min-w-0 w-full flex-col gap-4"
+        className="flex w-full min-w-0 flex-col gap-4"
       >
         <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="campaigns" className="flex-1 sm:flex-none">
@@ -205,7 +212,10 @@ export function TikTokContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
-          <TikTokManageProvider accountId={accountId} currency={accountCurrency}>
+          <TikTokManageProvider
+            accountId={accountId}
+            currency={accountCurrency}
+          >
             <CampaignsTable
               key={accountId ?? "no-account"}
               data={campaigns}
@@ -215,8 +225,12 @@ export function TikTokContent() {
               fetchCampaignAdSets={fetchCampaignAdSets}
               enableTikTokManage
               tikTokAdSetsByCampaignId={adSetsByCampaignId}
-              columnVisibilityStorageKey={TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
-              defaultColumnVisibility={TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
+              columnVisibilityStorageKey={
+                TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY
+              }
+              defaultColumnVisibility={
+                TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
+              }
             />
           </TikTokManageProvider>
         </TabsContent>

@@ -17,9 +17,17 @@ import {
   type CampaignRecord,
   type UpdateCampaignABOInput,
 } from "@/lib/services/campaign"
+import {
+  listCampaignsForKanban,
+  type CampaignKanbanRecord,
+} from "@/lib/services/campaign-kanban-outcomes"
 
 export const listCampaignsAction = createServerAction(
   async (): Promise<CampaignRecord[]> => listCampaigns()
+)
+
+export const listCampaignsForKanbanAction = createServerAction(
+  async (): Promise<CampaignKanbanRecord[]> => listCampaignsForKanban()
 )
 
 export const getCampaignByIdAction = createServerAction(

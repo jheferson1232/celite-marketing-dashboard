@@ -114,12 +114,16 @@ function mergeRows(group: AdInsightRow[]): AdInsightRow {
   }
 
   const best = pickHighestSpendRow(group)
+  const bestMedia =
+    group.find((r) =>
+      Boolean(r.thumbnail_url?.trim() || r.video_url?.trim())
+    ) ?? best
   base.ad_id = best.ad_id
   base.ad_name = best.ad_name
-  base.thumbnail_url = best.thumbnail_url
-  base.image_url = best.image_url
-  base.video_url = best.video_url
-  base.video_id = best.video_id
+  base.thumbnail_url = bestMedia.thumbnail_url
+  base.image_url = bestMedia.image_url
+  base.video_url = bestMedia.video_url
+  base.video_id = bestMedia.video_id || best.video_id
   base.url = pickUrlFromGroup(group)
   base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
   base.adset_name = pickAdsetNamesFromGroup(group) || best.adset_name
@@ -146,7 +150,7 @@ function CreativeCard({
   adsCount: number
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
-  const hasVideo = !!row.video_id
+  const hasVideo = Boolean(row.video_id || row.video_url)
   const displayTitle = getCreativeCardDisplayTitle(row, currency, platform)
 
   // We need to adapt AdInsightRow to CreativeRow for CreativePreviewDialog
@@ -232,7 +236,7 @@ function CreativeCard({
                 <dt className="text-muted-foreground">
                   {metricOptions.find((m) => m.key === metric)?.label}
                 </dt>
-                <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">
+                <dd className="shrink-0 font-medium whitespace-nowrap tabular-nums">
                   {formatMetricValue(
                     getMetricValue(row, metric),
                     metric,
@@ -261,9 +265,7 @@ export function TopCreativesPanel({
   platform = "meta",
 }: TopCreativesPanelProps) {
   const metricOptions =
-    platform === "meta"
-      ? META_CREATIVES_TABLE_METRICS
-      : METRIC_OPTIONS
+    platform === "meta" ? META_CREATIVES_TABLE_METRICS : METRIC_OPTIONS
 
   const [selectedMetrics, setSelectedMetrics] = React.useState<MetricKey[]>([
     "spend",

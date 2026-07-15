@@ -46,27 +46,38 @@ async function fetchTikTokCampaignsList(
 
   const [campaigns, reportRows, metrics7d, lifetimeMetrics, adGroups, ads] =
     await Promise.all([
-    fetchAllPages<TikTokCampaign>("campaign/get/"),
-    fetchIntegratedReport(
-      "AUCTION_CAMPAIGN",
-      ["campaign_id"],
-      [...CAMPAIGN_METRICS],
-      dateRange.from,
-      dateRange.to
-    ),
-    fetchCachedCampaignMetricsByDateRange(range7d),
-    fetchCachedCampaignMetricsByDateRange(lifetimeRange),
-    fetchAllPages<TikTokAdGroup>("adgroup/get/"),
-    fetchAllPages<TikTokAd>("/ad/get/"),
-  ])
+      fetchAllPages<TikTokCampaign>("campaign/get/"),
+      fetchIntegratedReport(
+        "AUCTION_CAMPAIGN",
+        ["campaign_id"],
+        [...CAMPAIGN_METRICS],
+        dateRange.from,
+        dateRange.to
+      ),
+      fetchCachedCampaignMetricsByDateRange(range7d),
+      fetchCachedCampaignMetricsByDateRange(lifetimeRange),
+      fetchAllPages<TikTokAdGroup>("adgroup/get/"),
+      fetchAllPages<TikTokAd>("/ad/get/", {
+        fields: JSON.stringify([
+          "ad_id",
+          "ad_name",
+          "campaign_id",
+          "campaign_name",
+          "adgroup_id",
+          "operation_status",
+          "landing_page_url",
+          "landing_page_urls",
+          "campaign_automation_type",
+          "video_id",
+          "image_ids",
+        ]),
+      }),
+    ])
 
   const landingUrlsByCampaign = collectUniqueLandingUrlsByCampaign(ads)
 
   const metricsByCampaign = new Map(
-    reportRows.map((row) => [
-      row.dimensions.campaign_id,
-      row.metrics,
-    ])
+    reportRows.map((row) => [row.dimensions.campaign_id, row.metrics])
   )
 
   const adGroupsByCampaign = new Map<string, TikTokAdGroup[]>()
@@ -129,8 +140,7 @@ async function fetchTikTokCampaignsList(
         totalSpend: lifetime.spend,
         totalCpa: lifetime.cpa,
         objective: campaign.objective_type || "PURCHASE",
-        landingUrls:
-          landingUrlsByCampaign.get(campaign.campaign_id) ?? [],
+        landingUrls: landingUrlsByCampaign.get(campaign.campaign_id) ?? [],
       } satisfies CampaignRow
     })
     .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name))

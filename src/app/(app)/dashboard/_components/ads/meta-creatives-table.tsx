@@ -198,9 +198,7 @@ function GenderPurchasesCell({
 function UrlCell({ row }: { row: MergedMetaCreativeRow }) {
   const url = row.url?.trim()
   if (!url) {
-    return (
-      <span className="text-sm italic text-muted-foreground">Sin URL</span>
-    )
+    return <span className="text-sm text-muted-foreground italic">Sin URL</span>
   }
 
   const path = formatLandingPagePath(url)
@@ -262,7 +260,10 @@ export function MetaCreativesTable({
       0
     )
     const totalMale = visibleGrouped.reduce((s, r) => s + r.purchasesMale, 0)
-    const totalFemale = visibleGrouped.reduce((s, r) => s + r.purchasesFemale, 0)
+    const totalFemale = visibleGrouped.reduce(
+      (s, r) => s + r.purchasesFemale,
+      0
+    )
     const totalUnknown = visibleGrouped.reduce(
       (s, r) => s + r.purchasesUnknown,
       0
@@ -355,10 +356,17 @@ export function MetaCreativesTable({
         </TableHeader>
         <TableBody>
           {sorted.map((row) => {
-            const displayTitle = getCreativeCardDisplayTitle(row, currency, platform)
+            const displayTitle = getCreativeCardDisplayTitle(
+              row,
+              currency,
+              platform
+            )
             const genderTotal =
               row.purchasesMale + row.purchasesFemale + row.purchasesUnknown
-            const malePct = genderPurchasePercent(row.purchasesMale, genderTotal)
+            const malePct = genderPurchasePercent(
+              row.purchasesMale,
+              genderTotal
+            )
             const femalePct = genderPurchasePercent(
               row.purchasesFemale,
               genderTotal
@@ -378,7 +386,7 @@ export function MetaCreativesTable({
                         />
                       ) : (
                         <div className="flex size-full items-center justify-center">
-                          {row.video_id ? (
+                          {row.video_id || row.video_url ? (
                             <RiPlayCircleLine className="size-6 text-muted-foreground" />
                           ) : (
                             <RiImageLine className="size-6 text-muted-foreground" />
