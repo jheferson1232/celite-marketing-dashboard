@@ -23,6 +23,10 @@ export type TikTokLaunchCampaignConfig = {
     name: string
     video?: string
     video_id?: string
+    /** Post orgánico Spark: usa el mismo item + identidad (no resube video). */
+    tiktok_item_id?: string
+    identity_id?: string
+    identity_type?: string
     url?: string
   }>
 }

@@ -71,6 +71,9 @@ function mapSparkRow(row: SparkListRow): TikTokAdVideoAsset | null {
     id: toSparkVideoSelectionId(itemId),
     name: profileName || `Post ${itemId.slice(-6)}`,
     profileName,
+    itemId,
+    identityId: row.user_info?.identity_id?.trim() || null,
+    identityType: row.user_info?.identity_type?.trim() || null,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs: durationSec != null ? Math.round(durationSec * 1000) : null,
@@ -119,19 +122,25 @@ async function fetchTikTokSparkPosts(): Promise<TikTokAdVideoAsset[]> {
 
 /** Posts orgánicos autorizados (Spark) — originales con nombre de perfil. */
 export async function listTikTokSparkPosts(): Promise<TikTokAdVideoAsset[]> {
-  const cacheKey = await buildTikTokCacheKey("spark-posts:v1")
+  const cacheKey = await buildTikTokCacheKey("spark-posts:v2")
   return withTikTokCache(cacheKey, SPARK_POSTS_TTL_MS, fetchTikTokSparkPosts)
+}
+
+export async function getTikTokSparkPostByItemId(
+  itemId: string
+): Promise<TikTokAdVideoAsset | null> {
+  const trimmed = itemId.trim()
+  if (!trimmed) return null
+
+  const posts = await listTikTokSparkPosts()
+  return (
+    posts.find((post) => post.id === toSparkVideoSelectionId(trimmed)) ?? null
+  )
 }
 
 export async function getTikTokSparkPostPreviewUrl(
   itemId: string
 ): Promise<string | null> {
-  const trimmed = itemId.trim()
-  if (!trimmed) return null
-
-  const posts = await listTikTokSparkPosts()
-  const match = posts.find(
-    (post) => post.id === toSparkVideoSelectionId(trimmed)
-  )
-  return match?.previewUrl ?? null
+  const post = await getTikTokSparkPostByItemId(itemId)
+  return post?.previewUrl ?? null
 }

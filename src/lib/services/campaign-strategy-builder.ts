@@ -9,6 +9,7 @@ import {
   type CampaignStrategyConfig,
   type TikTokStrategyId,
 } from "@/lib/config/tiktok-strategies"
+import { parseSparkVideoSelectionId } from "@/lib/services/tiktok/ad-video-asset"
 
 export function getABOCampaignContext(
   config: ABOStrategyConfig
@@ -81,14 +82,19 @@ function buildABOAdgroups(
     url: landingUrl,
   }))
 
-  const fromTikTok = dynamic.selectedTikTokVideoIds.map((videoId, index) => ({
-    name: strategy.buildAdgroupName(
-      variantLabel,
-      selectedVideos.length + index
-    ),
-    video_id: videoId,
-    url: landingUrl,
-  }))
+  const fromTikTok = dynamic.selectedTikTokVideoIds.map((videoId, index) => {
+    const sparkItemId = parseSparkVideoSelectionId(videoId)
+    return {
+      name: strategy.buildAdgroupName(
+        variantLabel,
+        selectedVideos.length + index
+      ),
+      ...(sparkItemId
+        ? { tiktok_item_id: sparkItemId, video_id: videoId }
+        : { video_id: videoId }),
+      url: landingUrl,
+    }
+  })
 
   return [...fromBaul, ...fromTikTok]
 }

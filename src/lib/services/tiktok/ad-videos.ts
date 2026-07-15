@@ -65,6 +65,9 @@ function mapVideoRow(row: TikTokVideoSearchRow): TikTokAdVideoAsset | null {
     id,
     name,
     profileName: null,
+    itemId: null,
+    identityId: null,
+    identityType: null,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs:

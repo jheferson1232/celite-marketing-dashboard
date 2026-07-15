@@ -11,10 +11,12 @@ import {
   launchProgressMessage,
   setLaunchProgress,
 } from "./launch-progress"
+import { parseSparkVideoSelectionId } from "./ad-video-asset"
 import type {
   TikTokLaunchCampaignConfig,
   TikTokLaunchResult,
 } from "./launch-campaign-types"
+import { getTikTokSparkPostByItemId } from "./spark-posts"
 import {
   getTikTokRequestContext,
 } from "./tiktok-api.server"
@@ -334,23 +336,10 @@ async function resolveVideoIdForAdgroup(
   ctx: LaunchContext
 ): Promise<string> {
   if (ag.video_id) {
-    const { parseSparkVideoSelectionId } = await import("./ad-video-asset")
-    const sparkItemId = parseSparkVideoSelectionId(ag.video_id)
-    if (sparkItemId) {
-      const { getTikTokSparkPostPreviewUrl } = await import("./spark-posts")
-      const previewUrl = await getTikTokSparkPostPreviewUrl(sparkItemId)
-      if (!previewUrl) {
-        throw new Error(
-          `Conjunto "${ag.name}": no se encontró el post Spark ${sparkItemId}`
-        )
-      }
-      // Reutilizar el flujo de video remoto: descargar preview y subir a biblioteca.
-      const staged = await stageSparkPreviewToTempFile(previewUrl, ag.name)
-      try {
-        return await uploadVideo(staged.path, ctx)
-      } finally {
-        staged.cleanup()
-      }
+    if (parseSparkVideoSelectionId(ag.video_id) || ag.tiktok_item_id) {
+      throw new Error(
+        `Conjunto "${ag.name}": post Spark no debe resolverse como video de biblioteca`
+      )
     }
     return ag.video_id
   }
@@ -360,42 +349,27 @@ async function resolveVideoIdForAdgroup(
   return uploadVideo(ag.video, ctx)
 }
 
-async function stageSparkPreviewToTempFile(
-  previewUrl: string,
-  adgroupName: string
-): Promise<{ path: string; cleanup: () => void }> {
-  const fs = await import("fs")
-  const os = await import("os")
-  const path = await import("path")
-  const { fetchWithRetry } = await import("./fetch-with-retry")
+type LibraryCreative = {
+  kind: "library"
+  videoId: string
+  imageId: string
+}
 
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "celite-spark-"))
-  const localPath = path.join(dir, "spark-preview.mp4")
-  const res = await fetchWithRetry(
-    previewUrl,
-    {},
-    {
-      label: `descarga post Spark "${adgroupName}"`,
-      timeoutMs: 180_000,
-    }
-  )
-  if (!res.ok) {
-    fs.rmSync(dir, { recursive: true, force: true })
-    throw new Error(
-      `No se pudo descargar el post Spark "${adgroupName}" (${res.status})`
-    )
-  }
-  fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()))
-  return {
-    path: localPath,
-    cleanup: () => {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true })
-      } catch {
-        // ignore
-      }
-    },
-  }
+type SparkCreative = {
+  kind: "spark"
+  itemId: string
+  identityId: string
+  identityType: string
+}
+
+type AdCreativeRef = LibraryCreative | SparkCreative
+
+function resolveSparkItemIdFromAdgroup(
+  ag: TikTokLaunchCampaignConfig["adgroups"][number]
+): string | null {
+  if (ag.tiktok_item_id?.trim()) return ag.tiktok_item_id.trim()
+  if (!ag.video_id) return null
+  return parseSparkVideoSelectionId(ag.video_id)
 }
 
 async function resolveCoverIdForVideo(
@@ -405,13 +379,41 @@ async function resolveCoverIdForVideo(
   return uploadCover(videoId, ctx)
 }
 
+async function resolveAdCreativeForAdgroup(
+  ag: TikTokLaunchCampaignConfig["adgroups"][number],
+  ctx: LaunchContext
+): Promise<AdCreativeRef> {
+  const sparkItemId = resolveSparkItemIdFromAdgroup(ag)
+  if (sparkItemId) {
+    const post = await getTikTokSparkPostByItemId(sparkItemId)
+    const identityId =
+      ag.identity_id?.trim() || post?.identityId?.trim() || null
+    const identityType =
+      ag.identity_type?.trim() || post?.identityType?.trim() || null
+    if (!identityId || !identityType) {
+      throw new Error(
+        `Conjunto "${ag.name}": el post Spark ${sparkItemId} no tiene identidad (AUTH_CODE/TT_USER). Reautorizá el post.`
+      )
+    }
+    return {
+      kind: "spark",
+      itemId: sparkItemId,
+      identityId,
+      identityType,
+    }
+  }
+
+  const videoId = await resolveVideoIdForAdgroup(ag, ctx)
+  const imageId = await resolveCoverIdForVideo(videoId, ctx)
+  return { kind: "library", videoId, imageId }
+}
+
 async function createAdgroupAndAd(
   cfg: TikTokLaunchCampaignConfig,
   campaignId: string,
   ag: TikTokLaunchCampaignConfig["adgroups"][number],
   index: number,
-  videoId: string,
-  imageId: string,
+  creative: AdCreativeRef,
   startTime: string,
   api: { advertiserId: string; identityId: string | null }
 ): Promise<TikTokLaunchResult["adGroups"][number]> {
@@ -463,24 +465,37 @@ async function createAdgroupAndAd(
     pacing: "PACING_MODE_SMOOTH",
   })
 
+  const creativePayload =
+    creative.kind === "spark"
+      ? {
+          ad_name: ag.name,
+          ad_format: "SINGLE_VIDEO",
+          identity_type: creative.identityType,
+          identity_id: creative.identityId,
+          tiktok_item_id: creative.itemId,
+          ad_text: cfg.campaign.ad_text ?? "",
+          call_to_action: cta,
+          landing_page_url: landingUrl,
+          operation_status: "DISABLE",
+        }
+      : {
+          ad_name: ag.name,
+          ad_format: "SINGLE_VIDEO",
+          identity_type: "TT_USER",
+          identity_id: getIdentityId(cfg, identityId),
+          video_id: creative.videoId,
+          image_ids: [creative.imageId],
+          ad_text: cfg.campaign.ad_text ?? "",
+          call_to_action: cta,
+          landing_page_url: landingUrl,
+          display_name: cfg.campaign.display_name ?? "jhefersonet",
+          operation_status: "DISABLE",
+        }
+
   const adData = await tiktokPost<{ ad_ids?: string[] }>("/ad/create/", {
     advertiser_id: advertiserId,
     adgroup_id: agData.adgroup_id,
-    creatives: [
-      {
-        ad_name: ag.name,
-        ad_format: "SINGLE_VIDEO",
-        identity_type: "TT_USER",
-        identity_id: getIdentityId(cfg, identityId),
-        video_id: videoId,
-        image_ids: [imageId],
-        ad_text: cfg.campaign.ad_text ?? "",
-        call_to_action: cta,
-        landing_page_url: landingUrl,
-        display_name: cfg.campaign.display_name ?? "jhefersonet",
-        operation_status: "DISABLE",
-      },
-    ],
+    creatives: [creativePayload],
   })
 
   return {
@@ -535,7 +550,13 @@ export async function launchTikTokCampaign(
   const startTime = new Date().toISOString().replace("T", " ").slice(0, 19)
 
   const signaturesToPrefetch = cfg.adgroups
-    .filter((ag) => ag.video && !ag.video_id && fs.existsSync(ag.video))
+    .filter(
+      (ag) =>
+        ag.video &&
+        !ag.video_id &&
+        !ag.tiktok_item_id &&
+        fs.existsSync(ag.video)
+    )
     .map((ag) => computeFileMd5(ag.video!))
 
   const prefetchLibrary = async () => prefetchVideoLibrary(ctx, signaturesToPrefetch)
@@ -547,27 +568,15 @@ export async function launchTikTokCampaign(
 
   updateProgress(ctx, "resolve_videos", 0, totalAdgroups)
 
-  const resolveVideos = async () =>
+  const resolveCreatives = async () =>
     mapWithConcurrency(cfg.adgroups, ASSET_CONCURRENCY, async (ag, index) => {
       updateProgress(ctx, "resolve_videos", index + 1, totalAdgroups)
-      return resolveVideoIdForAdgroup(ag, ctx)
+      return resolveAdCreativeForAdgroup(ag, ctx)
     })
 
-  const videoIds = options.metrics
-    ? await options.metrics.time("resolve_videos", resolveVideos)
-    : await resolveVideos()
-
-  updateProgress(ctx, "resolve_covers", 0, totalAdgroups)
-
-  const resolveCovers = async () =>
-    mapWithConcurrency(videoIds, ASSET_CONCURRENCY, async (videoId, index) => {
-      updateProgress(ctx, "resolve_covers", index + 1, totalAdgroups)
-      return resolveCoverIdForVideo(videoId, ctx)
-    })
-
-  const imageIds = options.metrics
-    ? await options.metrics.time("resolve_covers", resolveCovers)
-    : await resolveCovers()
+  const creatives = options.metrics
+    ? await options.metrics.time("resolve_videos", resolveCreatives)
+    : await resolveCreatives()
 
   const results: TikTokLaunchResult["adGroups"] = []
 
@@ -579,8 +588,7 @@ export async function launchTikTokCampaign(
         campaignId,
         cfg.adgroups[i]!,
         i,
-        videoIds[i]!,
-        imageIds[i]!,
+        creatives[i]!,
         startTime,
         launchApi
       )

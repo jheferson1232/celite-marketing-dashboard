@@ -5,6 +5,11 @@ export type TikTokAdVideoAsset = {
   name: string
   /** @usuario TikTok del post (Spark / orgánico). */
   profileName: string | null
+  /** item_id del post orgánico (sin prefijo spark:). */
+  itemId: string | null
+  /** Identidad Spark Ads asociada al post. */
+  identityId: string | null
+  identityType: string | null
   coverUrl: string | null
   previewUrl: string | null
   durationMs: number | null
