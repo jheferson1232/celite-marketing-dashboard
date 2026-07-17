@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { RiChat3Line } from "@remixicon/react"
+import { RiChat3Line, RiExternalLinkLine } from "@remixicon/react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,6 +11,20 @@ import type {
   TikTokCommentDecisionRecord,
   TikTokLiveComment,
 } from "@/lib/services/tiktok/comments/types"
+
+function tikTokPostUrl(
+  profileName: string | null,
+  tiktokItemId: string | null
+): string | null {
+  const itemId = tiktokItemId?.trim()
+  if (!itemId) return null
+  const handle = profileName
+    ?.trim()
+    .replace(/^@/, "")
+    .replace(/\s+/g, "_")
+  if (handle) return `https://www.tiktok.com/@${handle}/video/${itemId}`
+  return `https://www.tiktok.com/video/${itemId}`
+}
 
 function actionBadge(action: string) {
   if (action === "hide") {
@@ -84,6 +98,7 @@ function LiveCommentRow({ row }: { row: TikTokLiveComment }) {
     addSuffix: true,
     locale: es,
   })
+  const postUrl = tikTokPostUrl(row.profileName, row.tiktokItemId)
 
   return (
     <div className="flex gap-3 border-b px-4 py-4 last:border-b-0">
@@ -104,6 +119,17 @@ function LiveCommentRow({ row }: { row: TikTokLiveComment }) {
             <span className="text-xs font-medium">@{row.profileName}</span>
           ) : null}
           <span className="text-muted-foreground text-xs">· {row.adName}</span>
+          {postUrl ? (
+            <a
+              href={postUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
+            >
+              Ver post
+              <RiExternalLinkLine className="size-3" />
+            </a>
+          ) : null}
         </div>
         <div className="space-y-1">
           <p className="text-sm font-medium">
