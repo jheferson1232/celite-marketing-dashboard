@@ -303,7 +303,7 @@ async function resolveCampaignId(
   campaignName: string,
   configuredId: string | null | undefined,
   objective: string,
-  options?: { forceNew?: boolean }
+  options?: { forceNew?: boolean; cfg?: TikTokLaunchCampaignConfig }
 ): Promise<{ campaignId: string; reusedExisting: boolean }> {
   if (!options?.forceNew && configuredId) {
     return { campaignId: configuredId, reusedExisting: true }
@@ -317,16 +317,28 @@ async function resolveCampaignId(
   }
 
   const { advertiserId } = await getTikTokRequestContext()
+  const isCampaignBudget = options?.cfg?.campaign.budget_scope === "campaign"
+  const campaignPayload: Record<string, unknown> = {
+    advertiser_id: advertiserId,
+    campaign_name: campaignName,
+    objective_type: objective,
+    campaign_type: "REGULAR_CAMPAIGN",
+    operation_status: "DISABLE",
+  }
+
+  if (isCampaignBudget) {
+    // WEB_CONVERSIONS no admite BUDGET_MODE_DYNAMIC_DAILY_BUDGET.
+    // CBO estándar: presupuesto diario fijo a nivel de campaña.
+    campaignPayload.budget_mode = "BUDGET_MODE_DAY"
+    campaignPayload.budget = options?.cfg?.campaign.daily_budget ?? 0
+    campaignPayload.budget_optimize_on = true
+  } else {
+    campaignPayload.budget_mode = "BUDGET_MODE_INFINITE"
+  }
+
   const campaignData = await tiktokPost<{ campaign_id: string }>(
     "/campaign/create/",
-    {
-      advertiser_id: advertiserId,
-      campaign_name: campaignName,
-      objective_type: objective,
-      campaign_type: "REGULAR_CAMPAIGN",
-      budget_mode: "BUDGET_MODE_INFINITE",
-      operation_status: "DISABLE",
-    }
+    campaignPayload
   )
   return { campaignId: campaignData.campaign_id, reusedExisting: false }
 }
@@ -431,7 +443,8 @@ async function createAdgroupAndAd(
       ? "SHOPPING"
       : cfg.campaign.optimization_event
 
-  const agData = await tiktokPost<{ adgroup_id: string }>("/adgroup/create/", {
+  const isCampaignBudget = cfg.campaign.budget_scope === "campaign"
+  const adgroupPayload: Record<string, unknown> = {
     advertiser_id: advertiserId,
     campaign_id: campaignId,
     adgroup_name: ag.name,
@@ -444,11 +457,9 @@ async function createAdgroupAndAd(
     billing_event: "OCPM",
     placements: ["PLACEMENT_TIKTOK"],
     placement_type: "PLACEMENT_TYPE_NORMAL",
-    comment_disabled: true,
+    comment_disabled: false,
     video_download_disabled: true,
     video_share_disabled: true,
-    budget_mode: "BUDGET_MODE_DAY",
-    budget: cfg.campaign.daily_budget,
     schedule_type: "SCHEDULE_FROM_NOW",
     schedule_start_time: startTime,
     operation_status: "DISABLE",
@@ -463,7 +474,23 @@ async function createAdgroupAndAd(
     location_ids: cfg.campaign.location_ids ?? ["3686110"],
     bid_type: "BID_TYPE_NO_BID",
     pacing: "PACING_MODE_SMOOTH",
-  })
+  }
+
+  if (isCampaignBudget) {
+    adgroupPayload.budget_mode = "BUDGET_MODE_INFINITE"
+  } else {
+    adgroupPayload.budget_mode = "BUDGET_MODE_DAY"
+    adgroupPayload.budget = cfg.campaign.daily_budget
+  }
+
+  if (ag.interest_category_ids && ag.interest_category_ids.length > 0) {
+    adgroupPayload.interest_category_ids = ag.interest_category_ids
+  }
+
+  const agData = await tiktokPost<{ adgroup_id: string }>(
+    "/adgroup/create/",
+    adgroupPayload
+  )
 
   const creativePayload =
     creative.kind === "spark"
@@ -540,7 +567,7 @@ export async function launchTikTokCampaign(
       campaignName,
       options.forceNewCampaign ? undefined : cfg.campaign.campaign_id,
       objective,
-      { forceNew: options.forceNewCampaign === true }
+      { forceNew: options.forceNewCampaign === true, cfg }
     )
 
   const { campaignId, reusedExisting } = options.metrics

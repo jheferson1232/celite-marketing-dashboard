@@ -1,0 +1,49 @@
+# Agente comentarios TikTok: cada 2 horas (UTC). Requiere CRON_SECRET.
+
+name: TikTok comments agent 2h
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (1 = sí)"
+        required: false
+        default: "0"
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Llamar cron agente comentarios TikTok
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.META_CRON_APP_URL }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta CRON_SECRET en GitHub Actions"
+            exit 1
+          fi
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
+          BASE="${BASE%/}"
+
+          DRY="${INPUT_DRY:-0}"
+          QS=""
+          if [ "$DRY" = "1" ]; then QS="dryRun=1"; fi
+
+          URL="${BASE}/api/cron/tiktok-comments-agent"
+          if [ -n "$QS" ]; then URL="${URL}?${QS}"; fi
+          echo "GET ${URL}"
+          HTTP_CODE=$(curl -sS --retry 2 --retry-delay 5 --max-time 300 \
+            -o /tmp/tiktok-comments-cron.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/tiktok-comments-cron.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            exit 1
+          fi

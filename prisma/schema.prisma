@@ -103,6 +103,7 @@ enum CampaignStatus {
 
 enum CampaignStrategy {
   ABO
+  CBO
 }
 
 /** Imagen o video reutilizable (asociable a variantes de producto). */
@@ -447,4 +448,45 @@ model TikTokAgentRun {
 
   @@index([startedAt])
   @@map("TikTokAgentRun")
+}
+
+/** Corrida del agente de comentarios TikTok (cron o manual). */
+model TikTokCommentAgentRun {
+  id           String    @id @default(cuid())
+  trigger      String
+  status       String    @default("running")
+  dryRun       Boolean   @default(false)
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  adsScanned   Int       @default(0)
+  commentsSeen Int       @default(0)
+  actionsCount Int       @default(0)
+  summary      String?
+  errorMessage String?
+
+  @@index([startedAt])
+  @@map("TikTokCommentAgentRun")
+}
+
+/** Decisión del agente por comentario TikTok (dedupe por tiktokCommentId). */
+model TikTokCommentDecision {
+  id             String   @id @default(cuid())
+  runId          String?
+  tiktokCommentId String  @unique
+  adId           String?
+  tiktokItemId   String?
+  identityId     String?
+  identityType   String?
+  authorName     String?
+  message        String
+  classification String
+  action         String
+  replyText      String?
+  applied        Boolean  @default(false)
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([runId])
+  @@map("TikTokCommentDecision")
 }

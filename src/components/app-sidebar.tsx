@@ -79,6 +79,12 @@ const navItems = [
     icon: RiRobotLine,
   },
   {
+    id: "tiktok-comentarios",
+    title: "Comentarios IA (TikTok)",
+    href: "/tiktok/comentarios",
+    icon: RiChat3Line,
+  },
+  {
     id: "campaigns",
     title: "Campaigns",
     href: "/campaigns",
@@ -158,7 +164,10 @@ export function AppSidebar() {
                               : item.id === "tiktok-agente"
                                 ? pathname === "/tiktok/agente" ||
                                   pathname.startsWith("/tiktok/agente/")
-                                : item.id === "campaigns"
+                                : item.id === "tiktok-comentarios"
+                                  ? pathname === "/tiktok/comentarios" ||
+                                    pathname.startsWith("/tiktok/comentarios/")
+                                  : item.id === "campaigns"
                               ? pathname === "/campaigns" ||
                                 pathname.startsWith("/campaigns/")
                             : item.id === "products"

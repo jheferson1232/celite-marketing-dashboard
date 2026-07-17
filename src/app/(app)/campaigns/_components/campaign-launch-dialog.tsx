@@ -181,7 +181,11 @@ export function CampaignLaunchDialog({
               </p>
               <dl className="mt-3 grid gap-1 text-xs">
                 <div className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">Presupuesto/conjunto</dt>
+                  <dt className="text-muted-foreground">
+                    {preflight.strategy === "CBO"
+                      ? "Presupuesto/campaña"
+                      : "Presupuesto/conjunto"}
+                  </dt>
                   <dd className="font-medium tabular-nums">
                     {preflight.dailyBudget} COP
                   </dd>

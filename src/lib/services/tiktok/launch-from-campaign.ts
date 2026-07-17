@@ -1,7 +1,9 @@
 import { DASHBOARD_TIMEZONE } from "@/lib/date"
 import {
   validateABODynamicFields,
+  validateCBODynamicFields,
   type ABOStrategyConfig,
+  type CBOStrategyConfig,
 } from "@/lib/config/tiktok-strategies"
 import {
   getCampaignById,
@@ -10,6 +12,7 @@ import {
 } from "@/lib/services/campaign"
 import {
   getABOCampaignContext,
+  getCBODynamicCampaignContext,
   toLaunchConfig,
 } from "@/lib/services/campaign-strategy-builder"
 import { launchTikTokCampaign } from "./launch-campaign"
@@ -79,7 +82,7 @@ export async function getCampaignForTikTokLaunch(
       `La campaña debe estar en Borrador, Listo o En curso para lanzar (estado actual: ${campaign.status}).`
     )
   }
-  if (campaign.strategy !== "ABO") {
+  if (campaign.strategy !== "ABO" && campaign.strategy !== "CBO") {
     throw new Error(
       `Estrategia no soportada para lanzamiento: ${campaign.strategy}`
     )
@@ -135,8 +138,8 @@ async function buildCampaignLaunchPreflight(
   campaign: CampaignRecord
 ): Promise<CampaignLaunchPreflightResult> {
   const checks: LaunchCheckItem[] = []
-  const aboConfig = campaign.config as ABOStrategyConfig
-  const context = getABOCampaignContext(aboConfig)
+  const launchCfg = buildLaunchConfigFromCampaign(campaign)
+  const isCbo = campaign.strategy === "CBO"
 
   checks.push({
     ok: Boolean(campaign.name.trim()),
@@ -145,41 +148,72 @@ async function buildCampaignLaunchPreflight(
   })
 
   checks.push({
-    ok: campaign.strategy === "ABO",
+    ok: campaign.strategy === "ABO" || campaign.strategy === "CBO",
     label: "Estrategia",
     detail: campaign.strategy,
   })
 
-  const validation = validateABODynamicFields(aboConfig.dynamic, context)
-  if (!validation.valid) {
-    for (const [field, message] of Object.entries(validation.errors)) {
-      if (!message) continue
+  if (campaign.strategy === "ABO") {
+    const aboConfig = campaign.config as ABOStrategyConfig
+    const context = getABOCampaignContext(aboConfig)
+    const validation = validateABODynamicFields(aboConfig.dynamic, context)
+    if (!validation.valid) {
+      for (const [field, message] of Object.entries(validation.errors)) {
+        if (!message) continue
+        checks.push({
+          ok: false,
+          label: `Config ABO (${field})`,
+          detail: message,
+        })
+      }
+    } else {
       checks.push({
-        ok: false,
-        label: `Config ABO (${field})`,
-        detail: message,
+        ok: true,
+        label: "Configuración ABO",
+        detail: "Válida",
       })
     }
-  } else {
-    checks.push({
-      ok: true,
-      label: "Configuración ABO",
-      detail: "Válida",
-    })
   }
 
-  const launchCfg = buildLaunchConfigFromCampaign(campaign)
+  if (campaign.strategy === "CBO") {
+    const cboConfig = campaign.config as CBOStrategyConfig
+    const context = getCBODynamicCampaignContext(cboConfig)
+    const validation = validateCBODynamicFields(cboConfig.dynamic, context)
+    if (!validation.valid) {
+      for (const [field, message] of Object.entries(validation.errors)) {
+        if (!message) continue
+        checks.push({
+          ok: false,
+          label: `Config CBO (${field})`,
+          detail: message,
+        })
+      }
+    } else {
+      checks.push({
+        ok: true,
+        label: "Configuración CBO",
+        detail: "Válida",
+      })
+    }
+  }
+
   const budget = launchCfg.campaign.daily_budget ?? 0
   checks.push({
     ok: budget > 0,
     label: "Presupuesto diario",
-    detail: budget > 0 ? `${budget} COP/conjunto` : "Debe ser mayor a 0",
+    detail: budget > 0
+      ? isCbo
+        ? `${budget} COP/campaña`
+        : `${budget} COP/conjunto`
+      : "Debe ser mayor a 0",
   })
 
   const landingUrl =
     launchCfg.campaign.default_url ??
     launchCfg.adgroups[0]?.url ??
-    aboConfig.dynamic.landingPageUrl ??
+    (campaign.strategy === "ABO"
+      ? (campaign.config as ABOStrategyConfig).dynamic.landingPageUrl
+      : (campaign.config as CBOStrategyConfig).dynamic.landingPageUrl) ??
     ""
   checks.push({
     ok: Boolean(landingUrl.trim()),
@@ -187,7 +221,12 @@ async function buildCampaignLaunchPreflight(
     detail: landingUrl.trim() || "Falta URL de destino",
   })
 
-  const adText = launchCfg.campaign.ad_text ?? aboConfig.dynamic.adText ?? ""
+  const adText =
+    launchCfg.campaign.ad_text ??
+    (campaign.strategy === "ABO"
+      ? (campaign.config as ABOStrategyConfig).dynamic.adText
+      : (campaign.config as CBOStrategyConfig).dynamic.adText) ??
+    ""
   checks.push({
     ok: Boolean(adText.trim()),
     label: "Texto del anuncio",
@@ -208,16 +247,24 @@ async function buildCampaignLaunchPreflight(
     detail:
       videoAdgroupCount === 0
         ? "Se requiere al menos un video asociado"
-        : [
-            baulVideoAdgroups.length > 0
-              ? `${baulVideoAdgroups.length} del Baúl`
-              : null,
-            tiktokVideoAdgroups.length > 0
-              ? `${tiktokVideoAdgroups.length} de la biblioteca TikTok`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" · "),
+        : isCbo
+          ? `${videoAdgroupCount} conjunto(s) · ${
+              new Set(
+                launchCfg.adgroups.map(
+                  (ag) => ag.tiktok_item_id ?? ag.video_id ?? ag.video ?? ""
+                )
+              ).size
+            } video(s)`
+          : [
+              baulVideoAdgroups.length > 0
+                ? `${baulVideoAdgroups.length} del Baúl`
+                : null,
+              tiktokVideoAdgroups.length > 0
+                ? `${tiktokVideoAdgroups.length} de la biblioteca TikTok`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
   })
 
   checks.push(await checkTikTokEnv())
@@ -234,7 +281,16 @@ async function buildCampaignLaunchPreflight(
     strategy: campaign.strategy,
     dailyBudget: budget,
     adGroupCount: launchCfg.adgroups.length,
-    videoCount: videoAdgroupCount,
+    videoCount: (() => {
+      if (!isCbo) return videoAdgroupCount
+      const uniqueVideos = new Set(
+        launchCfg.adgroups.map(
+          (ag) => ag.tiktok_item_id ?? ag.video_id ?? ag.video ?? ""
+        )
+      )
+      uniqueVideos.delete("")
+      return uniqueVideos.size
+    })(),
     landingPageUrl: landingUrl,
     adText,
     adgroups: launchCfg.adgroups.map((ag) => ({

@@ -48,6 +48,7 @@ interface CampaignGeneralSectionProps {
   pixelId: string
   authCode: string
   selectedTikTokVideoIds: string[]
+  maxTikTokVideos?: number
   disabled?: boolean
   onNameChange: (name: string) => void
   onStatusChange: (status: CampaignStatus) => void
@@ -200,6 +201,7 @@ export function CampaignGeneralSection({
   pixelId,
   authCode,
   selectedTikTokVideoIds,
+  maxTikTokVideos,
   disabled = false,
   onNameChange,
   onStatusChange,
@@ -293,6 +295,10 @@ export function CampaignGeneralSection({
 
   function toggleTikTokVideo(videoId: string, checked: boolean) {
     if (checked) {
+      if (maxTikTokVideos === 1) {
+        onSelectedTikTokVideoIdsChange([videoId])
+        return
+      }
       if (selectedTikTokSet.has(videoId)) return
       onSelectedTikTokVideoIdsChange([...selectedTikTokVideoIds, videoId])
       return

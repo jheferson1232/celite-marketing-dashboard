@@ -16,6 +16,8 @@ import { runServerAction } from "@/lib/server-action"
 import type {
   ABODynamicFieldErrors,
   ABOStrategyConfig,
+  CBODynamicFieldErrors,
+  CBOStrategyConfig,
 } from "@/lib/config/tiktok-strategies"
 import type { TikTokStrategyId } from "@/lib/config/tiktok-strategies"
 import { canDeleteCampaign, type CampaignStatus } from "@/lib/campaigns/status"
@@ -34,6 +36,10 @@ import {
   AboStrategyForm,
   type AboStrategyFormPayload,
 } from "./strategies/abo-strategy-form"
+import {
+  CboStrategyForm,
+  type CboStrategyFormPayload,
+} from "./strategies/cbo-strategy-form"
 
 interface CampaignDetailContentProps {
   campaignId: string
@@ -50,8 +56,11 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const [pendingAuthCode, setPendingAuthCode] = useState("")
   const [pendingTikTokVideoIds, setPendingTikTokVideoIds] = useState<string[]>([])
   const [pendingAbo, setPendingAbo] = useState<AboStrategyFormPayload | null>(null)
-  const [isAboValid, setIsAboValid] = useState(true)
-  const [aboErrors, setAboErrors] = useState<ABODynamicFieldErrors>({})
+  const [pendingCbo, setPendingCbo] = useState<CboStrategyFormPayload | null>(null)
+  const [isStrategyValid, setIsStrategyValid] = useState(true)
+  const [strategyErrors, setStrategyErrors] = useState<
+    ABODynamicFieldErrors | CBODynamicFieldErrors
+  >({})
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -78,64 +87,141 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   })
 
   useEffect(() => {
-    if (!campaign || campaign.strategy !== "ABO") return
-    const config = campaign.config as ABOStrategyConfig
+    if (!campaign) return
+
     setPendingName(campaign.name)
     setPendingStatus(campaign.status)
-    setPendingAbo({
-      dynamic: config.dynamic,
-      landingPages: config.landingPages,
-      creatives: config.creatives,
-    })
-    setPendingVariantId(config.dynamic.variantId)
-    setPendingVariantName(config.dynamic.variantName)
-    setPendingPixelId(config.campaign.pixel_id)
-    setPendingAuthCode(config.campaign.auth_code ?? "")
-    setPendingTikTokVideoIds(config.dynamic.selectedTikTokVideoIds ?? [])
+
+    if (campaign.strategy === "ABO") {
+      const config = campaign.config as ABOStrategyConfig
+      setPendingAbo({
+        dynamic: config.dynamic,
+        landingPages: config.landingPages,
+        creatives: config.creatives,
+      })
+      setPendingCbo(null)
+      setPendingVariantId(config.dynamic.variantId)
+      setPendingVariantName(config.dynamic.variantName)
+      setPendingPixelId(config.campaign.pixel_id)
+      setPendingAuthCode(config.campaign.auth_code ?? "")
+      setPendingTikTokVideoIds(config.dynamic.selectedTikTokVideoIds ?? [])
+      return
+    }
+
+    if (campaign.strategy === "CBO") {
+      const config = campaign.config as CBOStrategyConfig
+      setPendingCbo({
+        dynamic: config.dynamic,
+        landingPages: config.landingPages,
+        creatives: config.creatives,
+      })
+      setPendingAbo(null)
+      setPendingVariantId(config.dynamic.variantId)
+      setPendingVariantName(config.dynamic.variantName)
+      setPendingPixelId(config.campaign.pixel_id)
+      setPendingAuthCode(config.campaign.auth_code ?? "")
+      setPendingTikTokVideoIds(config.dynamic.selectedTikTokVideoIds ?? [])
+    }
   }, [campaign])
 
   const isDirty = useMemo(() => {
-    if (!campaign || campaign.strategy !== "ABO" || !pendingAbo) return false
+    if (!campaign) return false
 
     const generalDirty =
       pendingName.trim() !== campaign.name || pendingStatus !== campaign.status
 
-    const config = campaign.config as ABOStrategyConfig
-    const dynamic = config.dynamic
+    if (campaign.strategy === "ABO" && pendingAbo) {
+      const config = campaign.config as ABOStrategyConfig
+      const dynamic = config.dynamic
 
-    const pixelDirty = pendingPixelId !== config.campaign.pixel_id
-    const authDirty =
-      pendingAuthCode.trim() !== (config.campaign.auth_code ?? "").trim()
-    const tikTokVideosDirty =
-      pendingTikTokVideoIds.join(",") !==
-      (config.dynamic.selectedTikTokVideoIds ?? []).join(",")
+      const pixelDirty = pendingPixelId !== config.campaign.pixel_id
+      const authDirty =
+        pendingAuthCode.trim() !== (config.campaign.auth_code ?? "").trim()
+      const tikTokVideosDirty =
+        pendingTikTokVideoIds.join(",") !==
+        (config.dynamic.selectedTikTokVideoIds ?? []).join(",")
 
-    const strategyDirty =
-      pendingVariantId !== dynamic.variantId ||
-      pendingVariantName !== dynamic.variantName ||
-      pendingAbo.dynamic.budgetPerAdgroup !== dynamic.budgetPerAdgroup ||
-      pendingAbo.dynamic.autoCreateAdgroupsFromCreatives !==
-        dynamic.autoCreateAdgroupsFromCreatives ||
-      pendingAbo.dynamic.landingPageId !== dynamic.landingPageId ||
-      pendingAbo.dynamic.landingPageUrl !== dynamic.landingPageUrl ||
-      pendingAbo.dynamic.adText !== dynamic.adText ||
-      pendingAbo.dynamic.selectedCreativeIds.join(",") !==
-        dynamic.selectedCreativeIds.join(",") ||
-      pendingAbo.landingPages.map((p) => p.url).join("|") !==
-        config.landingPages.map((p) => p.url).join("|")
+      const strategyDirty =
+        pendingVariantId !== dynamic.variantId ||
+        pendingVariantName !== dynamic.variantName ||
+        pendingAbo.dynamic.budgetPerAdgroup !== dynamic.budgetPerAdgroup ||
+        pendingAbo.dynamic.autoCreateAdgroupsFromCreatives !==
+          dynamic.autoCreateAdgroupsFromCreatives ||
+        pendingAbo.dynamic.landingPageId !== dynamic.landingPageId ||
+        pendingAbo.dynamic.landingPageUrl !== dynamic.landingPageUrl ||
+        pendingAbo.dynamic.adText !== dynamic.adText ||
+        pendingAbo.dynamic.selectedCreativeIds.join(",") !==
+          dynamic.selectedCreativeIds.join(",") ||
+        pendingAbo.landingPages.map((p) => p.url).join("|") !==
+          config.landingPages.map((p) => p.url).join("|")
 
-    return generalDirty || pixelDirty || authDirty || tikTokVideosDirty || strategyDirty
-  }, [campaign, pendingAbo, pendingAuthCode, pendingName, pendingPixelId, pendingStatus, pendingTikTokVideoIds, pendingVariantId, pendingVariantName])
+      return generalDirty || pixelDirty || authDirty || tikTokVideosDirty || strategyDirty
+    }
+
+    if (campaign.strategy === "CBO" && pendingCbo) {
+      const config = campaign.config as CBOStrategyConfig
+      const dynamic = config.dynamic
+
+      const pixelDirty = pendingPixelId !== config.campaign.pixel_id
+      const authDirty =
+        pendingAuthCode.trim() !== (config.campaign.auth_code ?? "").trim()
+      const tikTokVideoDirty =
+        pendingTikTokVideoIds.join(",") !==
+        (config.dynamic.selectedTikTokVideoIds ?? []).join(",")
+
+      const strategyDirty =
+        pendingVariantId !== dynamic.variantId ||
+        pendingVariantName !== dynamic.variantName ||
+        pendingCbo.dynamic.campaignBudget !== dynamic.campaignBudget ||
+        pendingCbo.dynamic.selectedPresetIds.join(",") !==
+          dynamic.selectedPresetIds.join(",") ||
+        pendingCbo.dynamic.selectedCreativeIds.join(",") !==
+          dynamic.selectedCreativeIds.join(",") ||
+        pendingCbo.dynamic.landingPageId !== dynamic.landingPageId ||
+        pendingCbo.dynamic.landingPageUrl !== dynamic.landingPageUrl ||
+        pendingCbo.dynamic.adText !== dynamic.adText ||
+        pendingCbo.landingPages.map((p) => p.url).join("|") !==
+          config.landingPages.map((p) => p.url).join("|")
+
+      return generalDirty || pixelDirty || authDirty || tikTokVideoDirty || strategyDirty
+    }
+
+    return generalDirty
+  }, [
+    campaign,
+    pendingAbo,
+    pendingCbo,
+    pendingAuthCode,
+    pendingName,
+    pendingPixelId,
+    pendingStatus,
+    pendingTikTokVideoIds,
+    pendingVariantId,
+    pendingVariantName,
+  ])
 
   const handleAboChange = useCallback((payload: AboStrategyFormPayload) => {
     setPendingAbo(payload)
     setSaveNotice(null)
   }, [])
 
-  const handleValidationChange = useCallback(
+  const handleCboChange = useCallback((payload: CboStrategyFormPayload) => {
+    setPendingCbo(payload)
+    setSaveNotice(null)
+  }, [])
+
+  const handleAboValidationChange = useCallback(
     (valid: boolean, errors: ABODynamicFieldErrors) => {
-      setIsAboValid(valid)
-      setAboErrors(errors)
+      setIsStrategyValid(valid)
+      setStrategyErrors(errors)
+    },
+    []
+  )
+
+  const handleCboValidationChange = useCallback(
+    (valid: boolean, errors: CBODynamicFieldErrors) => {
+      setIsStrategyValid(valid)
+      setStrategyErrors(errors)
     },
     []
   )
@@ -161,6 +247,18 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
                 },
                 aboLandingPages: pendingAbo.landingPages,
                 aboCreatives: pendingAbo.creatives,
+              }
+            : {}),
+          ...(campaign.strategy === "CBO" && pendingCbo
+            ? {
+                cboDynamic: {
+                  ...pendingCbo.dynamic,
+                  variantId: pendingVariantId,
+                  variantName: pendingVariantName,
+                  selectedTikTokVideoIds: pendingTikTokVideoIds,
+                },
+                cboLandingPages: pendingCbo.landingPages,
+                cboCreatives: pendingCbo.creatives,
               }
             : {}),
         })
@@ -232,12 +330,21 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
   const aboConfig =
     campaign.strategy === "ABO" ? (campaign.config as ABOStrategyConfig) : null
+  const cboConfig =
+    campaign.strategy === "CBO" ? (campaign.config as CBOStrategyConfig) : null
+
+  const hasValidStrategyConfig =
+    campaign.strategy === "ABO"
+      ? pendingAbo !== null && isStrategyValid
+      : campaign.strategy === "CBO"
+        ? pendingCbo !== null && isStrategyValid
+        : false
 
   const canSave =
     isDirty &&
     pendingName.trim().length > 0 &&
     pendingPixelId.trim().length > 0 &&
-    (campaign.strategy !== "ABO" || (pendingAbo !== null && isAboValid)) &&
+    hasValidStrategyConfig &&
     !saveMutation.isPending &&
     !strategyMutation.isPending
 
@@ -248,9 +355,9 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
   const canLaunch =
     !isDirty &&
-    campaign.strategy === "ABO" &&
+    (campaign.strategy === "ABO" || campaign.strategy === "CBO") &&
     canLaunchByStatus &&
-    (pendingAbo === null || isAboValid) &&
+    hasValidStrategyConfig &&
     !saveMutation.isPending &&
     !strategyMutation.isPending
 
@@ -260,12 +367,17 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
       return "Esperá a que terminen los cambios…"
     }
     if (isDirty) return "Guardá los cambios antes de lanzar"
-    if (campaign.strategy !== "ABO") return "Solo se puede lanzar con estrategia ABO"
+    if (campaign.strategy !== "ABO" && campaign.strategy !== "CBO") {
+      return "Solo se puede lanzar con estrategia ABO o CBO"
+    }
     if (!canLaunchByStatus) {
       return "Solo se puede lanzar en Borrador, Listo o En curso"
     }
-    if (pendingAbo !== null && !isAboValid) {
-      return Object.values(aboErrors)[0] ?? "Revisá la configuración ABO"
+    if (!isStrategyValid) {
+      return (
+        Object.values(strategyErrors)[0] ??
+        `Revisá la configuración ${campaign.strategy}`
+      )
     }
     return null
   })()
@@ -434,7 +546,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
           </p>
         </div>
 
-        {campaign.strategy === "ABO" ? (
+        {campaign.strategy === "ABO" || campaign.strategy === "CBO" ? (
           <CampaignVariantSelect
             value={pendingVariantId}
             disabled={saveMutation.isPending || strategyMutation.isPending}
@@ -456,19 +568,35 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
               selectedTikTokVideoIds={pendingTikTokVideoIds}
               disabled={saveMutation.isPending || strategyMutation.isPending}
               onChange={handleAboChange}
-              onValidationChange={handleValidationChange}
+              onValidationChange={handleAboValidationChange}
             />
-            {!isAboValid ? (
+            {!isStrategyValid ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {Object.values(aboErrors)[0] ?? "Revisa la configuración ABO"}
+                {Object.values(strategyErrors)[0] ?? "Revisa la configuración ABO"}
               </div>
             ) : null}
           </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Estrategia no soportada todavía en el formulario.
-          </p>
-        )}
+        ) : null}
+
+        {campaign.strategy === "CBO" && cboConfig && pendingCbo ? (
+          <>
+            <CboStrategyForm
+              key={`${campaign.id}-${campaign.updatedAt.toISOString()}`}
+              config={cboConfig}
+              variantId={pendingVariantId}
+              variantName={pendingVariantName}
+              selectedTikTokVideoIds={pendingTikTokVideoIds}
+              disabled={saveMutation.isPending || strategyMutation.isPending}
+              onChange={handleCboChange}
+              onValidationChange={handleCboValidationChange}
+            />
+            {!isStrategyValid ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {Object.values(strategyErrors)[0] ?? "Revisa la configuración CBO"}
+              </div>
+            ) : null}
+          </>
+        ) : null}
       </section>
     </div>
   )

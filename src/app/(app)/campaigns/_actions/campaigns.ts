@@ -1,7 +1,7 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
-import type { ABODynamicFields } from "@/lib/config/tiktok-strategies"
+import type { ABODynamicFields, CBODynamicFields } from "@/lib/config/tiktok-strategies"
 import type { TikTokStrategyId } from "@/lib/config/tiktok-strategies"
 import type { CampaignStatus } from "@/lib/campaigns/status"
 import {
@@ -10,12 +10,14 @@ import {
   getCampaignById,
   listCampaigns,
   updateCampaignABOConfig,
+  updateCampaignCBOConfig,
   updateCampaignDetail,
   updateCampaignGeneral,
   updateCampaignStatus,
   updateCampaignStrategy,
   type CampaignRecord,
   type UpdateCampaignABOInput,
+  type UpdateCampaignCBOInput,
 } from "@/lib/services/campaign"
 import {
   listCampaignsForKanban,
@@ -44,6 +46,9 @@ export const createCampaignAction = createServerAction(
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
+    cboDynamic?: CBODynamicFields
+    cboLandingPages?: UpdateCampaignCBOInput["landingPages"]
+    cboCreatives?: UpdateCampaignCBOInput["creatives"]
   }): Promise<CampaignRecord> =>
     createCampaign({
       name: input.name,
@@ -59,6 +64,17 @@ export const createCampaignAction = createServerAction(
               dynamic: input.aboDynamic,
               landingPages: input.aboLandingPages,
               creatives: input.aboCreatives,
+            },
+          }
+        : {}),
+      ...(input.cboDynamic &&
+      input.cboLandingPages &&
+      input.cboCreatives
+        ? {
+            cbo: {
+              dynamic: input.cboDynamic,
+              landingPages: input.cboLandingPages,
+              creatives: input.cboCreatives,
             },
           }
         : {}),
@@ -92,6 +108,17 @@ export const updateCampaignABOConfigAction = createServerAction(
     })
 )
 
+export const updateCampaignCBOConfigAction = createServerAction(
+  async (input: {
+    campaignId: string
+  } & UpdateCampaignCBOInput): Promise<CampaignRecord> =>
+    updateCampaignCBOConfig(input.campaignId, {
+      dynamic: input.dynamic,
+      landingPages: input.landingPages,
+      creatives: input.creatives,
+    })
+)
+
 export const updateCampaignGeneralAction = createServerAction(
   async (input: {
     campaignId: string
@@ -114,6 +141,9 @@ export const updateCampaignDetailAction = createServerAction(
     aboDynamic?: ABODynamicFields
     aboLandingPages?: UpdateCampaignABOInput["landingPages"]
     aboCreatives?: UpdateCampaignABOInput["creatives"]
+    cboDynamic?: CBODynamicFields
+    cboLandingPages?: UpdateCampaignCBOInput["landingPages"]
+    cboCreatives?: UpdateCampaignCBOInput["creatives"]
   }): Promise<CampaignRecord> =>
     updateCampaignDetail(input.campaignId, {
       name: input.name,
@@ -128,6 +158,17 @@ export const updateCampaignDetailAction = createServerAction(
               dynamic: input.aboDynamic,
               landingPages: input.aboLandingPages,
               creatives: input.aboCreatives,
+            },
+          }
+        : {}),
+      ...(input.cboDynamic &&
+      input.cboLandingPages &&
+      input.cboCreatives
+        ? {
+            cbo: {
+              dynamic: input.cboDynamic,
+              landingPages: input.cboLandingPages,
+              creatives: input.cboCreatives,
             },
           }
         : {}),

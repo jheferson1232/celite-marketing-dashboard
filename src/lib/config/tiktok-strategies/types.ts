@@ -1,6 +1,6 @@
 import type { TikTokLaunchCampaignConfig } from "@/lib/services/tiktok/launch-campaign-types"
 
-export const TIKTOK_STRATEGY_IDS = ["ABO"] as const
+export const TIKTOK_STRATEGY_IDS = ["ABO", "CBO"] as const
 
 export type TikTokStrategyId = (typeof TIKTOK_STRATEGY_IDS)[number]
 
@@ -37,7 +37,28 @@ export type ABOStrategyConfig = TikTokLaunchCampaignConfig & {
   creatives: ABODynamicCreative[]
 }
 
-export type CampaignStrategyConfig = ABOStrategyConfig
+export type CBODynamicFields = {
+  variantId: string
+  variantName: string
+  campaignBudget: number
+  selectedPresetIds: string[]
+  /** Videos del Baúl (cada uno × presets de interés). */
+  selectedCreativeIds: string[]
+  /** Videos TikTok/Spark (cada uno × presets de interés). */
+  selectedTikTokVideoIds: string[]
+  landingPageId: string | null
+  landingPageUrl: string
+  adText: string
+}
+
+export type CBOStrategyConfig = TikTokLaunchCampaignConfig & {
+  strategy: "CBO"
+  dynamic: CBODynamicFields
+  landingPages: CampaignLandingPageRef[]
+  creatives: ABODynamicCreative[]
+}
+
+export type CampaignStrategyConfig = ABOStrategyConfig | CBOStrategyConfig
 
 export type TikTokStrategyDefinition = {
   id: TikTokStrategyId

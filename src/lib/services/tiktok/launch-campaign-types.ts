@@ -4,6 +4,8 @@ export type TikTokLaunchCampaignConfig = {
     campaign_id?: string
     objective?: string
     daily_budget: number
+    /** ABO: presupuesto por conjunto. CBO: presupuesto de campaña. */
+    budget_scope?: "campaign" | "adgroup"
     pixel_id: string
     optimization_event?: string
     location_ids?: string[]
@@ -27,6 +29,8 @@ export type TikTokLaunchCampaignConfig = {
     tiktok_item_id?: string
     identity_id?: string
     identity_type?: string
+    /** CBO: intereses por conjunto (ej. 22 = Ropa, 14 = Belleza). */
+    interest_category_ids?: string[]
     url?: string
   }>
 }
