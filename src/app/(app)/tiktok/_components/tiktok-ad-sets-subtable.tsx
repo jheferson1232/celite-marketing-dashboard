@@ -28,6 +28,7 @@ import {
   type TikTokAdSetManageColumnId,
 } from "@/app/(app)/dashboard/_components/campaigns/ad-set-subtable-columns"
 import { TikTokBudgetCell } from "./tiktok-budget-cell"
+import { TikTokDuplicateAdGroupButton } from "./tiktok-duplicate-adgroup-button"
 import { TikTokStatusSwitch } from "./tiktok-status-switch"
 import {
   getTikTokAdSetColumnMeta,
@@ -39,6 +40,35 @@ import {
   type TikTokAdSetMetricColumnId,
 } from "./tiktok-ad-set-columns"
 
+/** Sticky solo en Act. / Estado / Nombre (Presupuesto no se fija). */
+const STICKY_ADSET_COLUMNS = {
+  active: { left: "left-0", z: "z-[5]", width: "w-[52px] min-w-[52px]" },
+  estado: {
+    left: "left-[52px]",
+    z: "z-[4]",
+    width: "w-[88px] min-w-[88px]",
+  },
+  name: {
+    left: "left-[140px]",
+    z: "z-[3]",
+    width: "w-[220px] min-w-[220px] max-w-[220px]",
+  },
+} as const
+
+type StickyAdSetColumnId = keyof typeof STICKY_ADSET_COLUMNS
+
+function isStickyAdSetColumnId(
+  columnId: string
+): columnId is StickyAdSetColumnId {
+  return columnId in STICKY_ADSET_COLUMNS
+}
+
+function getStickyAdSetClassName(columnId: TikTokAdSetDisplayColumnId) {
+  if (!isStickyAdSetColumnId(columnId)) return undefined
+  const sticky = STICKY_ADSET_COLUMNS[columnId]
+  return cn("sticky bg-transparent", sticky.left, sticky.z, sticky.width)
+}
+
 function getSubtableHeadClassName(
   columnId: TikTokAdSetDisplayColumnId,
   currency: CurrencyCode
@@ -46,12 +76,14 @@ function getSubtableHeadClassName(
   const meta = getTikTokAdSetColumnMeta(columnId, currency)
 
   return cn(
-    columnId === "name" && "w-[300px] pl-5",
-    columnId === "active" && "w-[52px]",
-    columnId === "estado" && "w-[88px]",
+    getStickyAdSetClassName(columnId),
+    columnId === "name" && "pl-5",
+    columnId === "budget" && "w-[96px] min-w-[96px]",
+    columnId === "duplicate" && "w-[44px] min-w-[44px]",
     columnId !== "name" &&
       columnId !== "active" &&
       columnId !== "estado" &&
+      columnId !== "duplicate" &&
       "text-right",
     meta.align === "left" && "text-left"
   )
@@ -64,11 +96,18 @@ function getSubtableCellClassName(
   const meta = getTikTokAdSetColumnMeta(columnId, currency)
 
   return cn(
+    getStickyAdSetClassName(columnId),
     columnId === "name" && "pl-5",
-    (columnId === "active" || columnId === "estado") && "text-center",
+    columnId === "budget" && "w-[96px] min-w-[96px]",
+    columnId === "duplicate" && "w-[44px] min-w-[44px]",
+    (columnId === "active" ||
+      columnId === "estado" ||
+      columnId === "duplicate") &&
+      "text-center",
     columnId !== "name" &&
       columnId !== "active" &&
       columnId !== "estado" &&
+      columnId !== "duplicate" &&
       "text-right",
     meta.align === "left" && "text-left"
   )
@@ -90,6 +129,16 @@ function renderManageCell(
 
   if (columnId === "active") {
     return <TikTokStatusSwitch entity={entity} />
+  }
+
+  if (columnId === "duplicate") {
+    return (
+      <TikTokDuplicateAdGroupButton
+        adgroupId={adSet.id}
+        adgroupName={adSet.name}
+        campaignId={adSet.campaignId}
+      />
+    )
   }
 
   return <TikTokBudgetCell entity={entity} />
@@ -135,7 +184,11 @@ function buildColumnDef(
                 align={align}
               />
             )
-          : () => <span className="text-sm font-semibold">{meta.label}</span>,
+          : () => (
+              <span className="text-sm font-semibold">
+                {meta.label || "Dup."}
+              </span>
+            ),
       cell: ({ row }) => renderManageCell(columnId, row.original),
     }
   }
@@ -208,7 +261,8 @@ export function TikTokAdSetsSubtable({
   })
 
   return (
-    <div className="py-1">
+    <div className="min-w-0 w-full max-w-full py-1">
+      {/* Scroll propio: sin min-w-0 la subtabla ensancha toda la tabla de campañas. */}
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (

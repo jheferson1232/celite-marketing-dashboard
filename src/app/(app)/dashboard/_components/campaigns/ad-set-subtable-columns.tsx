@@ -11,7 +11,11 @@ import { cn } from "@/lib/utils"
 import type { CampaignColumnMeta } from "./types"
 import { formatNumber, formatPercent, getCostPerResultCellClassName } from "./utils"
 
-export const TIKTOK_AD_SET_MANAGE_COLUMN_IDS = ["active", "budget"] as const
+export const TIKTOK_AD_SET_MANAGE_COLUMN_IDS = [
+  "active",
+  "budget",
+  "duplicate",
+] as const
 
 export type TikTokAdSetManageColumnId =
   (typeof TIKTOK_AD_SET_MANAGE_COLUMN_IDS)[number]
@@ -42,6 +46,7 @@ const TIKTOK_AD_SET_MANAGE_COLUMN_META: Record<
 > = {
   active: { label: "Act.", align: "left" },
   budget: { label: "Presupuesto", align: "right" },
+  duplicate: { label: "Dup.", align: "left" },
 }
 
 const AD_SET_SUBTABLE_COLUMN_META: Record<
@@ -113,19 +118,23 @@ export function getAdSetSubtableColumnsWithTikTokManage(
 ): (AdSetSubtableColumnId | TikTokAdSetManageColumnId)[] {
   if (!enableTikTokManage) return visibleSubtableColumns
 
-  const withBudgetAfterImpressions: (
-    | AdSetSubtableColumnId
-    | TikTokAdSetManageColumnId
-  )[] = ["active"]
+  const out: (AdSetSubtableColumnId | TikTokAdSetManageColumnId)[] = ["active"]
+  let insertedBudget = false
 
   for (const columnId of visibleSubtableColumns) {
-    withBudgetAfterImpressions.push(columnId)
-    if (columnId === "impressions") {
-      withBudgetAfterImpressions.push("budget")
+    out.push(columnId)
+    // Siempre tras Nombre (no depende de Impresiones visible).
+    if (columnId === "name") {
+      out.push("budget")
+      insertedBudget = true
     }
   }
 
-  return withBudgetAfterImpressions
+  if (!insertedBudget) {
+    out.push("budget")
+  }
+
+  return out
 }
 
 export function renderAdSetSubtableCell(

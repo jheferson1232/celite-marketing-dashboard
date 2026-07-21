@@ -45,16 +45,33 @@ export async function getTikTokAgentTelegramStatus(): Promise<{
 }
 
 function formatActionLine(action: TikTokAgentPlannedAction): string {
-  const spend = formatCurrency(action.spendPen, "PEN")
-  const scope =
-    action.kind === "pause_campaign"
-      ? `Campaña <b>${escapeHtml(action.entityName)}</b>`
-      : `Conjunto <b>${escapeHtml(action.entityName)}</b> (${escapeHtml(action.campaignName ?? "—")})`
   const status = action.applied
     ? "✅"
     : action.error
       ? `❌ ${escapeHtml(action.error)}`
       : "⏸ dry-run"
+
+  if (action.kind === "scale_adgroup") {
+    const before =
+      action.budgetBeforePen != null
+        ? formatCurrency(action.budgetBeforePen, "PEN")
+        : "—"
+    const after =
+      action.budgetAfterPen != null
+        ? formatCurrency(action.budgetAfterPen, "PEN")
+        : "—"
+    const pct =
+      action.budgetIncreasePercent != null
+        ? `+${action.budgetIncreasePercent}%`
+        : ""
+    return `${status} 📈 Escalado <b>${escapeHtml(action.entityName)}</b> (${escapeHtml(action.campaignName ?? "—")}) · ${before} → ${after} ${pct}`
+  }
+
+  const spend = formatCurrency(action.spendPen, "PEN")
+  const scope =
+    action.kind === "pause_campaign"
+      ? `Campaña <b>${escapeHtml(action.entityName)}</b>`
+      : `Conjunto <b>${escapeHtml(action.entityName)}</b> (${escapeHtml(action.campaignName ?? "—")})`
   return `${status} ${scope} · ${spend} · ${action.reason}`
 }
 
@@ -91,7 +108,7 @@ export async function sendTikTokAgentTelegramSummary(input: {
   ]
 
   if (input.actions.length === 0) {
-    lines.push("Sin pausas sugeridas hoy.")
+    lines.push("Sin pausas ni escalados sugeridos hoy.")
   } else {
     for (const action of input.actions.slice(0, 25)) {
       lines.push(formatActionLine(action))
@@ -115,6 +132,57 @@ export async function sendTikTokAgentTelegramSummary(input: {
       sent += 1
     } catch (error) {
       console.error(`TikTok agent Telegram ${chatId}:`, error)
+    }
+  }
+  return sent
+}
+
+/** Aviso dedicado cuando se escala el presupuesto del mejor conjunto. */
+export async function sendTikTokScaleBudgetTelegram(input: {
+  action: TikTokAgentPlannedAction
+  dryRun: boolean
+  thresholds: TikTokAgentThresholds
+}): Promise<number> {
+  if (!input.thresholds.telegramNotify) return 0
+  if (input.action.kind !== "scale_adgroup") return 0
+  if (!input.dryRun && !input.action.applied) return 0
+
+  const status = await getTikTokAgentTelegramStatus()
+  if (!status.configured) return 0
+
+  const before =
+    input.action.budgetBeforePen != null
+      ? formatCurrency(input.action.budgetBeforePen, "PEN")
+      : "—"
+  const after =
+    input.action.budgetAfterPen != null
+      ? formatCurrency(input.action.budgetAfterPen, "PEN")
+      : "—"
+  const pct = input.action.budgetIncreasePercent ?? 0
+  const cpa =
+    input.action.cpaPen > 0
+      ? formatCurrency(input.action.cpaPen, "PEN")
+      : "—"
+
+  const lines = [
+    `<b>📈 Escalado de presupuesto TikTok</b>`,
+    input.dryRun ? "<i>Dry run (sin cambio en TikTok)</i>" : "",
+    "",
+    `Conjunto: <b>${escapeHtml(input.action.entityName)}</b>`,
+    `Campaña: ${escapeHtml(input.action.campaignName ?? "—")}`,
+    `Presupuesto: ${before} → <b>${after}</b> (+${pct}%)`,
+    `Hoy: ${input.action.purchases} compra(s) · CPA ${cpa} · gasto ${formatCurrency(input.action.spendPen, "PEN")}`,
+  ]
+
+  const text = lines.filter(Boolean).join("\n")
+  const ids = await getTikTokAgentTelegramRecipientIds()
+  let sent = 0
+  for (const chatId of ids) {
+    try {
+      await sendTelegramLongMessage(chatId, text, { html: true })
+      sent += 1
+    } catch (error) {
+      console.error(`TikTok scale Telegram ${chatId}:`, error)
     }
   }
   return sent

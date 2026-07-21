@@ -3,12 +3,18 @@ import { getTodayDateRange } from "@/lib/date"
 import { getTikTokCampaignsList } from "@/lib/services/tiktok/campaigns-list"
 import { getTikTokAdSetsGroupedByCampaign } from "@/lib/services/tiktok/campaign-adgroups"
 import {
+  getTikTokAdGroupDailyBudget,
   pauseTikTokCampaignComplete,
+  updateTikTokAdGroupBudget,
   updateTikTokAdGroupStatus,
 } from "@/lib/services/tiktok/manage"
 import { getTikTokAgentThresholds } from "./config"
 import { planTikTokAgentActions } from "./rules"
-import { sendTikTokAgentTelegramSummary } from "./telegram"
+import { planScaleBestAdGroup } from "./scale-best"
+import {
+  sendTikTokAgentTelegramSummary,
+  sendTikTokScaleBudgetTelegram,
+} from "./telegram"
 import type {
   TikTokAgentPlannedAction,
   TikTokAgentRunSummary,
@@ -63,6 +69,27 @@ async function applyAction(
   try {
     if (action.kind === "pause_campaign") {
       await pauseTikTokCampaignComplete(action.entityId)
+    } else if (action.kind === "scale_adgroup") {
+      const liveBudget = await getTikTokAdGroupDailyBudget(action.entityId)
+      const before = liveBudget ?? action.budgetBeforePen ?? null
+      if (before == null || before < 1) {
+        return {
+          ...action,
+          applied: false,
+          error: "Sin presupuesto diario editable",
+        }
+      }
+      const percent = action.budgetIncreasePercent ?? 0
+      const after =
+        action.budgetAfterPen ??
+        Math.round(before * (1 + percent / 100) * 100) / 100
+      await updateTikTokAdGroupBudget(action.entityId, after)
+      return {
+        ...action,
+        budgetBeforePen: before,
+        budgetAfterPen: after,
+        applied: true,
+      }
     } else {
       await updateTikTokAdGroupStatus([action.entityId], "DISABLE")
     }
@@ -121,17 +148,40 @@ export async function runTikTokAgent(input: {
       thresholds,
     })
 
+    const excludeFromScale = new Set(
+      planned.flatMap((action) => {
+        if (action.kind === "pause_campaign" || action.kind === "pause_adgroup") {
+          return [action.entityId]
+        }
+        return []
+      })
+    )
+
+    const scalePlan = planScaleBestAdGroup({
+      campaigns,
+      adsetsByCampaign,
+      thresholds,
+      excludeEntityIds: excludeFromScale,
+    })
+
     const executed: TikTokAgentPlannedAction[] = []
     for (const action of planned) {
       executed.push(await applyAction(action, input.dryRun))
     }
+    if (scalePlan) {
+      executed.push(await applyAction(scalePlan, input.dryRun))
+    }
 
     const appliedCount = executed.filter((a) => a.applied).length
+    const pauseCount = executed.filter(
+      (a) => a.kind === "pause_adgroup" || a.kind === "pause_campaign"
+    ).length
+    const scaleCount = executed.filter((a) => a.kind === "scale_adgroup").length
     const summary =
       executed.length === 0
         ? "Sin acciones: ninguna campaña/conjunto activo superó los umbrales hoy."
         : input.dryRun
-          ? `${executed.length} pausa(s) sugerida(s) (dry run).`
+          ? `${pauseCount} pausa(s) y ${scaleCount} escalado(s) sugerido(s) (dry run).`
           : `${appliedCount} de ${executed.length} acción(es) aplicada(s) en TikTok.`
 
     await sendTikTokAgentTelegramSummary({
@@ -142,6 +192,17 @@ export async function runTikTokAgent(input: {
       actions: executed,
       thresholds,
     })
+
+    const scaled = executed.find(
+      (a) => a.kind === "scale_adgroup" && (a.applied || input.dryRun)
+    )
+    if (scaled) {
+      await sendTikTokScaleBudgetTelegram({
+        action: scaled,
+        dryRun: input.dryRun,
+        thresholds,
+      })
+    }
 
     const finished = await prisma.tikTokAgentRun.update({
       where: { id: run.id },

@@ -39,7 +39,7 @@ ACCIONES DE ESCRITURA EN TIKTOK (encender, apagar, presupuesto):
 Puedes ejecutar cambios reales en la cuenta. Herramientas:
 - searchTikTokEntities — buscar por nombre y obtener campaignId / adgroupId
 - getTikTokCampaigns / getTikTokCampaignAdGroups — listar con IDs y dailyBudgetPen
-- setTikTokCampaignStatus — activa/pausa SOLO la campaña (no toca conjuntos); usa setTikTokAdGroupStatus para un conjunto concreto
+- setTikTokCampaignStatus — activa/pausa SOLO la campaña (no toca conjuntos); si «Activación 6:00» está on, ENABLE encola para las 6:00 Lima en vez de prender ahora; usa setTikTokAdGroupStatus para un conjunto concreto
 - setTikTokAdGroupStatus — ENABLE=prender/activar un conjunto, DISABLE=apagar/pausar
 - setTikTokAdGroupBudget / setTikTokCampaignBudget — fijar monto diario exacto en PEN
 - adjustTikTokBudget — subir/bajar por % o monto (ej. +20% o +10 soles)

@@ -64,6 +64,9 @@ export interface TikTokAd {
   identity_id?: string
   identity_type?: string
   ad_format?: string
+  ad_text?: string
+  call_to_action?: string
+  display_name?: string
   creative_authorized?: boolean
 }
 

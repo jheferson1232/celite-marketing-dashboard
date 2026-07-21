@@ -14,21 +14,30 @@ interface TikTokStatusSwitchProps {
 }
 
 export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
-  const { isEntityPending, getEntityError, setEntityStatus } = useTikTokManage()
+  const {
+    isEntityPending,
+    getEntityError,
+    getEntityInfo,
+    isCampaignQueuedFor6am,
+    setEntityStatus,
+  } = useTikTokManage()
   const serverActive = getTikTokEntityIsActive(entity)
+  const queuedFor6am =
+    entity.type === "campaign" && isCampaignQueuedFor6am(entity.id)
   const [optimisticActive, setOptimisticActive] = React.useState<boolean | null>(
     null
   )
 
   const isPending = isEntityPending(entity)
-  const isActive = optimisticActive ?? serverActive
+  const isActive = optimisticActive ?? (queuedFor6am ? false : serverActive)
   const errorMessage = getEntityError(entity)
+  const infoMessage = getEntityInfo(entity)
 
   React.useEffect(() => {
     if (!isPending) {
       setOptimisticActive(null)
     }
-  }, [isPending, serverActive])
+  }, [isPending, serverActive, queuedFor6am])
 
   return (
     <div
@@ -43,13 +52,21 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
           setEntityStatus(entity, checked ? "ENABLE" : "DISABLE")
         }}
         aria-label={
-          isActive ? `Pausar ${entity.name}` : `Activar ${entity.name}`
+          isActive
+            ? `Pausar ${entity.name}`
+            : queuedFor6am
+              ? `${entity.name} programada 6:00`
+              : `Activar ${entity.name}`
         }
         className={cn(isPending && "opacity-60")}
       />
       {errorMessage ? (
         <span className="max-w-[140px] text-center text-[10px] leading-tight text-destructive">
           {errorMessage}
+        </span>
+      ) : infoMessage || queuedFor6am ? (
+        <span className="text-muted-foreground max-w-[140px] text-center text-[10px] leading-tight">
+          {infoMessage ?? "6:00 AM"}
         </span>
       ) : null}
     </div>

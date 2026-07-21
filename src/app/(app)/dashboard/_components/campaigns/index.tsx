@@ -540,7 +540,7 @@ export function CampaignsTable({
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell
                           colSpan={visibleColumnsCount}
-                          className="whitespace-normal p-0"
+                          className="max-w-0 whitespace-normal p-0"
                         >
                           <CampaignAdSetsExpandedRow
                             campaignId={row.original.id}

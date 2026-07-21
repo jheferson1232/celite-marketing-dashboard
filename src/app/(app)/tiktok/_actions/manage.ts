@@ -1,8 +1,9 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
+import { applyTikTokCampaignStatusWith6amQueue } from "@/lib/services/tiktok/apply-campaign-status-6am"
+import { duplicateTikTokAdGroup } from "@/lib/services/tiktok/duplicate-adgroup"
 import {
-  setTikTokCampaignStatusOnly,
   updateTikTokAdGroupBudget,
   updateTikTokAdGroupStatus,
   updateTikTokCampaignBudget,
@@ -14,19 +15,16 @@ export const setTikTokCampaignStatusAction = createServerAction(
   async (input: {
     campaignId: string
     operationStatus: TikTokOperationStatus
+    campaignName?: string
     accountId?: string
-  }): Promise<void> =>
-    withTikTokDashboardAccount(input.accountId, async () => {
-      const state = await setTikTokCampaignStatusOnly(
-        input.campaignId,
-        input.operationStatus
-      )
-      if (state.campaignOperationStatus !== input.operationStatus) {
-        throw new Error(
-          `No se pudo actualizar la campaña en TikTok (estado: ${state.campaignOperationStatus})`
-        )
-      }
-    })
+  }) =>
+    withTikTokDashboardAccount(input.accountId, () =>
+      applyTikTokCampaignStatusWith6amQueue({
+        campaignId: input.campaignId,
+        name: input.campaignName,
+        operationStatus: input.operationStatus,
+      })
+    )
 )
 
 export const setTikTokAdGroupStatusAction = createServerAction(
@@ -59,5 +57,12 @@ export const setTikTokAdGroupBudgetAction = createServerAction(
   }): Promise<void> =>
     withTikTokDashboardAccount(input.accountId, () =>
       updateTikTokAdGroupBudget(input.adgroupId, input.budget)
+    )
+)
+
+export const duplicateTikTokAdGroupAction = createServerAction(
+  async (input: { adgroupId: string; accountId?: string }) =>
+    withTikTokDashboardAccount(input.accountId, () =>
+      duplicateTikTokAdGroup(input.adgroupId)
     )
 )

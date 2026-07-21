@@ -25,13 +25,18 @@ export function useInvalidateTikTokDashboard() {
     })
   }, [queryClient])
 
-  /** Tras pausar/activar o cambiar presupuesto: solo campañas y conjuntos (no bloquea todo el dashboard). */
+  /** Tras pausar/activar, presupuesto o duplicar: campañas + conjuntos (incl. prefetch). */
   const invalidateAfterManageChange = useCallback(
     (options?: { campaignId?: string }) => {
       void (async () => {
         await runServerAction(clearTikTokCacheAction())
         await queryClient.invalidateQueries({
           queryKey: ["tiktok-campaigns"],
+          refetchType: "active",
+        })
+        // TikTok usa prefetch de todos los conjuntos; sin esto el duplicado no aparece.
+        await queryClient.invalidateQueries({
+          queryKey: ["tiktok-all-campaign-adgroups"],
           refetchType: "active",
         })
         if (options?.campaignId) {

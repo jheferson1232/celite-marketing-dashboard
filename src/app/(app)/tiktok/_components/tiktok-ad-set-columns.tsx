@@ -62,7 +62,7 @@ export function isTikTokAdSetEstadoColumnId(
   return columnId === TIKTOK_AD_SET_ESTADO_COLUMN_ID
 }
 
-/** Sin Agreg. carrito; añade métricas 7d y totales tras Costo/Res. */
+/** Sin Agreg. carrito; presupuesto tras Nombre; duplicar tras Presupuesto; métricas 7d tras CPA. */
 export function getTikTokAdSetDisplayColumns(
   visibleSubtableColumns: AdSetSubtableColumnId[]
 ): TikTokAdSetDisplayColumnId[] {
@@ -75,6 +75,9 @@ export function getTikTokAdSetDisplayColumns(
     if (columnId === "active") {
       out.push(TIKTOK_AD_SET_ESTADO_COLUMN_ID)
     }
+    if (columnId === "budget") {
+      out.push("duplicate")
+    }
     if (columnId === "costPerResult") {
       out.push(
         "purchases7d",
@@ -83,6 +86,10 @@ export function getTikTokAdSetDisplayColumns(
         "totalCpa"
       )
     }
+  }
+
+  if (!out.includes("duplicate")) {
+    out.push("duplicate")
   }
 
   return out

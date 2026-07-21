@@ -1,0 +1,51 @@
+# Activación TikTok 6:00 America/Lima (11:00 UTC).
+# Enciende campañas encoladas desde el dashboard (switch ON con «Activación 6:00»).
+# Requiere secret CRON_SECRET (mismo valor que en Vercel).
+
+name: TikTok activate 6am
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (1 = sí)"
+        required: false
+        default: "0"
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Llamar cron activación 6am
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.META_CRON_APP_URL }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta CRON_SECRET en GitHub Actions"
+            exit 1
+          fi
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          BASE="${APP_URL:-https://celite-marketing-dashboard-chi.vercel.app}"
+          BASE="${BASE%/}"
+
+          DRY="${INPUT_DRY:-0}"
+          QS=""
+          if [ "$DRY" = "1" ]; then QS="dryRun=1"; fi
+
+          URL="${BASE}/api/cron/tiktok-activate-6am"
+          if [ -n "$QS" ]; then URL="${URL}?${QS}"; fi
+          echo "GET ${URL}"
+          HTTP_CODE=$(curl -sS --retry 2 --retry-delay 5 --max-time 300 \
+            -o /tmp/tiktok-activate-6am.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL}")
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/tiktok-activate-6am.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            exit 1
+          fi

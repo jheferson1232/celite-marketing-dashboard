@@ -15,9 +15,9 @@ import {
   getPurchases,
 } from "@/lib/services/tiktok/report"
 import type { TikTokAdGroup } from "@/lib/services/tiktok/types"
+import { applyTikTokCampaignStatusWith6amQueue } from "@/lib/services/tiktok/apply-campaign-status-6am"
 import {
   getTikTokAdGroupDailyBudget,
-  setTikTokCampaignStatusOnly,
   updateTikTokAdGroupBudget,
   updateTikTokAdGroupStatus,
 } from "@/lib/services/tiktok/manage"
@@ -448,10 +448,14 @@ export async function executeConfirmPause(
 ): Promise<string> {
   const dateRange = parseDateRangeArg("hoy")
   const name = await resolveCampaignName(campaignId, dateRange)
-  const state = await setTikTokCampaignStatusOnly(campaignId, "DISABLE")
+  const result = await applyTikTokCampaignStatusWith6amQueue({
+    campaignId,
+    name,
+    operationStatus: "DISABLE",
+  })
   clearTikTokCache()
 
-  if (state.campaignOperationStatus !== "DISABLE") {
+  if (result.campaignOperationStatus !== "DISABLE") {
     return `No se pudo pausar "${name}" en TikTok.`
   }
   return `✅ Campaña **${name}** pausada.`
@@ -462,9 +466,17 @@ export async function executeConfirmActivate(
 ): Promise<string> {
   const dateRange = parseDateRangeArg("hoy")
   const name = await resolveCampaignName(campaignId, dateRange)
-  const state = await setTikTokCampaignStatusOnly(campaignId, "ENABLE")
+  const result = await applyTikTokCampaignStatusWith6amQueue({
+    campaignId,
+    name,
+    operationStatus: "ENABLE",
+  })
 
-  if (state.campaignOperationStatus !== "ENABLE") {
+  if (result.scheduledFor6am) {
+    return `⏰ Campaña **${name}** en cola: se activará a las **6:00 AM** (Lima).`
+  }
+
+  if (result.campaignOperationStatus !== "ENABLE") {
     return `No se pudo activar "${name}" en TikTok.`
   }
   clearTikTokCache()

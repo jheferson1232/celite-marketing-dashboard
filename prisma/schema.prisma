@@ -270,6 +270,14 @@ model TikTokAgentSettings {
   campaignPauseSpendPen Float @default(30)
   adsetCpaCriticoPen    Float @default(15)
   telegramNotify        Boolean @default(true)
+  /** Activar campañas apagadas a las 6:00 America/Lima. */
+  activateAt6amEnabled  Boolean @default(false)
+  /** IDs de campaña en cola para activar a las 6:00 (JSON string[]). */
+  pendingActivateCampaignIds String @default("[]")
+  /** Escalar presupuesto del mejor conjunto/anuncio del día. */
+  scaleBestEnabled      Boolean @default(false)
+  /** % de aumento de presupuesto diario al escalar (ej. 20 = +20%). */
+  scaleBestBudgetIncreasePercent Float @default(20)
   updatedAt        DateTime @updatedAt
 
   @@map("TikTokAgentSettings")

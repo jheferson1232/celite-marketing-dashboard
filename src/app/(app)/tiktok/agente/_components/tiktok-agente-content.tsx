@@ -33,6 +33,7 @@ import {
   RiTelegramLine,
 } from "@remixicon/react"
 import { TIKTOK_AGENT_TRIGGER_LABEL } from "@/lib/services/tiktok/agent/constants"
+import { TikTokAgenteAutomationCards } from "./tiktok-agente-automation-cards"
 import {
   getTikTokAgentTelegramStatusAction,
   getTikTokAgentThresholdsAction,
@@ -204,11 +205,15 @@ export function TikTokAgenteContent() {
         <CardContent className="text-sm">
           <ul className="list-inside list-disc space-y-1">
             <li>
-              <strong>8:00</strong> · <strong>14:00</strong> ·{" "}
-              <strong>20:00</strong> hora local
+              <strong>6:00</strong> campañas en cola (si «Activación 6:00» está on)
             </li>
             <li>
-              Cron en UTC: <code className="text-xs">13:00</code> /{" "}
+              <strong>8:00</strong> · <strong>14:00</strong> ·{" "}
+              <strong>20:00</strong> pausas / escalado · hora local
+            </li>
+            <li>
+              Cron en UTC: <code className="text-xs">11:00</code> (6 AM) ·{" "}
+              <code className="text-xs">13:00</code> /{" "}
               <code className="text-xs">19:00</code> /{" "}
               <code className="text-xs">01:00</code> (día siguiente). Podés
               disparar manual entre medio con &quot;Ejecutar ahora&quot;.
@@ -378,6 +383,15 @@ export function TikTokAgenteContent() {
           </CardContent>
         </Card>
       </div>
+
+      {thresholdsReady && thresholds ? (
+        <TikTokAgenteAutomationCards settings={thresholds} />
+      ) : thresholdsQuery.isLoading ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      ) : null}
 
       {runMutation.data && (
         <Card className="border-primary/30">

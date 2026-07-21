@@ -13,10 +13,10 @@ import { getCampaignsList } from "@/lib/services/meta/campaigns-list"
 import { getTikTokAccountKpis } from "@/lib/services/tiktok/account-kpis"
 import { getTikTokCampaignAdGroupsByCampaignId } from "@/lib/services/tiktok/campaign-adgroups"
 import { getTikTokCampaignsList } from "@/lib/services/tiktok/campaigns-list"
+import { applyTikTokCampaignStatusWith6amQueue } from "@/lib/services/tiktok/apply-campaign-status-6am"
 import {
   getTikTokAdGroupDailyBudget,
   getTikTokCampaignDailyBudget,
-  setTikTokCampaignStatusOnly,
   updateTikTokAdGroupBudget,
   updateTikTokAdGroupStatus,
   updateTikTokCampaignBudget,
@@ -241,21 +241,24 @@ export const chatTools = {
       if (block) return block
 
       try {
-        const state = await setTikTokCampaignStatusOnly(
+        const result = await applyTikTokCampaignStatusWith6amQueue({
           campaignId,
-          operationStatus
-        )
+          name: campaignName,
+          operationStatus,
+        })
 
-        const verified = state.campaignOperationStatus === operationStatus
-
-        if (!verified) {
+        if (result.scheduledFor6am) {
           return {
-            ok: false,
-            verified: false,
+            ok: true,
+            verified: true,
             platform: "tiktok",
+            campaignId,
             campaignName: campaignName ?? null,
-            ...state,
-            error: `No se pudo verificar la campaña en TikTok (estado: ${state.campaignOperationStatus}).`,
+            operationStatus: "DISABLE",
+            scheduledFor6am: true,
+            message:
+              result.message ??
+              `Campaña ${campaignName ? `"${campaignName}" ` : ""}en cola para activarse a las 6:00 AM (Lima). No se encendió en TikTok ahora.`,
           }
         }
 
@@ -268,9 +271,8 @@ export const chatTools = {
           campaignId,
           campaignName: campaignName ?? null,
           operationStatus,
-          adGroupsEnabled: state.adGroupsEnabled,
-          adGroupsTotal: state.adGroupsTotal,
-          message: `Campaña ${campaignName ? `"${campaignName}" ` : ""}${action} en TikTok. Los conjuntos no se modificaron (${state.adGroupsEnabled}/${state.adGroupsTotal} conjuntos siguen como estaban a nivel conjunto).`,
+          scheduledFor6am: false,
+          message: `Campaña ${campaignName ? `"${campaignName}" ` : ""}${action} en TikTok.`,
         }
       } catch (error) {
         return toolError(error, "Error al actualizar estado de campaña TikTok")

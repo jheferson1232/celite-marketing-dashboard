@@ -16,6 +16,16 @@ import {
 import { isTikTokEditableDailyBudget } from "./budget-mode"
 import type { TikTokAdGroup } from "./types"
 
+const ADGROUP_LIST_FIELDS = JSON.stringify([
+  "adgroup_id",
+  "adgroup_name",
+  "campaign_id",
+  "operation_status",
+  "budget",
+  "budget_mode",
+  "campaign_automation_type",
+])
+
 function normalizeStatus(status?: string): CampaignEntityStatus {
   if (status === "ENABLE" || status === "ACTIVE") return "ACTIVE"
   if (status === "DISABLE" || status === "PAUSED") return "PAUSED"
@@ -84,7 +94,9 @@ export async function getTikTokAdSetsGroupedByCampaign(
   dateRange: DateRange
 ): Promise<Record<string, CampaignAdSetRow[]>> {
   const [adGroups, metrics] = await Promise.all([
-    fetchAllPages<TikTokAdGroup>("/adgroup/get/"),
+    fetchAllPages<TikTokAdGroup>("/adgroup/get/", {
+      fields: ADGROUP_LIST_FIELDS,
+    }),
     fetchTikTokAdGroupMetricsBundle(dateRange),
   ])
 
@@ -115,6 +127,7 @@ export async function getTikTokCampaignAdGroupsByCampaignId(
       filtering: JSON.stringify({
         campaign_ids: [campaignId],
       }),
+      fields: ADGROUP_LIST_FIELDS,
     }),
     fetchTikTokAdGroupMetricsBundle(dateRange),
   ])

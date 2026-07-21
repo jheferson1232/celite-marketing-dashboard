@@ -100,7 +100,7 @@ export function TikTokAgentRunDetail({ runId }: { runId: string }) {
         <CardContent className="overflow-x-auto p-0 sm:p-6 sm:pt-0">
           {run.actions.length === 0 ? (
             <p className="text-muted-foreground p-6 text-sm">
-              No se planificaron pausas en esta corrida.
+              No se planificaron acciones en esta corrida.
             </p>
           ) : (
             <Table>
@@ -119,8 +119,10 @@ export function TikTokAgentRunDetail({ runId }: { runId: string }) {
                   <TableRow key={`${action.kind}-${action.entityId}`}>
                     <TableCell className="text-xs">
                       {action.kind === "pause_campaign"
-                        ? "Campaña"
-                        : "Conjunto"}
+                        ? "Pausa campaña"
+                        : action.kind === "scale_adgroup"
+                          ? "Escalado"
+                          : "Pausa conjunto"}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{action.entityName}</div>

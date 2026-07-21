@@ -7,6 +7,7 @@ export type TikTokAgentTrigger =
 export type TikTokAgentActionKind =
   | "pause_adgroup"
   | "pause_campaign"
+  | "scale_adgroup"
 
 export type TikTokAgentPlannedAction = {
   kind: TikTokAgentActionKind
@@ -20,6 +21,12 @@ export type TikTokAgentPlannedAction = {
   reason: string
   applied: boolean
   error?: string
+  /** Presupuesto diario antes del escalado (solo scale_adgroup). */
+  budgetBeforePen?: number
+  /** Presupuesto diario después del escalado (solo scale_adgroup). */
+  budgetAfterPen?: number
+  /** % de aumento aplicado (solo scale_adgroup). */
+  budgetIncreasePercent?: number
 }
 
 export type TikTokAgentThresholds = {
@@ -27,6 +34,9 @@ export type TikTokAgentThresholds = {
   campaignPauseSpendPen: number
   adsetCpaCriticoPen: number
   telegramNotify: boolean
+  activateAt6amEnabled: boolean
+  scaleBestEnabled: boolean
+  scaleBestBudgetIncreasePercent: number
 }
 
 export type TikTokAgentRunSummary = {
