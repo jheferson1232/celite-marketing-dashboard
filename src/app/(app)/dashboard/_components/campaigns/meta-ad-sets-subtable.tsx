@@ -34,7 +34,8 @@ function getSubtableHeadClassName(
   const meta = getAdSetSubtableColumnMeta(columnId, currency, true)
 
   return cn(
-    columnId === "name" && "w-[300px] pl-5",
+    columnId === "name" &&
+      "sticky left-0 z-[2] w-[300px] min-w-[12rem] max-w-[20rem] bg-muted pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
@@ -47,7 +48,8 @@ function getSubtableCellClassName(
   const meta = getAdSetSubtableColumnMeta(columnId, currency, true)
 
   return cn(
-    columnId === "name" && "pl-5",
+    columnId === "name" &&
+      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted/30 pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/50 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
@@ -166,7 +168,7 @@ export function MetaAdSetsSubtable({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow key={row.id} className="group">
               {row.getVisibleCells().map((cell) => {
                 const columnId = cell.column.id as AdSetSubtableColumnId
                 return (
