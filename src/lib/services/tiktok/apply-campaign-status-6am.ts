@@ -1,9 +1,11 @@
 import { getTikTokAgentThresholds } from "@/lib/services/tiktok/agent/config"
 import {
+  isCampaignQueuedFor6am,
   queueCampaignFor6amActivation,
   removeCampaignFrom6amQueue,
 } from "@/lib/services/tiktok/agent/pending-6am-activation"
 import {
+  activateTikTokCampaignComplete,
   setTikTokCampaignStatusOnly,
   type TikTokOperationStatus,
 } from "@/lib/services/tiktok/manage"
@@ -15,7 +17,8 @@ export type ApplyCampaignStatusResult = {
 }
 
 /**
- * Si «Activación 6:00 AM» está on, ENABLE no toca TikTok: encola para las 6:00 Lima.
+ * Si «Activación 6:00 AM» está on, el primer ENABLE encola (no toca TikTok).
+ * Si ya estaba en cola, un nuevo ENABLE la activa ya (escape manual).
  * DISABLE saca de la cola y pausa en TikTok.
  */
 export async function applyTikTokCampaignStatusWith6amQueue(input: {
@@ -42,6 +45,21 @@ export async function applyTikTokCampaignStatusWith6amQueue(input: {
 
   const thresholds = await getTikTokAgentThresholds()
   if (thresholds.activateAt6amEnabled) {
+    const alreadyQueued = await isCampaignQueuedFor6am(campaignId)
+    if (alreadyQueued) {
+      await removeCampaignFrom6amQueue(campaignId)
+      const state = await activateTikTokCampaignComplete(campaignId)
+      if (state.campaignOperationStatus !== "ENABLE") {
+        throw new Error(
+          `No se pudo actualizar la campaña en TikTok (estado: ${state.campaignOperationStatus})`
+        )
+      }
+      return {
+        scheduledFor6am: false,
+        campaignOperationStatus: "ENABLE",
+        message: "Activada ahora en TikTok.",
+      }
+    }
     await queueCampaignFor6amActivation({ campaignId, name })
     return {
       scheduledFor6am: true,
@@ -50,6 +68,7 @@ export async function applyTikTokCampaignStatusWith6amQueue(input: {
     }
   }
 
+  await removeCampaignFrom6amQueue(campaignId)
   const state = await setTikTokCampaignStatusOnly(campaignId, "ENABLE")
   if (state.campaignOperationStatus !== "ENABLE") {
     throw new Error(

@@ -55,7 +55,7 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
           isActive
             ? `Pausar ${entity.name}`
             : queuedFor6am
-              ? `${entity.name} programada 6:00`
+              ? `${entity.name} en cola 6:00 — encender para activar ya`
               : `Activar ${entity.name}`
         }
         className={cn(isPending && "opacity-60")}
@@ -66,7 +66,7 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
         </span>
       ) : infoMessage || queuedFor6am ? (
         <span className="text-muted-foreground max-w-[140px] text-center text-[10px] leading-tight">
-          {infoMessage ?? "6:00 AM"}
+          {infoMessage ?? (queuedFor6am ? "Cola 6AM" : null)}
         </span>
       ) : null}
     </div>

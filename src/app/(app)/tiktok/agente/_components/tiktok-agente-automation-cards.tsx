@@ -114,7 +114,9 @@ export function TikTokAgenteAutomationCards({
           <CardDescription>
             Con esto encendido, al activar una campaña en el dashboard{" "}
             <strong>no se prende ahora</strong>: queda en cola y se enciende a
-            las <strong>6:00 America/Lima</strong>.
+            las <strong>6:00 America/Lima</strong>. Si ya está en cola, encendé
+            el switch otra vez para activarla ya. Cada corrida 6am queda en
+            «Últimas corridas» (trigger ⏰ 6am).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -186,9 +188,12 @@ export function TikTokAgenteAutomationCards({
             Escalar mejor resultado
           </CardTitle>
           <CardDescription>
-            En cada corrida del agente (8 / 14 / 20 h), sube el presupuesto
-            diario del <strong>conjunto</strong> con más compras hoy (mejor CPA
-            como desempate) y te avisa por <strong>Telegram</strong> cuál fue.
+            Con esto encendido, en cada corrida del agente (
+            <strong>8:00</strong>, <strong>14:00</strong> y{" "}
+            <strong>20:00</strong> Lima) sube el presupuesto diario del{" "}
+            <strong>conjunto</strong> con más compras hoy (mejor CPA como
+            desempate) y te avisa por <strong>Telegram</strong>. Queda en
+            «Últimas corridas» como <em>escalado</em>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -196,7 +201,9 @@ export function TikTokAgenteAutomationCards({
             <div className="min-w-0">
               <p className="text-sm font-medium">Escalar automáticamente</p>
               <p className="text-muted-foreground text-xs">
-                Requiere notificación Telegram del agente activa
+                Horario Lima <strong>8:00 · 14:00 · 20:00</strong> (mismo cron
+                del agente) · UTC{" "}
+                <code className="text-[10px]">13:00 / 19:00 / 01:00</code>
               </p>
             </div>
             <Switch

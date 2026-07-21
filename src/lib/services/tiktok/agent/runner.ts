@@ -4,6 +4,7 @@ import { getTikTokCampaignsList } from "@/lib/services/tiktok/campaigns-list"
 import { getTikTokAdSetsGroupedByCampaign } from "@/lib/services/tiktok/campaign-adgroups"
 import {
   getTikTokAdGroupDailyBudget,
+  activateTikTokCampaignComplete,
   pauseTikTokCampaignComplete,
   updateTikTokAdGroupBudget,
   updateTikTokAdGroupStatus,
@@ -90,6 +91,8 @@ async function applyAction(
         budgetAfterPen: after,
         applied: true,
       }
+    } else if (action.kind === "activate_campaign") {
+      await activateTikTokCampaignComplete(action.entityId)
     } else {
       await updateTikTokAdGroupStatus([action.entityId], "DISABLE")
     }

@@ -67,6 +67,10 @@ function formatActionLine(action: TikTokAgentPlannedAction): string {
     return `${status} 📈 Escalado <b>${escapeHtml(action.entityName)}</b> (${escapeHtml(action.campaignName ?? "—")}) · ${before} → ${after} ${pct}`
   }
 
+  if (action.kind === "activate_campaign") {
+    return `${status} ⏰ Activación 6am <b>${escapeHtml(action.entityName)}</b>`
+  }
+
   const spend = formatCurrency(action.spendPen, "PEN")
   const scope =
     action.kind === "pause_campaign"

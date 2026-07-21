@@ -105,6 +105,9 @@ export async function saveTikTokAgentThresholds(
 
   assertTikTokAgentPrisma()
 
+  const turningOff6am =
+    current.activateAt6amEnabled && !next.activateAt6amEnabled
+
   try {
     await prisma.tikTokAgentSettings.upsert({
       where: { id: "default" },
@@ -112,7 +115,11 @@ export async function saveTikTokAgentThresholds(
         id: "default",
         ...next,
       },
-      update: next,
+      update: {
+        ...next,
+        // Al apagar la feature, vaciar cola para no dejar switches “Cola 6AM”.
+        ...(turningOff6am ? { pendingActivateCampaignIds: "[]" } : {}),
+      },
     })
   } catch (error) {
     const message =

@@ -1,5 +1,6 @@
 export type TikTokAgentTrigger =
   | "manual"
+  | "morning_6am"
   | "morning_8am"
   | "afternoon_2pm"
   | "evening_8pm"
@@ -8,6 +9,7 @@ export type TikTokAgentActionKind =
   | "pause_adgroup"
   | "pause_campaign"
   | "scale_adgroup"
+  | "activate_campaign"
 
 export type TikTokAgentPlannedAction = {
   kind: TikTokAgentActionKind

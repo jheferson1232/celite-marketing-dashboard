@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TIKTOK_AGENT_ACTION_KIND_LABEL } from "@/lib/services/tiktok/agent/constants"
 import { getTikTokAgentRunAction } from "../../../_actions/tiktok-agent"
 
 export function TikTokAgentRunDetail({ runId }: { runId: string }) {
@@ -118,11 +119,8 @@ export function TikTokAgentRunDetail({ runId }: { runId: string }) {
                 {run.actions.map((action) => (
                   <TableRow key={`${action.kind}-${action.entityId}`}>
                     <TableCell className="text-xs">
-                      {action.kind === "pause_campaign"
-                        ? "Pausa campaña"
-                        : action.kind === "scale_adgroup"
-                          ? "Escalado"
-                          : "Pausa conjunto"}
+                      {TIKTOK_AGENT_ACTION_KIND_LABEL[action.kind] ??
+                        action.kind}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{action.entityName}</div>

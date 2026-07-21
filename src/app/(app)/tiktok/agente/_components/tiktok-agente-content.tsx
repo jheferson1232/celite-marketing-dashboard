@@ -32,7 +32,10 @@ import {
   RiRobotLine,
   RiTelegramLine,
 } from "@remixicon/react"
-import { TIKTOK_AGENT_TRIGGER_LABEL } from "@/lib/services/tiktok/agent/constants"
+import {
+  summarizeTikTokAgentActions,
+  TIKTOK_AGENT_TRIGGER_LABEL,
+} from "@/lib/services/tiktok/agent/constants"
 import { TikTokAgenteAutomationCards } from "./tiktok-agente-automation-cards"
 import {
   getTikTokAgentTelegramStatusAction,
@@ -470,8 +473,8 @@ export function TikTokAgenteContent() {
                     <TableCell className="text-right">
                       {run.campaignsScanned}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {run.actionsCount}
+                    <TableCell className="text-right text-xs">
+                      {summarizeTikTokAgentActions(run.actions)}
                     </TableCell>
                     <TableCell>
                       <Link
