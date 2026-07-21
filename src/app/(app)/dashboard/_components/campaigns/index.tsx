@@ -443,7 +443,7 @@ export function CampaignsTable({
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell
                           colSpan={visibleColumnsCount}
-                          className="p-0"
+                          className="overflow-visible p-0"
                         >
                           <CampaignAdSetsExpandedRow
                             campaignId={row.original.id}

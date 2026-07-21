@@ -49,7 +49,7 @@ function getSubtableCellClassName(
 
   return cn(
     columnId === "name" &&
-      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted/30 pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/50 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
+      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/80 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
@@ -143,7 +143,7 @@ export function MetaAdSetsSubtable({
 
   return (
     <div className="py-1">
-      <Table>
+      <Table containerClassName="overflow-visible">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">

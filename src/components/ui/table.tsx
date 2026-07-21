@@ -4,11 +4,21 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<"table"> & {
+  /** Clases del wrapper. Por defecto incluye scroll horizontal. */
+  containerClassName?: string
+}) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full max-w-full overflow-x-auto overscroll-x-contain"
+      className={cn(
+        "relative w-full max-w-full",
+        containerClassName ?? "overflow-x-auto overscroll-x-contain"
+      )}
     >
       <table
         data-slot="table"

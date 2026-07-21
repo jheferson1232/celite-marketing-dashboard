@@ -56,7 +56,6 @@ import {
   type InformeEstadoFilterKey,
 } from "@/lib/services/meta/meta-informe-scoring"
 import { InformeFilterBars } from "./informe-estado-filters"
-import { InformeVoicePanel } from "./informe-voice-panel"
 import {
   getMetaInformeAction,
   previewMetaInformeHourlyAction,
@@ -1168,44 +1167,41 @@ export function InformeIaContent() {
             (conjuntos OFF con buen CPA total) filtran la misma tabla.
           </p>
         </div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <div className="flex flex-wrap items-center gap-2">
-            <MetaApiStatusIndicator status={metaApiStatus} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncMutation.mutate()}
-              disabled={pending}
-            >
-              <RiRefreshLine
-                className={cn("size-4", syncMutation.isPending && "animate-spin")}
-              />
-              Sincronizar Meta
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => previewMutation.mutate()}
-              disabled={hourlyPending || informeQuery.isLoading}
-            >
-              <RiBrainLine
-                className={cn("size-4", previewMutation.isPending && "animate-pulse")}
-              />
-              Vista previa
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => sendMutation.mutate()}
-              disabled={hourlyPending || informeQuery.isLoading}
-            >
-              <RiBrainLine
-                className={cn("size-4", sendMutation.isPending && "animate-pulse")}
-              />
-              Enviar a Telegram
-            </Button>
-          </div>
-          <InformeVoicePanel />
+        <div className="flex flex-wrap items-center gap-2">
+          <MetaApiStatusIndicator status={metaApiStatus} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncMutation.mutate()}
+            disabled={pending}
+          >
+            <RiRefreshLine
+              className={cn("size-4", syncMutation.isPending && "animate-spin")}
+            />
+            Sincronizar Meta
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => previewMutation.mutate()}
+            disabled={hourlyPending || informeQuery.isLoading}
+          >
+            <RiBrainLine
+              className={cn("size-4", previewMutation.isPending && "animate-pulse")}
+            />
+            Vista previa
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => sendMutation.mutate()}
+            disabled={hourlyPending || informeQuery.isLoading}
+          >
+            <RiBrainLine
+              className={cn("size-4", sendMutation.isPending && "animate-pulse")}
+            />
+            Enviar a Telegram
+          </Button>
         </div>
       </div>
 
