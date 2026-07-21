@@ -11,6 +11,7 @@ import { buildAdsetCatalogById, mergeAdSetsForCampaign } from "./meta-adset-coun
 import { normalizeMetaId } from "./meta-ids"
 import { isMetaAdSetActiveForCount } from "./meta-adset-status"
 import { OBJECTIVE_TO_ACTION_TYPE } from "./objective"
+import { getLeadsFromActions, getLeadCplFromActions } from "./leads"
 import { getPurchaseSpendAndCpaFromInsight } from "./purchase-metrics"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
@@ -48,6 +49,8 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
       costPerResult: 0,
       roas: 0,
       addToCart: 0,
+      leads: 0,
+      costPerLead: 0,
     }
   }
 
@@ -59,6 +62,12 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
     insight.cost_per_action_type?.find(
       (action) => action.action_type === actionType
     )?.value || "0"
+  const leads = getLeadsFromActions(insight.actions)
+  const costPerLead = getLeadCplFromActions(
+    insight.actions,
+    insight.cost_per_action_type,
+    purchases.spend
+  )
 
   return {
     spend: purchases.spend,
@@ -75,6 +84,8 @@ function mapInsightToMetrics(insight: MetaInsightRow | undefined, objective: str
         : parseFloat(costPerResultRaw) || 0,
     roas: 0,
     addToCart: getAddToCartFromActions(insight.actions),
+    leads,
+    costPerLead,
   }
 }
 
@@ -211,7 +222,7 @@ export async function getCampaignAdSetsByCampaignId(
   dateRange: DateRange,
   objective: string
 ): Promise<CampaignAdSetRow[]> {
-  const cacheKey = `campaign-adsets:v5:${normalizeMetaId(campaignId)}:${dateRange.from}:${dateRange.to}:${objective}`
+  const cacheKey = `campaign-adsets:v6:${normalizeMetaId(campaignId)}:${dateRange.from}:${dateRange.to}:${objective}`
   return withMetaCache(cacheKey, ADSETS_BY_CAMPAIGN_TTL_MS, () =>
     fetchCampaignAdSetsByCampaignId(campaignId, dateRange, objective)
   )

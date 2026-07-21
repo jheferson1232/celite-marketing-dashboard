@@ -56,7 +56,7 @@ El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe
 1. En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
    - `CRON_SECRET` — **el mismo valor** que en Vercel (sin espacios al inicio/final).
 2. (Opcional) **Variables → Actions → New repository variable**
-   - `META_CRON_APP_URL` — URL de producción si no es `https://celite-marketing-dashboard.vercel.app`
+   - `META_CRON_APP_URL` — URL de producción si no es `https://celite-marketing-dashboard-chi.vercel.app`
 3. **Actions** debe estar habilitado en el repo (pestaña Actions → el workflow aparece tras el push).
 
 Probar sin esperar la hora:
@@ -71,7 +71,7 @@ Si prefieres no usar GitHub Actions:
 
 | Campo | Valor |
 |-------|--------|
-| URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
+| URL | `https://celite-marketing-dashboard-chi.vercel.app/api/cron/meta-telegram-reports` |
 | Método | GET |
 | Cabecera | `Authorization: Bearer <CRON_SECRET>` |
 | Intervalo | 2×/día: `0 13 * * *` UTC = 8:00 Lima; `0 1 * * *` UTC = 20:00 Lima |

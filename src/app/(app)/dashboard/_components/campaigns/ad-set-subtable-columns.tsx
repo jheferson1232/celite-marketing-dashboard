@@ -24,6 +24,8 @@ export const AD_SET_SUBTABLE_COLUMN_IDS = [
   "cpc",
   "results",
   "costPerResult",
+  "leads",
+  "costPerLead",
   "roas",
   "purchases7d",
   "cpa7d",
@@ -53,6 +55,8 @@ const AD_SET_SUBTABLE_COLUMN_META: Record<
   cpc: { label: "CPC", align: "right" },
   results: { label: "Resultados", align: "right" },
   costPerResult: { label: "Costo/Res", align: "right" },
+  leads: { label: "Clientes potenciales", align: "right" },
+  costPerLead: { label: "CPL", align: "right" },
   roas: { label: "ROAS", align: "right" },
   purchases7d: { label: "Ventas 7d", align: "right" },
   cpa7d: { label: "CPA 7d", align: "right" },
@@ -186,6 +190,21 @@ export function renderAdSetSubtableCell(
           {row.costPerResult > 0
             ? formatCurrency(row.costPerResult, currency)
             : "-"}
+        </div>
+      )
+    }
+    case "leads":
+      return (
+        <div className="text-right">
+          {(row.leads ?? 0) > 0 ? formatNumber(row.leads ?? 0) : "-"}
+        </div>
+      )
+    case "costPerLead": {
+      const cpl = row.costPerLead ?? 0
+      const highlight = getCostPerResultCellClassName(cpl, currency)
+      return (
+        <div className={cn("-m-2 p-2 text-right", highlight)}>
+          {cpl > 0 ? formatCurrency(cpl, currency) : "-"}
         </div>
       )
     }

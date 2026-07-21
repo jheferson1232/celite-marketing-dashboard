@@ -15,3 +15,6 @@ export type CampaignPerformanceFilter =
   | "ALL"
   | "ACTIVOS"
   | CampaignPerformanceStatus
+
+/** Filtro por tipo de objetivo Meta (conversiones vs mensajes). */
+export type CampaignObjectiveFilter = "ALL" | "CONVERSIONS" | "MESSAGES"

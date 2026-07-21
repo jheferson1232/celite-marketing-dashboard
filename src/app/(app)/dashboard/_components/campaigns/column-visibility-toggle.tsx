@@ -37,7 +37,6 @@ export function ColumnVisibilityToggle({ table }: ColumnVisibilityToggleProps) {
           return (
             <DropdownMenuCheckboxItem
               key={column.id}
-              className="capitalize"
               checked={column.getIsVisible()}
               onCheckedChange={(checked) =>
                 column.toggleVisibility(Boolean(checked))

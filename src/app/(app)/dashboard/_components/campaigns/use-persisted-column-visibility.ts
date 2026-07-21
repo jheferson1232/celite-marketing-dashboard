@@ -10,6 +10,41 @@ export const META_CAMPAIGNS_COLUMN_VISIBILITY_KEY =
 export const META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   impressions: false,
   totalSpend: false,
+  /** Ocultas por defecto; se activan en «Columnas» o al filtrar mensajes. */
+  leads: false,
+  costPerLead: false,
+}
+
+/**
+ * Columnas al filtrar campañas de mensajes:
+ * Campaña, Gasto, conjuntos, CTR/CPC + clientes potenciales / CPL.
+ */
+export const META_CAMPAIGNS_MESSAGES_COLUMN_VISIBILITY: VisibilityState = {
+  impressions: false,
+  results: false,
+  costPerResult: false,
+  purchases7d: false,
+  cpa7d: false,
+  totalPurchases: false,
+  totalSpend: false,
+  totalCpa: false,
+  roas: false,
+  leads: true,
+  costPerLead: true,
+}
+
+/** Columnas al filtrar campañas de conversiones (compras / CPA). */
+export const META_CAMPAIGNS_CONVERSIONS_COLUMN_VISIBILITY: VisibilityState = {
+  impressions: false,
+  leads: false,
+  costPerLead: false,
+  results: true,
+  costPerResult: true,
+  purchases7d: true,
+  cpa7d: true,
+  totalPurchases: true,
+  totalSpend: false,
+  totalCpa: true,
 }
 
 export const TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY =
@@ -26,8 +61,10 @@ export function usePersistedColumnVisibility(
   defaultVisibility: VisibilityState = {}
 ) {
   const [columnVisibility, _setColumnVisibility] = useState<VisibilityState>(
-    () =>
-      getLocalStorageItem<VisibilityState>(storageKey, defaultVisibility)
+    () => ({
+      ...defaultVisibility,
+      ...getLocalStorageItem<VisibilityState>(storageKey, {}),
+    })
   )
 
   const setColumnVisibility = (visibility: VisibilityState) => {

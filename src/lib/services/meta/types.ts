@@ -80,6 +80,10 @@ export interface CampaignAdSetRow {
   results: number
   costPerResult: number
   roas: number
+  /** Clientes potenciales (leads) en el periodo. */
+  leads?: number
+  /** Costo por lead en el periodo. */
+  costPerLead?: number
   /** Agregados al carrito (Meta actions / TikTok web_event_add_to_cart). */
   addToCart?: number
   /** TikTok: compras en los últimos 7 días (calendario dashboard). */
@@ -143,6 +147,10 @@ export interface CampaignRow {
   costPerResult: number
   roas: number
   addToCart?: number
+  /** Clientes potenciales (leads) en el periodo. */
+  leads?: number
+  /** Costo por lead en el periodo. */
+  costPerLead?: number
   objective: string
   /** Estado operativo en TikTok (ENABLE/DISABLE). */
   operationStatus?: "ENABLE" | "DISABLE"

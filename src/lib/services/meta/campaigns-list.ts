@@ -13,6 +13,7 @@ import {
 import { isMetaAdSetActiveForCount } from "./meta-adset-status"
 import { normalizeMetaId } from "./meta-ids"
 import { OBJECTIVE_TO_ACTION_TYPE } from "./objective"
+import { getLeadsFromActions, getLeadCplFromActions } from "./leads"
 import { getMetaClient } from "./meta"
 import { withMetaCache } from "./meta-cache"
 import { getPurchasesFromInsight } from "./purchase-metrics"
@@ -60,6 +61,8 @@ function buildPeriodMetrics(insight: MetaInsightRow | undefined, objective: stri
       results: 0,
       costPerResult: 0,
       addToCart: 0,
+      leads: 0,
+      costPerLead: 0,
       objective: objective || "",
     }
   }
@@ -77,6 +80,12 @@ function buildPeriodMetrics(insight: MetaInsightRow | undefined, objective: stri
 
   const purchases = getPurchasesFromInsight(insight)
   const spend = parseFloat(insight.spend || "0")
+  const leads = getLeadsFromActions(insight.actions)
+  const costPerLead = getLeadCplFromActions(
+    insight.actions,
+    insight.cost_per_action_type,
+    spend
+  )
 
   return {
     spend,
@@ -89,6 +98,8 @@ function buildPeriodMetrics(insight: MetaInsightRow | undefined, objective: stri
         ? spend / purchases
         : parseFloat(costPerResultRaw) || 0,
     addToCart: getAddToCartFromActions(insight.actions),
+    leads,
+    costPerLead,
     objective: resolvedObjective,
   }
 }
@@ -125,6 +136,8 @@ function buildCampaignRow(
     costPerResult: period.costPerResult,
     roas: 0,
     addToCart: period.addToCart,
+    leads: period.leads,
+    costPerLead: period.costPerLead,
     objective: period.objective,
     landingUrls: [],
   }
@@ -133,7 +146,7 @@ function buildCampaignRow(
 export async function getCampaignsList(
   dateRange: DateRange
 ): Promise<CampaignRow[]> {
-  const cacheKey = `campaigns:v11:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `campaigns:v12:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, CAMPAIGNS_TTL_MS, () =>
     fetchCampaignsList(dateRange)
   )

@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
           CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-          BASE="${APP_URL:-https://celite-marketing-dashboard.vercel.app}"
+          BASE="${APP_URL:-https://celite-marketing-dashboard-chi.vercel.app}"
           BASE="${BASE%/}"
 
           TRIGGER="${INPUT_TRIGGER:-morning_8am}"

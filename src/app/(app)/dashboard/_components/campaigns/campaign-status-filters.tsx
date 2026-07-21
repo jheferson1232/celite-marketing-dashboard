@@ -1,5 +1,6 @@
 "use client"
 
+import type * as React from "react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type {
@@ -57,6 +58,8 @@ interface CampaignStatusFiltersProps {
   apagadoMeansSwitchOff?: boolean
   /** Los chips excelente / en curso / crítico cuentan conjuntos, no campañas. */
   performanceCountsAtAdSetLevel?: boolean
+  /** Chips extra al final de la fila (p. ej. conversiones / mensajes). */
+  children?: React.ReactNode
 }
 
 export function CampaignStatusFilters({
@@ -69,6 +72,7 @@ export function CampaignStatusFilters({
   totalCampaignCount,
   apagadoMeansSwitchOff = false,
   performanceCountsAtAdSetLevel = false,
+  children,
 }: CampaignStatusFiltersProps) {
   const totalCount =
     totalCampaignCount ?? Object.values(counts).reduce((sum, n) => sum + n, 0)
@@ -140,6 +144,7 @@ export function CampaignStatusFilters({
           </Badge>
         )
       })}
+      {children}
       </div>
       {showActiveFilter && (isActivosActive || selectedFilter === "APAGADO") ? (
         <p className="text-sm text-muted-foreground">

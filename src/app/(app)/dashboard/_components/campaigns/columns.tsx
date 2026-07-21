@@ -235,6 +235,49 @@ export function getCampaignColumns({
         )
       },
     },
+    ...(!enableTikTokManage
+      ? [
+          {
+            id: "leads",
+            accessorKey: "leads",
+            meta: columnMeta("Clientes potenciales"),
+            header: (context) => (
+              <span title="Leads / clientes potenciales en el periodo">
+                <SortableHeader
+                  context={context}
+                  label="Clientes potenciales"
+                />
+              </span>
+            ),
+            cell: ({ row }) => (
+              <div className="text-right">
+                {(row.original.leads ?? 0) > 0
+                  ? formatNumber(row.original.leads ?? 0)
+                  : "-"}
+              </div>
+            ),
+          } satisfies ColumnDef<CampaignRow>,
+          {
+            id: "costPerLead",
+            accessorKey: "costPerLead",
+            meta: columnMeta("CPL"),
+            header: (context) => (
+              <span title="Costo por cliente potencial (lead)">
+                <SortableHeader context={context} label="CPL" />
+              </span>
+            ),
+            cell: ({ row }) => {
+              const cpl = row.original.costPerLead ?? 0
+              const highlight = getCostPerResultCellClassName(cpl, currency)
+              return (
+                <div className={cn("-m-2 p-2 text-right", highlight)}>
+                  {cpl > 0 ? formatCurrency(cpl, currency) : "-"}
+                </div>
+              )
+            },
+          } satisfies ColumnDef<CampaignRow>,
+        ]
+      : []),
     ...(showLifetimeMetrics
       ? [
           {

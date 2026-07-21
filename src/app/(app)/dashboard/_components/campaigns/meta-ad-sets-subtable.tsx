@@ -49,7 +49,7 @@ function getSubtableCellClassName(
 
   return cn(
     columnId === "name" &&
-      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/80 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
+      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted/80 pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted dark:bg-muted/60 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
@@ -74,6 +74,10 @@ function adSetSortValue(
       return row.results
     case "costPerResult":
       return row.costPerResult
+    case "leads":
+      return row.leads ?? 0
+    case "costPerLead":
+      return row.costPerLead ?? 0
     case "roas":
       return row.addToCart ?? 0
     case "purchases7d":
@@ -142,8 +146,9 @@ export function MetaAdSetsSubtable({
   })
 
   return (
-    <div className="py-1">
-      <Table containerClassName="overflow-visible">
+    <div className="min-w-0 w-full py-1">
+      {/* Scroll propio: overflow-visible rompía el layout de la subtabla anidada. */}
+      <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">

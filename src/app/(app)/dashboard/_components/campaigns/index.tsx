@@ -25,6 +25,7 @@ import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
 import { CampaignAdSetsExpandedRow } from "./campaign-adsets-expanded-row"
 import { CampaignDetailsSheet } from "./campaign-details-sheet"
+import { CampaignObjectiveFilters } from "./campaign-objective-filters"
 import { CampaignStatusFilters } from "./campaign-status-filters"
 import { getCampaignColumns } from "./columns"
 import { ColumnVisibilityToggle } from "./column-visibility-toggle"
@@ -33,12 +34,16 @@ import { TableErrorState } from "./table-error-state"
 import { TableSkeleton } from "./table-skeleton"
 import type {
   CampaignColumnMeta,
+  CampaignObjectiveFilter,
   CampaignPerformanceFilter,
   CampaignPerformanceStatus,
 } from "./types"
+import { isMetaCampaignObjectiveKind } from "@/lib/services/meta/campaign-objective-kind"
 import {
   META_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
+  META_CAMPAIGNS_CONVERSIONS_COLUMN_VISIBILITY,
   META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
+  META_CAMPAIGNS_MESSAGES_COLUMN_VISIBILITY,
   usePersistedColumnVisibility,
 } from "./use-persisted-column-visibility"
 import type { VisibilityState } from "@tanstack/react-table"
@@ -106,6 +111,8 @@ export function CampaignsTable({
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
     React.useState<CampaignPerformanceFilter>("ALL")
+  const [selectedObjectiveFilter, setSelectedObjectiveFilter] =
+    React.useState<CampaignObjectiveFilter>("ALL")
   const [expandedCampaignIds, setExpandedCampaignIds] = React.useState<
     Set<string>
   >(() => new Set())
@@ -117,6 +124,46 @@ export function CampaignsTable({
       columnVisibilityStorageKey,
       defaultColumnVisibility
     )
+  const columnVisibilityBaselineRef = React.useRef<VisibilityState | null>(
+    null
+  )
+
+  const handleObjectiveFilterChange = React.useCallback(
+    (filter: CampaignObjectiveFilter) => {
+      if (enableTikTokManage) {
+        setSelectedObjectiveFilter(filter)
+        return
+      }
+
+      if (filter !== "ALL" && selectedObjectiveFilter === "ALL") {
+        columnVisibilityBaselineRef.current = columnVisibility
+      }
+
+      if (filter === "MESSAGES") {
+        setColumnVisibility({
+          ...(columnVisibilityBaselineRef.current ?? columnVisibility),
+          ...META_CAMPAIGNS_MESSAGES_COLUMN_VISIBILITY,
+        })
+      } else if (filter === "CONVERSIONS") {
+        setColumnVisibility({
+          ...(columnVisibilityBaselineRef.current ?? columnVisibility),
+          ...META_CAMPAIGNS_CONVERSIONS_COLUMN_VISIBILITY,
+        })
+      } else if (columnVisibilityBaselineRef.current) {
+        setColumnVisibility(columnVisibilityBaselineRef.current)
+        columnVisibilityBaselineRef.current = null
+      }
+
+      setSelectedObjectiveFilter(filter)
+    },
+    [
+      columnVisibility,
+      enableTikTokManage,
+      selectedObjectiveFilter,
+      setColumnVisibility,
+    ]
+  )
+
   const tableData = data ?? EMPTY_DATA
 
   const handleToggleAdSets = React.useCallback((campaignId: string) => {
@@ -147,7 +194,14 @@ export function CampaignsTable({
     "CRITICO",
   ]
 
-  const { statusCounts, activeCampaignCount, totalCampaignCount, filteredTableData } =
+  const {
+    statusCounts,
+    activeCampaignCount,
+    totalCampaignCount,
+    filteredTableData,
+    conversionsCount,
+    messagesCount,
+  } =
     React.useMemo(() => {
     const counts: Record<CampaignPerformanceStatus, number> = {
       ...EMPTY_STATUS_COUNTS,
@@ -244,17 +298,49 @@ export function CampaignsTable({
                   )
                   .map(({ row }) => row)
 
+    const objectiveFilteredRows =
+      enableTikTokManage || selectedObjectiveFilter === "ALL"
+        ? filteredRows
+        : filteredRows.filter((row) =>
+            isMetaCampaignObjectiveKind(
+              row.objective,
+              selectedObjectiveFilter === "CONVERSIONS"
+                ? "conversions"
+                : "messages",
+              row.name
+            )
+          )
+
+    let conversionsCount = 0
+    let messagesCount = 0
+    if (!enableTikTokManage) {
+      for (const row of tableData) {
+        if (
+          isMetaCampaignObjectiveKind(row.objective, "conversions", row.name)
+        ) {
+          conversionsCount += 1
+        } else if (
+          isMetaCampaignObjectiveKind(row.objective, "messages", row.name)
+        ) {
+          messagesCount += 1
+        }
+      }
+    }
+
     return {
       statusCounts: counts,
       activeCampaignCount: activeCount,
       totalCampaignCount: tableData.length,
-      filteredTableData: filteredRows,
+      filteredTableData: objectiveFilteredRows,
+      conversionsCount,
+      messagesCount,
     }
   }, [
     currency,
     enableTikTokManage,
     performanceCountsAtAdSetLevel,
     showMetaActiveCampaignFilter,
+    selectedObjectiveFilter,
     selectedPerformanceFilter,
     tableData,
     tikTokAdSetsByCampaignId,
@@ -347,20 +433,31 @@ export function CampaignsTable({
 
   return (
     <div className="min-w-0 w-full max-w-full space-y-3">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <CampaignStatusFilters
           counts={statusCounts}
           selectedFilter={selectedPerformanceFilter}
           onFilterChange={setSelectedPerformanceFilter}
           showAllFilter={showAllCampaignsFilter || enableTikTokManage}
-          showActiveFilter={enableTikTokManage || showMetaActiveCampaignFilter}
+          showActiveFilter={
+            enableTikTokManage || showMetaActiveCampaignFilter
+          }
           activeCampaignCount={activeCampaignCount}
           totalCampaignCount={totalCampaignCount}
           apagadoMeansSwitchOff={
             enableTikTokManage || showMetaActiveCampaignFilter
           }
           performanceCountsAtAdSetLevel={performanceCountsAtAdSetLevel}
-        />
+        >
+          {!enableTikTokManage ? (
+            <CampaignObjectiveFilters
+              conversionsCount={conversionsCount}
+              messagesCount={messagesCount}
+              selectedFilter={selectedObjectiveFilter}
+              onFilterChange={handleObjectiveFilterChange}
+            />
+          ) : null}
+        </CampaignStatusFilters>
         <ColumnVisibilityToggle table={table} />
       </div>
 
@@ -443,7 +540,7 @@ export function CampaignsTable({
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell
                           colSpan={visibleColumnsCount}
-                          className="overflow-visible p-0"
+                          className="whitespace-normal p-0"
                         >
                           <CampaignAdSetsExpandedRow
                             campaignId={row.original.id}
