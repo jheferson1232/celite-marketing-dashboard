@@ -24,6 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  formatDashboardDayLabel,
+  formatDashboardDayLong,
+  formatDashboardDayNumeric,
+  formatDashboardDayShort,
+  formatDashboardDayWithWeekday,
+} from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
 import { getMetaInformeApiStatus } from "@/lib/meta-api-status"
@@ -57,15 +64,11 @@ import {
 } from "../_actions/meta-informe"
 
 function formatDayLabel(date: string): string {
-  const [, m, d] = date.split("-")
-  return `${d}/${m}`
+  return formatDashboardDayShort(date)
 }
 
-/** Fecha completa para columnas ayer/hoy (ej. 21/05/2026). */
 function formatInformeDate(date: string): string {
-  const [y, m, d] = date.split("-")
-  if (!y || !m || !d) return date
-  return `${d}/${m}/${y}`
+  return formatDashboardDayNumeric(date)
 }
 
 const INFORME_HIDDEN_DAY_KEYS_STORAGE = "informe-ia-hidden-day-keys"
@@ -151,54 +154,81 @@ function InformeDayVisibilityControls({
   if (dateKeys.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">
-          Columnas por día{" "}
+    <div className="flex flex-col gap-1.5 rounded-md border bg-muted/20 px-2.5 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <p className="text-xs font-medium">
+          Días{" "}
           <span className="text-muted-foreground font-normal">
-            ({visibleCount} de {dateKeys.length} visibles)
+            ({visibleCount}/{dateKeys.length})
           </span>
         </p>
-        <div className="flex flex-wrap gap-1.5">
-          <Button type="button" variant="outline" size="sm" onClick={showAll}>
-            Mostrar todos
+        <div className="flex flex-wrap gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={showAll}
+          >
+            Todos
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={showOnlyRecent}>
-            Solo hoy y ayer
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={showOnlyRecent}
+          >
+            Hoy + ayer
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={showOnlyToday}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={showOnlyToday}
+          >
             Solo hoy
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1">
         {dateKeys.map((date) => {
           const hidden = hiddenDayKeys.has(date)
           const isToday = date === today
+          const isYesterday = date === yesterday
+          const relative = isToday || isYesterday
           return (
             <Button
               key={date}
               type="button"
               size="sm"
               variant={hidden ? "outline" : "secondary"}
+              title={formatDashboardDayLong(date)}
+              aria-label={`${hidden ? "Mostrar" : "Ocultar"} columna del ${formatDashboardDayLong(date)}`}
               className={cn(
-                "h-8 gap-1 tabular-nums",
+                "h-7 gap-1 px-2 text-xs capitalize",
                 isToday && !hidden && "ring-1 ring-primary/40"
               )}
               onClick={() => toggleDay(date)}
             >
               {hidden ? (
-                <RiEyeOffLine className="size-3.5 opacity-60" />
+                <RiEyeOffLine className="size-3 opacity-60" />
               ) : (
-                <RiEyeLine className="size-3.5" />
+                <RiEyeLine className="size-3" />
               )}
-              {formatInformeDate(date)}
-              {date === yesterday ? (
-                <span className="text-muted-foreground text-[10px]">ayer</span>
-              ) : null}
-              {isToday ? (
-                <span className="text-muted-foreground text-[10px]">hoy</span>
-              ) : null}
+              {relative ? (
+                <>
+                  <span className="font-medium">
+                    {formatDashboardDayLabel(date, today, yesterday)}
+                  </span>
+                  <span className="text-muted-foreground text-[10px] font-normal normal-case">
+                    {formatDashboardDayShort(date)}
+                  </span>
+                </>
+              ) : (
+                <span>{formatDashboardDayWithWeekday(date)}</span>
+              )}
             </Button>
           )
         })}
@@ -324,6 +354,9 @@ type PeriodMetrics = {
   cpa: number
 }
 
+const METRIC_CELL =
+  "px-1.5 py-1 text-right text-xs tabular-nums whitespace-nowrap"
+
 function getMetricsForDate(
   row: InformeEntityRow,
   date: string
@@ -369,7 +402,7 @@ function PeriodMetricsCells({
   return (
     <>
       <TableCell
-        className="text-right tabular-nums"
+        className={METRIC_CELL}
         title={`Gasto ${periodLabel}`}
       >
         {metrics.spend > 0
@@ -377,13 +410,13 @@ function PeriodMetricsCells({
           : "—"}
       </TableCell>
       <TableCell
-        className="text-right tabular-nums"
+        className={METRIC_CELL}
         title={`Compras ${periodLabel}`}
       >
         {metrics.purchases > 0 ? formatNumber(metrics.purchases) : "—"}
       </TableCell>
       <TableCell
-        className={cn("text-right tabular-nums", cpaHighlight)}
+        className={cn(METRIC_CELL, cpaHighlight)}
         title={`CPA ${periodLabel}`}
       >
         {metrics.cpa > 0
@@ -411,7 +444,7 @@ function InformeTotalCells({
   return (
     <>
       <TableCell
-        className="text-right tabular-nums font-medium"
+        className={cn(METRIC_CELL, "font-medium")}
         title={`${periodTitle} · gasto`}
       >
         {row.spendInformeTotal > 0
@@ -419,7 +452,7 @@ function InformeTotalCells({
           : "—"}
       </TableCell>
       <TableCell
-        className="text-right tabular-nums font-medium"
+        className={cn(METRIC_CELL, "font-medium")}
         title={`${periodTitle} · compras`}
       >
         {row.purchasesInformeTotal > 0
@@ -427,7 +460,7 @@ function InformeTotalCells({
           : "—"}
       </TableCell>
       <TableCell
-        className={cn("text-right tabular-nums font-medium", cpaClass)}
+        className={cn(METRIC_CELL, "font-medium", cpaClass)}
         title={`${periodTitle} · CPA`}
       >
         {row.cpaInformeTotal > 0
@@ -460,47 +493,66 @@ function MetricsCells({
 
 function dayColumnHeaderClass(date: string, today: string): string {
   return cn(
-    "border-border text-center text-xs font-semibold tabular-nums",
+    "border-border px-1 py-1 text-center text-[11px] font-semibold capitalize",
     date === today ? "bg-muted/20" : "bg-muted/40"
   )
 }
 
 function dayColumnSubHeaderClass(date: string, today: string): string {
-  return cn("text-right text-xs", date === today ? "bg-muted/20" : "bg-muted/40")
+  return cn(
+    "px-1 py-0.5 text-right text-[10px] font-medium text-muted-foreground",
+    date === today ? "bg-muted/20" : "bg-muted/40"
+  )
 }
 
 function InformeAccountSummary({
   totals,
   visibleDayKeys,
+  today,
+  yesterday,
   informeStartDate,
   dateRange,
 }: {
   totals: InformeTableTotals
   visibleDayKeys: string[]
+  today: string
+  yesterday: string
   informeStartDate: string
   dateRange: { from: string; to: string }
 }) {
   return (
-    <div className="text-muted-foreground flex flex-col gap-1 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6">
-      {visibleDayKeys.map((date) => {
-        const day = getDayTotalsMetrics(totals, date)
-        return (
-          <p key={date}>
-            <strong className="text-foreground font-medium">
-              {formatInformeDate(date)}:
-            </strong>{" "}
-            gasto {formatCurrency(day.spend, META_DASHBOARD_CURRENCY)} ·{" "}
-            {formatNumber(day.purchases)} compras
-            {day.cpa > 0
-              ? ` · CPA ${formatCurrency(day.cpa, META_DASHBOARD_CURRENCY)}`
-              : ""}
-          </p>
-        )
-      })}
-      <p className="text-xs sm:basis-full">
-        Informe desde {formatDayLabel(informeStartDate)}
+    <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+        {visibleDayKeys.map((date) => {
+          const day = getDayTotalsMetrics(totals, date)
+          return (
+            <div
+              key={date}
+              className="rounded-md border bg-muted/15 px-2 py-1.5"
+              title={formatDashboardDayLong(date)}
+            >
+              <p className="text-foreground text-[11px] font-medium capitalize leading-none">
+                {formatDashboardDayLabel(date, today, yesterday)}
+              </p>
+              <p className="text-muted-foreground mt-1 text-[11px] tabular-nums leading-snug">
+                {formatCurrency(day.spend, META_DASHBOARD_CURRENCY)}
+                <span className="mx-1 opacity-40">·</span>
+                {formatNumber(day.purchases)}
+                {day.cpa > 0 ? (
+                  <>
+                    <span className="mx-1 opacity-40">·</span>
+                    {formatCurrency(day.cpa, META_DASHBOARD_CURRENCY)}
+                  </>
+                ) : null}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-muted-foreground text-[11px]">
+        Desde {formatDayLabel(informeStartDate)}
         {dateRange.from !== dateRange.to
-          ? ` · historial ${formatDayLabel(dateRange.from)} → ${formatDayLabel(dateRange.to)}`
+          ? ` · ${formatDayLabel(dateRange.from)} → ${formatDayLabel(dateRange.to)}`
           : ""}
       </p>
     </div>
@@ -517,16 +569,22 @@ function AdsetCountCells({
   if (adSetsCount === undefined || activeAdSetsCount === undefined) {
     return (
       <>
-        <TableCell className="text-center text-muted-foreground">—</TableCell>
-        <TableCell className="text-center text-muted-foreground">—</TableCell>
+        <TableCell className="px-1.5 py-1 text-center text-xs text-muted-foreground">
+          —
+        </TableCell>
+        <TableCell className="px-1.5 py-1 text-center text-xs text-muted-foreground">
+          —
+        </TableCell>
       </>
     )
   }
 
   return (
     <>
-      <TableCell className="text-center tabular-nums">{adSetsCount}</TableCell>
-      <TableCell className="text-center tabular-nums">
+      <TableCell className="px-1.5 py-1 text-center text-xs tabular-nums">
+        {adSetsCount}
+      </TableCell>
+      <TableCell className="px-1.5 py-1 text-center text-xs tabular-nums">
         <span
           className={cn(
             activeAdSetsCount > 0 && "font-medium text-orange-500"
@@ -559,10 +617,10 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
 
   return (
     <>
-      <TableCell className="w-[72px] text-center">
+      <TableCell className="w-12 px-1 py-1 text-center">
         <span
           className={cn(
-            "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+            "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium",
             row.metaWasActive
               ? "bg-green-100 text-green-800 dark:bg-green-500/25 dark:text-green-300"
               : "bg-red-100 text-red-800 dark:bg-red-500/25 dark:text-red-300"
@@ -573,7 +631,7 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
       </TableCell>
       <TableCell
         className={cn(
-          "min-w-[120px] text-center text-xs",
+          "min-w-[88px] max-w-[110px] px-1 py-1 text-center text-[11px]",
           INFORME_ESTADO_TONE_CLASS[estadoDisplay.tone]
         )}
         title={estadoDisplay.title}
@@ -581,7 +639,7 @@ function StatusCells({ row }: { row: InformeEntityRow }) {
         <span className="flex flex-col items-center gap-0.5 leading-tight">
           <span>{estadoDisplay.label}</span>
           {estadoDisplay.hint ? (
-            <span className="text-[10px] font-normal opacity-90">
+            <span className="text-[9px] font-normal opacity-90">
               {estadoDisplay.hint}
             </span>
           ) : null}
@@ -610,17 +668,26 @@ function EntityRow({
   activeAdSetsCount?: number
 }) {
   return (
-    <TableRow className={cn(indent && "bg-muted/20")}>
-      <TableCell className={cn("max-w-[280px]", indent && "pl-10")}>
-        <div className="flex items-center gap-2">
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate font-medium leading-tight">{row.name}</span>
-            <span className="text-muted-foreground text-xs">
+    <TableRow className={cn("group", indent && "bg-muted/20")}>
+      <TableCell
+        className={cn(
+          "sticky left-0 z-[1] max-w-[168px] bg-background px-2 py-1 group-hover:bg-muted/50",
+          indent && "bg-muted/20 pl-8 group-hover:bg-muted/50"
+        )}
+      >
+        <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-0">
+            <span className="truncate text-xs font-medium leading-tight">
+              {row.name}
+            </span>
+            <span className="text-muted-foreground text-[10px]">
               {row.type === "campaign" ? "Campaña" : "Conjunto"}
             </span>
           </div>
           {campaignActions ? (
-            <div className="flex shrink-0 items-center gap-1">{campaignActions}</div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {campaignActions}
+            </div>
           ) : null}
         </div>
       </TableCell>
@@ -730,11 +797,14 @@ function InformeTotalsRow({
 
   return (
     <TableRow className="bg-muted/60 border-t-2 font-semibold">
-      <TableCell colSpan={5} className="text-left">
+      <TableCell
+        colSpan={5}
+        className="sticky left-0 z-[1] bg-muted/60 px-2 py-1 text-left text-xs"
+      >
         Total (conjuntos)
       </TableCell>
       <TableCell
-        className="text-right tabular-nums"
+        className={METRIC_CELL}
         title="Suma gasto conjuntos (periodo del informe)"
       >
         {adsetSpendTotal > 0
@@ -742,13 +812,13 @@ function InformeTotalsRow({
           : "—"}
       </TableCell>
       <TableCell
-        className="text-right tabular-nums"
+        className={METRIC_CELL}
         title="Suma compras conjuntos (periodo del informe)"
       >
         {adsetPurchasesTotal > 0 ? formatNumber(adsetPurchasesTotal) : "—"}
       </TableCell>
       <TableCell
-        className="text-right tabular-nums"
+        className={METRIC_CELL}
         title="CPA total conjuntos (periodo del informe)"
       >
         {adsetCpaTotal > 0
@@ -771,12 +841,14 @@ function InformeTable({
   groups,
   visibleDayKeys,
   today,
+  yesterday,
   totals,
   informeStartDate,
 }: {
   groups: InformeCampaignGroup[]
   visibleDayKeys: string[]
   today: string
+  yesterday: string
   totals: InformeTableTotals
   informeStartDate: string
 }) {
@@ -797,62 +869,83 @@ function InformeTable({
   }, [])
 
   return (
-    <Table>
+    <Table className="text-xs">
       <TableHeader>
         <TableRow>
-          <TableHead className="min-w-[220px]" rowSpan={2}>
+          <TableHead className="sticky left-0 z-[2] min-w-[148px] bg-background px-2 py-1 text-xs" rowSpan={2}>
             Nombre
           </TableHead>
-          <TableHead className="text-center" rowSpan={2}>
+          <TableHead className="w-12 px-1 py-1 text-center text-[11px]" rowSpan={2}>
             Meta
           </TableHead>
-          <TableHead className="text-center" rowSpan={2}>
+          <TableHead className="min-w-[88px] px-1 py-1 text-center text-[11px]" rowSpan={2}>
             Estado
           </TableHead>
-          <TableHead className="text-center" rowSpan={2}>
-            Conjuntos
-          </TableHead>
-          <TableHead className="text-center" rowSpan={2}>
-            Conj. activos
+          <TableHead
+            className="px-1 py-1 text-center text-[11px]"
+            rowSpan={2}
+            title="Conjuntos"
+          >
+            Conj.
           </TableHead>
           <TableHead
-            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            className="px-1 py-1 text-center text-[11px]"
             rowSpan={2}
+            title="Conjuntos activos"
           >
-            Gasto total
+            Act.
           </TableHead>
           <TableHead
-            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            className="border-border bg-muted/30 px-1 py-1 text-center text-[11px] font-semibold"
             rowSpan={2}
+            title="Gasto total del periodo"
           >
-            Compras total
+            $ tot
           </TableHead>
           <TableHead
-            className="border-border bg-muted/30 text-center text-xs font-semibold"
+            className="border-border bg-muted/30 px-1 py-1 text-center text-[11px] font-semibold"
             rowSpan={2}
+            title="Compras total del periodo"
           >
-            CPA total
+            Comp
+          </TableHead>
+          <TableHead
+            className="border-border bg-muted/30 px-1 py-1 text-center text-[11px] font-semibold"
+            rowSpan={2}
+            title="CPA total del periodo"
+          >
+            CPA
           </TableHead>
           {visibleDayKeys.map((date) => (
             <TableHead
               key={date}
               colSpan={3}
+              title={formatDashboardDayLong(date)}
               className={dayColumnHeaderClass(date, today)}
             >
-              {formatInformeDate(date)}
+              {formatDashboardDayLabel(date, today, yesterday)}
             </TableHead>
           ))}
         </TableRow>
         <TableRow>
           {visibleDayKeys.map((date) => (
             <Fragment key={date}>
-              <TableHead className={dayColumnSubHeaderClass(date, today)}>
-                Gasto
+              <TableHead
+                className={dayColumnSubHeaderClass(date, today)}
+                title="Gasto"
+              >
+                $
               </TableHead>
-              <TableHead className={dayColumnSubHeaderClass(date, today)}>
-                Compras
+              <TableHead
+                className={dayColumnSubHeaderClass(date, today)}
+                title="Compras"
+              >
+                n
               </TableHead>
-              <TableHead className={dayColumnSubHeaderClass(date, today)}>
+              <TableHead
+                className={dayColumnSubHeaderClass(date, today)}
+                title="CPA"
+              >
                 CPA
               </TableHead>
             </Fragment>
@@ -1040,13 +1133,13 @@ export function InformeIaContent() {
   )
 
   return (
-    <div className="flex w-full flex-col gap-6 p-6 pb-12 lg:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex w-full flex-col gap-3 p-4 pb-8 lg:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+          <h1 className="text-lg font-bold tracking-tight sm:text-xl">
             Informe IA · Meta
           </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+          <p className="text-muted-foreground mt-0.5 max-w-2xl text-xs leading-snug">
             Cron cada hora a Telegram (GitHub Actions): solo conjuntos{" "}
             <span className="font-medium text-green-700 dark:text-green-400">
               ON
@@ -1174,6 +1267,8 @@ export function InformeIaContent() {
           <InformeAccountSummary
             totals={data.totals}
             visibleDayKeys={visibleDayKeys}
+            today={data.date}
+            yesterday={data.yesterday}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
@@ -1187,6 +1282,8 @@ export function InformeIaContent() {
           <InformeAccountSummary
             totals={data.totals}
             visibleDayKeys={visibleDayKeys}
+            today={data.date}
+            yesterday={data.yesterday}
             informeStartDate={data.informeStartDate}
             dateRange={data.dateRange}
           />
@@ -1218,15 +1315,16 @@ export function InformeIaContent() {
           ) : visibleDayKeys.length === 0 ? (
             <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
               No hay días visibles en la tabla. Pulsa{" "}
-              <strong className="text-foreground">Mostrar todos</strong> o activa
-              al menos un día arriba.
+              <strong className="text-foreground">Todos</strong> o{" "}
+              <strong className="text-foreground">Hoy + ayer</strong>.
             </p>
           ) : (
-            <div className="min-w-0 overflow-x-auto rounded-lg border">
+            <div className="min-w-0 overflow-x-auto rounded-md border">
               <InformeTable
                 groups={filteredGroups}
                 visibleDayKeys={visibleDayKeys}
                 today={data.date}
+                yesterday={data.yesterday}
                 totals={data.totals}
                 informeStartDate={data.informeStartDate}
               />

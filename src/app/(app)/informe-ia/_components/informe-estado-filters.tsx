@@ -136,7 +136,7 @@ export function InformeFilterBars({
   onActivarFilterChange: (active: boolean) => void
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <InformeEstadoFilters
         counts={estadoCounts}
         selectedFilter={estadoFilter}

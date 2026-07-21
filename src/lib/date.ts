@@ -61,3 +61,77 @@ export function formatCreativeAddedAt(value: Date | string): string {
     minute: "2-digit",
   }).format(date)
 }
+
+const DATE_ONLY_LOCALE = "es-PE"
+
+/**
+ * Interpreta `YYYY-MM-DD` como día de calendario (sin corrimiento por zona).
+ * Usa mediodía UTC para formatear con `timeZone: "UTC"`.
+ */
+export function parseDateOnly(dateStr: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (!match) return null
+  const y = Number(match[1])
+  const m = Number(match[2])
+  const d = Number(match[3])
+  return new Date(Date.UTC(y, m - 1, d, 12))
+}
+
+function formatDateOnly(
+  dateStr: string,
+  options: Intl.DateTimeFormatOptions
+): string {
+  const date = parseDateOnly(dateStr)
+  if (!date) return dateStr
+  return new Intl.DateTimeFormat(DATE_ONLY_LOCALE, {
+    timeZone: "UTC",
+    ...options,
+  }).format(date)
+}
+
+/** ej. 20 jul */
+export function formatDashboardDayShort(dateStr: string): string {
+  return formatDateOnly(dateStr, { day: "numeric", month: "short" })
+}
+
+/** ej. lun 20 jul */
+export function formatDashboardDayWithWeekday(dateStr: string): string {
+  return formatDateOnly(dateStr, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+}
+
+/** ej. 20/07/2026 */
+export function formatDashboardDayNumeric(dateStr: string): string {
+  return formatDateOnly(dateStr, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
+/** ej. domingo, 20 de julio de 2026 */
+export function formatDashboardDayLong(dateStr: string): string {
+  return formatDateOnly(dateStr, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+}
+
+/**
+ * Etiqueta de día para UI: "Hoy" / "Ayer" / "lun 18 jul".
+ * Preferir relativo cuando aplica; absoluto corto en el resto.
+ */
+export function formatDashboardDayLabel(
+  dateStr: string,
+  today: string,
+  yesterday: string
+): string {
+  if (dateStr === today) return "Hoy"
+  if (dateStr === yesterday) return "Ayer"
+  return formatDashboardDayWithWeekday(dateStr)
+}
