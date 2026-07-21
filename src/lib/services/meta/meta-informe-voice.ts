@@ -1,6 +1,7 @@
 import "server-only"
 import axios from "axios"
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
+import { mapOpenAiVoiceErrorMessage } from "@/lib/openai-voice-errors"
 import { collectAdsetsCriticoActivos } from "./meta-informe-alerts"
 import {
   getMetaInformePayload,
@@ -186,7 +187,7 @@ export async function createInformeRealtimeClientSecret(): Promise<InformeRealti
     const message =
       data?.error?.message ||
       "OpenAI no devolvió un token de sesión de voz. Revisa OPENAI_API_KEY y el acceso a Realtime."
-    throw new Error(message)
+    throw new Error(mapOpenAiVoiceErrorMessage(message))
   }
 
   return {

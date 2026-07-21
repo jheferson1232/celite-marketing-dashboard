@@ -5,6 +5,7 @@ import { RiMicLine, RiMicOffLine, RiLoader4Line } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
+import { mapOpenAiVoiceErrorMessage } from "@/lib/openai-voice-errors"
 import { createInformeVoiceSessionAction } from "../_actions/informe-voice"
 
 type VoiceStatus = "idle" | "connecting" | "live" | "error"
@@ -151,9 +152,19 @@ export function InformeVoicePanel() {
 
       if (!sdpResponse.ok) {
         const body = await sdpResponse.text()
+        let detail = body.trim()
+        try {
+          const parsed = JSON.parse(body) as {
+            error?: { message?: string }
+          }
+          if (parsed.error?.message) detail = parsed.error.message
+        } catch {
+          // body may be plain SDP/text
+        }
         throw new Error(
-          body.trim() ||
-            `No se pudo conectar a Realtime (${sdpResponse.status})`
+          mapOpenAiVoiceErrorMessage(
+            detail || `No se pudo conectar a Realtime (${sdpResponse.status})`
+          )
         )
       }
 
@@ -167,11 +178,11 @@ export function InformeVoicePanel() {
     } catch (err) {
       cleanup()
       setStatus("error")
-      setError(
+      const raw =
         err instanceof Error
           ? err.message
           : "No se pudo iniciar la voz del informe"
-      )
+      setError(mapOpenAiVoiceErrorMessage(raw))
     }
   }
 
