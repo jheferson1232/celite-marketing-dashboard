@@ -383,8 +383,15 @@ export function CampaignsTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
+                  const isNameCol = header.column.id === "name"
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className={cn(
+                        isNameCol &&
+                          "sticky left-0 z-[2] min-w-[12rem] max-w-[20rem] bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -413,10 +420,17 @@ export function CampaignsTable({
 
                 return (
                   <React.Fragment key={row.id}>
-                    <TableRow aria-expanded={isExpanded}>
+                    <TableRow className="group" aria-expanded={isExpanded}>
                       {row.getVisibleCells().map((cell) => {
+                        const isNameCol = cell.column.id === "name"
                         return (
-                          <TableCell key={cell.id}>
+                          <TableCell
+                            key={cell.id}
+                            className={cn(
+                              isNameCol &&
+                                "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/50 group-aria-[expanded=true]:bg-muted/50 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
+                            )}
+                          >
                             {flexRender(
                               cell.column.columnDef.cell,
                               cell.getContext()
