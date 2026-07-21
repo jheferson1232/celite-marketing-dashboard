@@ -146,14 +146,29 @@ export async function createInformeRealtimeClientSecret(): Promise<InformeRealti
     )
   }
 
-  const informe = await getMetaInformePayload()
-  const summary = buildInformeVoiceSummary(informe)
+  const today = new Date().toISOString().slice(0, 10)
+  let date = today
+  let summary: string
+  try {
+    const informe = await getMetaInformePayload()
+    date = informe.date
+    summary = buildInformeVoiceSummary(informe)
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : "error al leer Meta/informe"
+    summary = [
+      `No se pudo sincronizar el informe ahora (${reason}).`,
+      "Di que los datos del informe no están disponibles temporalmente (límite de Meta o red) y pide reintentar en unos minutos.",
+      "No inventes cifras de gasto, CPA ni estados.",
+    ].join("\n")
+  }
+
   const instructions = buildInformeVoiceInstructions(summary)
 
   const { data } = await axios.post<{
     value?: string
     expires_at?: number
-    error?: { message?: string }
+    error?: { message?: string; code?: string; type?: string }
   }>(
     "https://api.openai.com/v1/realtime/client_secrets",
     {
@@ -186,14 +201,15 @@ export async function createInformeRealtimeClientSecret(): Promise<InformeRealti
   if (!data?.value) {
     const message =
       data?.error?.message ||
+      data?.error?.code ||
       "OpenAI no devolvió un token de sesión de voz. Revisa OPENAI_API_KEY y el acceso a Realtime."
-    throw new Error(mapOpenAiVoiceErrorMessage(message))
+    throw new Error(mapOpenAiVoiceErrorMessage(String(message)))
   }
 
   return {
     value: data.value,
     expiresAt: data.expires_at ?? null,
     model: REALTIME_MODEL,
-    date: informe.date,
+    date,
   }
 }

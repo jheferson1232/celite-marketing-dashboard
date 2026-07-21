@@ -1,4 +1,4 @@
-/** Mensajes claros en español para errores habituales de OpenAI / Realtime. */
+/** Mensajes claros en español para errores habituales de OpenAI / Realtime / Meta. */
 export function mapOpenAiVoiceErrorMessage(raw: string): string {
   const text = raw.trim()
   const lower = text.toLowerCase()
@@ -11,7 +11,20 @@ export function mapOpenAiVoiceErrorMessage(raw: string): string {
     return "OpenAI sin crédito o cuota agotada. En platform.openai.com → Billing carga saldo o sube el límite de gasto. Realtime (voz) consume más que el chat de texto."
   }
 
-  if (lower.includes("rate limit") || lower.includes("too many requests")) {
+  if (
+    lower.includes("demasiadas llamadas") ||
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("user request limit") ||
+    lower.includes("#17")
+  ) {
+    if (
+      lower.includes("cuenta publicitaria") ||
+      lower.includes("meta") ||
+      lower.includes("demasiadas llamadas")
+    ) {
+      return "Meta Ads está limitando peticiones ahora. Espera 2–5 minutos y vuelve a pulsar Hablar del informe."
+    }
     return "OpenAI está limitando peticiones (rate limit). Espera 1–2 minutos e inténtalo de nuevo."
   }
 
