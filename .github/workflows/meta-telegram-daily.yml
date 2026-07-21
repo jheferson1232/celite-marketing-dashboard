@@ -1,4 +1,5 @@
-# Informe Meta → Telegram 1×/día a las 8:00 America/Lima (13:00 UTC).
+# Informe Meta → Telegram 2×/día: 8:00 y 20:00 America/Lima
+# (13:00 UTC = 8:00 Lima; 01:00 UTC = 20:00 Lima).
 # Requiere secrets: CRON_SECRET (mismo valor que en Vercel).
 # Opcional: META_CRON_APP_URL (default: producción en Vercel).
 
@@ -6,7 +7,8 @@ name: Meta Telegram daily
 
 on:
   schedule:
-    - cron: "0 13 * * *"
+    - cron: "0 13 * * *" # 8:00 America/Lima
+    - cron: "0 1 * * *" # 20:00 America/Lima
   workflow_dispatch:
 
 jobs:

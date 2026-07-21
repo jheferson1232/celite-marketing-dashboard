@@ -1141,7 +1141,7 @@ export function InformeIaContent() {
             Informe IA · Meta
           </h1>
           <p className="text-muted-foreground mt-0.5 max-w-2xl text-xs leading-snug">
-            Cron cada hora a Telegram (GitHub Actions): solo conjuntos{" "}
+            Cron a Telegram (8:00 y 20:00 Lima, GitHub Actions): solo conjuntos{" "}
             <span className="font-medium text-green-700 dark:text-green-400">
               ON
             </span>{" "}

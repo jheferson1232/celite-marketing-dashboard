@@ -6,8 +6,8 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 
 1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
-3. **Cron** — 1×/día a las 8:00 (America/Lima) vía GitHub Actions → `/api/cron/meta-telegram-reports`: conjuntos ON en Crítico.
-4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule diario 8:00 no se envía solo.
+3. **Cron** — 2×/día a las **8:00** y **20:00** (America/Lima) vía GitHub Actions → `/api/cron/meta-telegram-reports`: conjuntos ON en Crítico.
+4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule 8:00/20:00 no se envía solo.
 5. **Voz (consulta)** — Botón «Hablar del informe»: OpenAI Realtime (WebRTC). Solo consulta el snapshot del informe; no apaga ni edita Meta.
 
 OpenAI (`gpt-4o-mini`) redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`. La voz del informe usa Realtime (`gpt-realtime-2.1`) con la misma key.
@@ -48,7 +48,7 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 
 ## Cron diario (GitHub Actions — recomendado en Hobby)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe lo dispara [`.github/workflows/meta-telegram-daily.yml`](../.github/workflows/meta-telegram-daily.yml) **1×/día a las 8:00 America/Lima** (`0 13 * * *` UTC).
+El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe lo dispara [`.github/workflows/meta-telegram-daily.yml`](../.github/workflows/meta-telegram-daily.yml) **2×/día a las 8:00 y 20:00 America/Lima** (`0 13 * * *` y `0 1 * * *` UTC).
 
 > Para reducir uso de Neon Free, el historial en BD/sync está limitado a **7 días** (`META_INFORME_MAX_DAYS`).
 
@@ -75,7 +75,7 @@ Si prefieres no usar GitHub Actions:
 | URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
 | Método | GET |
 | Cabecera | `Authorization: Bearer <CRON_SECRET>` |
-| Intervalo | 1×/día (p. ej. `0 13 * * *` UTC = 8:00 Lima) |
+| Intervalo | 2×/día: `0 13 * * *` UTC = 8:00 Lima; `0 1 * * *` UTC = 20:00 Lima |
 
 ### Plan Vercel Pro
 
