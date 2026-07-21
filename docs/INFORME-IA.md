@@ -8,8 +8,9 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
 3. **Cron** — 1×/día a las 8:00 (America/Lima) vía GitHub Actions → `/api/cron/meta-telegram-reports`: conjuntos ON en Crítico.
 4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule diario 8:00 no se envía solo.
+5. **Voz (consulta)** — Botón «Hablar del informe»: OpenAI Realtime (WebRTC). Solo consulta el snapshot del informe; no apaga ni edita Meta.
 
-OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`; el informe horario y los umbrales son reglas fijas en código.
+OpenAI (`gpt-4o-mini`) redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`. La voz del informe usa Realtime (`gpt-realtime-2.1`) con la misma key.
 
 ## Variables de entorno
 
@@ -21,7 +22,7 @@ OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe
 | `CRON_SECRET` | Sí (prod) | `Authorization: Bearer …` en el cron |
 | `TELEGRAM_BOT_TOKEN` | Sí (alertas) | Bot de @BotFather |
 | `TELEGRAM_ALLOWED_USER_IDS` | Sí (alertas) | IDs separados por coma |
-| `OPENAI_API_KEY` | No | Texto más natural en Telegram |
+| `OPENAI_API_KEY` | No | Cierre nocturno Telegram + voz conversacional del informe |
 | `META_INFORME_MAX_DAYS` | No | Ventana en tabla/sync (default **7** días, Lima). |
 | `META_INFORME_START_DATE` | No | Inicio fijo opcional (`YYYY-MM-DD`, Lima), acotado por `META_INFORME_MAX_DAYS`. |
 
@@ -121,4 +122,5 @@ No incluye resumen de cuenta, campañas activas ni listas “a apagar”. Si no 
 | `src/lib/services/meta/meta-informe-alerts.ts` | Listas apagar / resumen campañas |
 | `src/lib/services/meta/meta-hourly-report.ts` | Mensaje horario + envío |
 | `src/lib/services/meta/meta-telegram-cron.ts` | Orquestación cron |
-| `src/app/(app)/informe-ia/` | UI |
+| `src/lib/services/meta/meta-informe-voice.ts` | Resumen + token Realtime (voz consulta) |
+| `src/app/(app)/informe-ia/` | UI (tabla + panel voz) |
