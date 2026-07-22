@@ -277,14 +277,7 @@ export function TikTokAgentePausedRecoverableCard() {
                 }
                 toolbarExtra={archivedButton}
                 onArchiveCampaign={(campaign) => {
-                  if (
-                    archiveMutation.isPending ||
-                    !window.confirm(
-                      `¿Sacar «${campaign.name}» de esta lista?\nNo se pausa en TikTok; solo se oculta aquí (útil si no hay stock).`
-                    )
-                  ) {
-                    return
-                  }
+                  if (archiveMutation.isPending) return
                   archiveMutation.mutate(campaign)
                 }}
               />
