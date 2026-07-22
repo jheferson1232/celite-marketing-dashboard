@@ -62,6 +62,8 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
     metaCampaigns,
     isLoadingCampaigns,
     tiktokAdSetsByCampaignId,
+    extendedMetricsLoading,
+    extendedMetricsError,
   } = useProductoLinkedCampaigns(linkedTikTokIds, linkedMetaIds, dateRange)
 
   const invalidate = () => {
@@ -175,6 +177,8 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
           metaCampaigns={metaCampaigns}
           isLoading={isLoadingCampaigns}
           tiktokAdSetsByCampaignId={tiktokAdSetsByCampaignId}
+          extendedMetricsLoading={extendedMetricsLoading}
+          extendedMetricsError={extendedMetricsError}
         />
       </section>
 

@@ -64,7 +64,7 @@ export async function applyTikTokCampaignStatusWith6amQueue(input: {
     return {
       scheduledFor6am: true,
       campaignOperationStatus: "DISABLE",
-      message: "Programada para activarse a las 6:00 AM (Lima).",
+      message: "cola a las 6am",
     }
   }
 

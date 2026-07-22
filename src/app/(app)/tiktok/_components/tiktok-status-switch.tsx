@@ -17,7 +17,6 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
   const {
     isEntityPending,
     getEntityError,
-    getEntityInfo,
     isCampaignQueuedFor6am,
     setEntityStatus,
   } = useTikTokManage()
@@ -31,7 +30,6 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
   const isPending = isEntityPending(entity)
   const isActive = optimisticActive ?? (queuedFor6am ? false : serverActive)
   const errorMessage = getEntityError(entity)
-  const infoMessage = getEntityInfo(entity)
 
   React.useEffect(() => {
     if (!isPending) {
@@ -55,18 +53,21 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
           isActive
             ? `Pausar ${entity.name}`
             : queuedFor6am
-              ? `${entity.name} en cola 6:00 — encender para activar ya`
+              ? `${entity.name} en cola a las 6am — encender para activar ya`
               : `Activar ${entity.name}`
         }
         className={cn(isPending && "opacity-60")}
       />
       {errorMessage ? (
-        <span className="max-w-[140px] text-center text-[10px] leading-tight text-destructive">
+        <span className="max-w-[72px] text-center text-[10px] leading-tight text-destructive">
           {errorMessage}
         </span>
-      ) : infoMessage || queuedFor6am ? (
-        <span className="text-muted-foreground max-w-[140px] text-center text-[10px] leading-tight">
-          {infoMessage ?? (queuedFor6am ? "Cola 6AM" : null)}
+      ) : queuedFor6am ? (
+        <span
+          className="text-muted-foreground text-center text-[10px] leading-tight whitespace-nowrap"
+          title="En cola: se activa a las 6:00 AM (Lima). Encendé otra vez para activar ya."
+        >
+          cola a las 6am
         </span>
       ) : null}
     </div>

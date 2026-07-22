@@ -176,10 +176,7 @@ export function useTikTokManageMutations(accountId?: string) {
                 setQueuedCampaignIds((current) =>
                   new Set(current).add(entity.id)
                 )
-                setEntityInfo(
-                  key,
-                  result.message ?? "En cola 6AM · encendé otra vez para activar ya"
-                )
+                setEntityInfo(key, result.message ?? "cola a las 6am")
                 void queryClient.invalidateQueries({
                   queryKey: ["tiktok-pending-activate-6am"],
                 })
@@ -193,7 +190,7 @@ export function useTikTokManageMutations(accountId?: string) {
               void queryClient.invalidateQueries({
                 queryKey: ["tiktok-pending-activate-6am"],
               })
-              if (result?.message) {
+              if (result?.message && result.message !== "Activada ahora en TikTok.") {
                 setEntityInfo(key, result.message)
               }
               invalidateAfterManageChange({ campaignId: entity.id })

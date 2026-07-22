@@ -218,18 +218,21 @@ export async function listProducts(): Promise<ProductRecord[]> {
   })
 }
 
-/** Índice campaña Meta → productos (para etiquetas en el dashboard). */
-export type MetaCampaignProductLink = {
+/** Índice campaña (Meta/TikTok) → productos (etiquetas en dashboard). */
+export type CampaignProductLink = {
   campaignId: string
   productId: string
   productName: string
 }
 
-export async function listMetaCampaignProductLinks(): Promise<
-  MetaCampaignProductLink[]
-> {
+/** @deprecated Usar CampaignProductLink */
+export type MetaCampaignProductLink = CampaignProductLink
+
+export async function listCampaignProductLinks(
+  platform: ProductPlatform
+): Promise<CampaignProductLink[]> {
   const rows = await prisma.productCampaign.findMany({
-    where: { platform: "meta" },
+    where: { platform },
     select: {
       campaignId: true,
       productId: true,
@@ -242,6 +245,12 @@ export async function listMetaCampaignProductLinks(): Promise<
     productId: row.productId,
     productName: row.product.name,
   }))
+}
+
+export async function listMetaCampaignProductLinks(): Promise<
+  CampaignProductLink[]
+> {
+  return listCampaignProductLinks("meta")
 }
 
 export async function getProductById(id: string): Promise<ProductRecord | null> {

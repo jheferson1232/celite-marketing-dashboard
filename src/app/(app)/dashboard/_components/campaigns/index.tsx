@@ -26,6 +26,10 @@ import { getCampaignAdSets } from "../../_actions/campaign-adsets"
 import { CampaignAdSetsExpandedRow } from "./campaign-adsets-expanded-row"
 import { CampaignDetailsSheet } from "./campaign-details-sheet"
 import { CampaignObjectiveFilters } from "./campaign-objective-filters"
+import {
+  CampaignProductFilter,
+  useCampaignIdsForSelectedProducts,
+} from "./campaign-product-filter"
 import { CampaignStatusFilters } from "./campaign-status-filters"
 import { getCampaignColumns } from "./columns"
 import { ColumnVisibilityToggle } from "./column-visibility-toggle"
@@ -119,6 +123,14 @@ export function CampaignsTable({
   const [detailsCampaign, setDetailsCampaign] =
     React.useState<CampaignRow | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false)
+  const [selectedProductIds, setSelectedProductIds] = React.useState<
+    Set<string>
+  >(() => new Set())
+  const productFilterPlatform = enableTikTokManage ? "tiktok" : "meta"
+  const productCampaignIds = useCampaignIdsForSelectedProducts(
+    productFilterPlatform,
+    selectedProductIds
+  )
   const { columnVisibility, setColumnVisibility } =
     usePersistedColumnVisibility(
       columnVisibilityStorageKey,
@@ -311,6 +323,13 @@ export function CampaignsTable({
             )
           )
 
+    const productFilteredRows =
+      productCampaignIds == null
+        ? objectiveFilteredRows
+        : objectiveFilteredRows.filter((row) =>
+            productCampaignIds.has(row.id)
+          )
+
     let conversionsCount = 0
     let messagesCount = 0
     if (!enableTikTokManage) {
@@ -331,7 +350,7 @@ export function CampaignsTable({
       statusCounts: counts,
       activeCampaignCount: activeCount,
       totalCampaignCount: tableData.length,
-      filteredTableData: objectiveFilteredRows,
+      filteredTableData: productFilteredRows,
       conversionsCount,
       messagesCount,
     }
@@ -339,6 +358,7 @@ export function CampaignsTable({
     currency,
     enableTikTokManage,
     performanceCountsAtAdSetLevel,
+    productCampaignIds,
     showMetaActiveCampaignFilter,
     selectedObjectiveFilter,
     selectedPerformanceFilter,
@@ -457,8 +477,13 @@ export function CampaignsTable({
               onFilterChange={handleObjectiveFilterChange}
             />
           ) : null}
+          <CampaignProductFilter
+            platform={productFilterPlatform}
+            selectedProductIds={selectedProductIds}
+            onSelectedProductIdsChange={setSelectedProductIds}
+          />
+          <ColumnVisibilityToggle table={table} />
         </CampaignStatusFilters>
-        <ColumnVisibilityToggle table={table} />
       </div>
 
       {enableMetaExtendedMetrics && extendedMetricsError ? (

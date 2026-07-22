@@ -24,6 +24,8 @@ interface ProductoLinkedCampaignsTableProps {
   metaCampaigns: CampaignRow[]
   isLoading: boolean
   tiktokAdSetsByCampaignId?: Record<string, CampaignAdSetRow[]>
+  extendedMetricsLoading?: boolean
+  extendedMetricsError?: Error | null
 }
 
 export function ProductoLinkedCampaignsTable({
@@ -32,6 +34,8 @@ export function ProductoLinkedCampaignsTable({
   metaCampaigns,
   isLoading,
   tiktokAdSetsByCampaignId,
+  extendedMetricsLoading = false,
+  extendedMetricsError = null,
 }: ProductoLinkedCampaignsTableProps) {
   const { platformFilter } = useProductoPlatformFilter()
 
@@ -112,6 +116,8 @@ export function ProductoLinkedCampaignsTable({
               adSetsQueryKeyPrefix="campaign-adsets"
               fetchCampaignAdSets={getCampaignAdSets}
               enableMetaExtendedMetrics
+              extendedMetricsLoading={extendedMetricsLoading}
+              extendedMetricsError={extendedMetricsError}
               columnVisibilityStorageKey={META_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
               defaultColumnVisibility={META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
             />

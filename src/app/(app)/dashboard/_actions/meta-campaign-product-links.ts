@@ -2,10 +2,17 @@
 
 import { createServerAction } from "@/lib/server-action"
 import {
-  listMetaCampaignProductLinks,
-  type MetaCampaignProductLink,
+  listCampaignProductLinks,
+  type CampaignProductLink,
+  type ProductPlatform,
 } from "@/lib/services/product"
 
+export const listCampaignProductLinksAction = createServerAction(
+  async (platform: ProductPlatform): Promise<CampaignProductLink[]> =>
+    listCampaignProductLinks(platform)
+)
+
+/** @deprecated Usar listCampaignProductLinksAction("meta") */
 export const listMetaCampaignProductLinksAction = createServerAction(
-  async (): Promise<MetaCampaignProductLink[]> => listMetaCampaignProductLinks()
+  async (): Promise<CampaignProductLink[]> => listCampaignProductLinks("meta")
 )

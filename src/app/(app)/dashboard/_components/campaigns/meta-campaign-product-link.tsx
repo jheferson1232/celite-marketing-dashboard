@@ -14,27 +14,34 @@ import {
 import { runServerAction } from "@/lib/server-action"
 import { listProductsAction } from "@/app/(app)/products/_actions/products"
 import { linkProductCampaignAction } from "@/app/(app)/product-stats/_actions/product-campaigns"
-import { listMetaCampaignProductLinksAction } from "../../_actions/meta-campaign-product-links"
+import type { ProductPlatform } from "@/lib/services/product"
+import { listCampaignProductLinksAction } from "../../_actions/meta-campaign-product-links"
 
-const LINKS_QUERY_KEY = ["meta-campaign-product-links"] as const
 const PRODUCTS_QUERY_KEY = ["products"] as const
 
-interface MetaCampaignProductLinkControlProps {
-  campaignId: string
-  campaignName: string
+function linksQueryKey(platform: ProductPlatform) {
+  return ["campaign-product-links", platform] as const
 }
 
-export function MetaCampaignProductLinkControl({
+interface CampaignProductLinkControlProps {
+  campaignId: string
+  campaignName: string
+  platform: ProductPlatform
+}
+
+export function CampaignProductLinkControl({
   campaignId,
   campaignName,
-}: MetaCampaignProductLinkControlProps) {
+  platform,
+}: CampaignProductLinkControlProps) {
   const queryClient = useQueryClient()
   const [open, setOpen] = React.useState(false)
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const queryKey = linksQueryKey(platform)
 
   const linksQuery = useQuery({
-    queryKey: LINKS_QUERY_KEY,
-    queryFn: () => runServerAction(listMetaCampaignProductLinksAction()),
+    queryKey,
+    queryFn: () => runServerAction(listCampaignProductLinksAction(platform)),
     staleTime: 60_000,
   })
 
@@ -67,13 +74,13 @@ export function MetaCampaignProductLinkControl({
           productId,
           campaignId,
           campaignName,
-          platform: "meta",
+          platform,
         })
       ),
     onSuccess: async () => {
       setFeedback(null)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: LINKS_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey }),
         queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ["product-sales-history"] }),
       ])
@@ -185,4 +192,11 @@ export function MetaCampaignProductLinkControl({
       </Popover>
     </div>
   )
+}
+
+/** @deprecated Usar CampaignProductLinkControl con platform="meta" */
+export function MetaCampaignProductLinkControl(
+  props: Omit<CampaignProductLinkControlProps, "platform">
+) {
+  return <CampaignProductLinkControl {...props} platform="meta" />
 }
