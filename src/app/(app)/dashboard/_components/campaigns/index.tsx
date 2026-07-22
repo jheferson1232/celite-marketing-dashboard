@@ -81,6 +81,12 @@ interface CampaignsTableProps {
   defaultColumnVisibility?: VisibilityState
   /** TikTok: chips excelente/en curso/crítico por conjunto; activos/apagadas por campaña. */
   tikTokAdSetsByCampaignId?: Record<string, CampaignAdSetRow[]>
+  /** Campañas abiertas al montar (p. ej. lista de pausados del agente). */
+  defaultExpandedCampaignIds?: string[]
+  /** Archivar / sacar campaña de esta vista (no pausa en TikTok). */
+  onArchiveCampaign?: (campaign: CampaignRow) => void
+  /** Extra a la derecha del toolbar (p. ej. botón Archivados). */
+  toolbarExtra?: React.ReactNode
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -111,6 +117,9 @@ export function CampaignsTable({
     ? META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
     : {},
   tikTokAdSetsByCampaignId,
+  defaultExpandedCampaignIds,
+  onArchiveCampaign,
+  toolbarExtra,
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -119,7 +128,7 @@ export function CampaignsTable({
     React.useState<CampaignObjectiveFilter>("ALL")
   const [expandedCampaignIds, setExpandedCampaignIds] = React.useState<
     Set<string>
-  >(() => new Set())
+  >(() => new Set(defaultExpandedCampaignIds ?? []))
   const [detailsCampaign, setDetailsCampaign] =
     React.useState<CampaignRow | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false)
@@ -416,6 +425,7 @@ export function CampaignsTable({
         enableMetaExtendedMetrics,
         metaLandingUrlsLoading,
         extendedMetricsLoading,
+        onArchiveCampaign,
       }),
     [
       currency,
@@ -426,6 +436,7 @@ export function CampaignsTable({
       expandedCampaignIds,
       handleToggleAdSets,
       handleOpenDetails,
+      onArchiveCampaign,
     ]
   )
 
@@ -483,6 +494,7 @@ export function CampaignsTable({
             onSelectedProductIdsChange={setSelectedProductIds}
           />
           <ColumnVisibilityToggle table={table} />
+          {toolbarExtra}
         </CampaignStatusFilters>
       </div>
 

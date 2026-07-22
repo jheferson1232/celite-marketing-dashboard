@@ -48,6 +48,8 @@ const TIKTOK_AD_SET_METRIC_COLUMN_META: Record<
   totalCpa: { label: "CPA total", align: "right" },
 }
 
+const TIKTOK_METRIC_ID_SET = new Set<string>(TIKTOK_AD_SET_METRIC_COLUMN_IDS)
+
 export function isTikTokAdSetMetricColumnId(
   columnId: string
 ): columnId is TikTokAdSetMetricColumnId {
@@ -67,7 +69,12 @@ export function getTikTokAdSetDisplayColumns(
   visibleSubtableColumns: AdSetSubtableColumnId[]
 ): TikTokAdSetDisplayColumnId[] {
   const withoutRoas = visibleSubtableColumns.filter((id) => id !== "roas")
-  const base = getAdSetSubtableColumnsWithTikTokManage(withoutRoas, true)
+  /** Evita duplicar 7d/totales: salen del listado base y se reinyectan una sola vez tras CPA. */
+  const metricsToShow = TIKTOK_AD_SET_METRIC_COLUMN_IDS.filter((id) =>
+    withoutRoas.includes(id)
+  )
+  const coreColumns = withoutRoas.filter((id) => !TIKTOK_METRIC_ID_SET.has(id))
+  const base = getAdSetSubtableColumnsWithTikTokManage(coreColumns, true)
   const out: TikTokAdSetDisplayColumnId[] = []
 
   for (const columnId of base) {
@@ -79,12 +86,7 @@ export function getTikTokAdSetDisplayColumns(
       out.push("duplicate")
     }
     if (columnId === "costPerResult") {
-      out.push(
-        "purchases7d",
-        "cpa7d",
-        "totalPurchases",
-        "totalCpa"
-      )
+      out.push(...metricsToShow)
     }
   }
 

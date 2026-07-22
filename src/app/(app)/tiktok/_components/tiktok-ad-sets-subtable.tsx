@@ -262,8 +262,8 @@ export function TikTokAdSetsSubtable({
 
   return (
     <div className="min-w-0 w-full max-w-full py-1">
-      {/* Scroll propio: sin min-w-0 la subtabla ensancha toda la tabla de campañas. */}
-      <Table>
+      {/* Sin scroll propio: el scroll horizontal lo maneja la tabla de campañas. */}
+      <Table containerClassName="overflow-visible">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">

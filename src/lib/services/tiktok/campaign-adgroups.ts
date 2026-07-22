@@ -70,6 +70,7 @@ function mapTikTokAdGroupToRow(
     purchases7d: last7d.purchases,
     cpa7d: last7d.cpa,
     totalPurchases: totals.purchases,
+    totalSpend: totals.spend,
     totalCpa: totals.cpa,
   }
 }

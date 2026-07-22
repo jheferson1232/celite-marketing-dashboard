@@ -1,7 +1,7 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
-import { RiInformationLine, RiStackLine } from "@remixicon/react"
+import { RiArchiveLine, RiInformationLine, RiStackLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { CampaignRow } from "@/lib/services/meta/types"
@@ -39,6 +39,8 @@ interface GetCampaignColumnsOptions {
   enableMetaExtendedMetrics?: boolean
   metaLandingUrlsLoading?: boolean
   extendedMetricsLoading?: boolean
+  /** Archivar / sacar de una lista contextual (p. ej. Pausados recuperables). */
+  onArchiveCampaign?: (campaign: CampaignRow) => void
 }
 
 export function getCampaignColumns({
@@ -50,6 +52,7 @@ export function getCampaignColumns({
   enableMetaExtendedMetrics = false,
   metaLandingUrlsLoading = false,
   extendedMetricsLoading = false,
+  onArchiveCampaign,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
   const showLifetimeMetrics = enableTikTokManage || enableMetaExtendedMetrics
@@ -481,6 +484,17 @@ export function getCampaignColumns({
                 urls={row.original.landingUrls ?? []}
                 campaignName={row.original.name}
               />
+            ) : null}
+            {onArchiveCampaign ? (
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onArchiveCampaign(row.original)}
+                aria-label="Sacar de esta lista"
+                title="Sacar de esta lista (p. ej. sin stock)"
+              >
+                <RiArchiveLine data-icon="inline-start" />
+              </Button>
             ) : null}
             <Button
               variant="outline"

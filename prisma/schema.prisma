@@ -274,6 +274,11 @@ model TikTokAgentSettings {
   activateAt6amEnabled  Boolean @default(false)
   /** IDs de campaña en cola para activar a las 6:00 (JSON string[]). */
   pendingActivateCampaignIds String @default("[]")
+  /**
+   * Campañas ocultas de «Pausados con buen historial»
+   * (JSON { campaignId, name, archivedAt }[]).
+   */
+  archivedRecoverableCampaigns String @default("[]")
   /** Escalar presupuesto del mejor conjunto/anuncio del día. */
   scaleBestEnabled      Boolean @default(false)
   /** % de aumento de presupuesto diario al escalar (ej. 20 = +20%). */

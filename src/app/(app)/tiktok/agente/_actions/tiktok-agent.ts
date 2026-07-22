@@ -10,6 +10,12 @@ import {
   listTikTokAgentRuns,
   runTikTokAgent,
 } from "@/lib/services/tiktok/agent/runner"
+import { listTikTokPausedRecoverable } from "@/lib/services/tiktok/agent/paused-recoverable"
+import {
+  archiveRecoverableCampaign,
+  listArchivedRecoverableCampaigns,
+  unarchiveRecoverableCampaign,
+} from "@/lib/services/tiktok/agent/archived-recoverable"
 import { getTikTokAgentTelegramStatus } from "@/lib/services/tiktok/agent/telegram"
 import type { TikTokAgentThresholds } from "@/lib/services/tiktok/agent/types"
 
@@ -37,4 +43,21 @@ export const getTikTokAgentRunAction = createServerAction(async (runId: string) 
 export const runTikTokAgentNowAction = createServerAction(
   async (input: { dryRun: boolean }) =>
     runTikTokAgent({ trigger: "manual", dryRun: input.dryRun })
+)
+
+export const listTikTokPausedRecoverableAction = createServerAction(async () =>
+  listTikTokPausedRecoverable()
+)
+
+export const listArchivedRecoverableCampaignsAction = createServerAction(
+  async () => listArchivedRecoverableCampaigns()
+)
+
+export const archiveRecoverableCampaignAction = createServerAction(
+  async (input: { campaignId: string; name: string }) =>
+    archiveRecoverableCampaign(input)
+)
+
+export const unarchiveRecoverableCampaignAction = createServerAction(
+  async (campaignId: string) => unarchiveRecoverableCampaign(campaignId)
 )

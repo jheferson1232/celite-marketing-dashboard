@@ -37,6 +37,7 @@ import {
   TIKTOK_AGENT_TRIGGER_LABEL,
 } from "@/lib/services/tiktok/agent/constants"
 import { TikTokAgenteAutomationCards } from "./tiktok-agente-automation-cards"
+import { TikTokAgentePausedRecoverableCard } from "./tiktok-agente-paused-recoverable-card"
 import {
   getTikTokAgentTelegramStatusAction,
   getTikTokAgentThresholdsAction,
@@ -224,6 +225,8 @@ export function TikTokAgenteContent() {
           </ul>
         </CardContent>
       </Card>
+
+      <TikTokAgentePausedRecoverableCard />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

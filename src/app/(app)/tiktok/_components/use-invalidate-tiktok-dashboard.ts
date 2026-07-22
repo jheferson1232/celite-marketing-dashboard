@@ -11,7 +11,8 @@ function isTikTokQueryKey(key: string): boolean {
     key.startsWith("tiktok-campaigns") ||
     key.startsWith("tiktok-ad-insights") ||
     key.startsWith("tiktok-campaign-adgroups") ||
-    key.startsWith("tiktok-campaign-daily-insights")
+    key.startsWith("tiktok-campaign-daily-insights") ||
+    key.startsWith("tiktok-paused-recoverable")
   )
 }
 
@@ -32,6 +33,10 @@ export function useInvalidateTikTokDashboard() {
         await runServerAction(clearTikTokCacheAction())
         await queryClient.invalidateQueries({
           queryKey: ["tiktok-campaigns"],
+          refetchType: "active",
+        })
+        await queryClient.invalidateQueries({
+          queryKey: ["tiktok-paused-recoverable"],
           refetchType: "active",
         })
         // TikTok usa prefetch de todos los conjuntos; sin esto el duplicado no aparece.
