@@ -20,6 +20,7 @@ import { CampaignsTable } from "./campaigns"
 import { AdsView } from "./ads"
 import { DateRangePicker } from "./date-range-picker"
 import { MetaApiStatusIndicator } from "./meta-api-status-indicator"
+import { useMetaArchivedCampaigns } from "./campaigns/use-meta-archived-campaigns"
 import {
   RiAdvertisementLine,
   RiMegaphoneLine,
@@ -31,6 +32,12 @@ export function DashboardContent() {
   const [isReloading, setIsReloading] = useState(false)
   const [activeTab, setActiveTab] = useState("campaigns")
   const { dateRange, setDateRange } = useDateRange()
+  const {
+    archivedIds,
+    archivedMenu,
+    feedback: archiveFeedback,
+    archiveCampaign,
+  } = useMetaArchivedCampaigns()
 
   const dashboardQueryOptions = {
     staleTime: 2 * 60 * 1000,
@@ -51,6 +58,7 @@ export function DashboardContent() {
             "meta-campaign-landing-urls",
             "meta-landing-urls-map",
             "meta-adset-insights-warm",
+            "meta-archived-campaigns",
           ].includes(String(query.queryKey[0])),
       })
     } finally {
@@ -156,26 +164,28 @@ export function DashboardContent() {
   const campaignsEnriched = useMemo((): CampaignRow[] | undefined => {
     if (!campaigns) return undefined
 
-    return campaigns.map((campaign) => {
-      const urls = landingUrlsMap?.[campaign.id]
-      const withUrls =
-        urls && urls.length > 0
-          ? { ...campaign, landingUrls: urls }
-          : campaign
+    return campaigns
+      .filter((campaign) => !archivedIds.has(campaign.id))
+      .map((campaign) => {
+        const urls = landingUrlsMap?.[campaign.id]
+        const withUrls =
+          urls && urls.length > 0
+            ? { ...campaign, landingUrls: urls }
+            : campaign
 
-      if (!extendedMetrics) return withUrls
+        if (!extendedMetrics) return withUrls
 
-      const extended = extendedMetrics[campaign.id]
-      return {
-        ...withUrls,
-        purchases7d: extended?.purchases7d ?? 0,
-        cpa7d: extended?.cpa7d ?? 0,
-        totalPurchases: extended?.totalPurchases ?? 0,
-        totalSpend: extended?.totalSpend ?? 0,
-        totalCpa: extended?.totalCpa ?? 0,
-      }
-    })
-  }, [campaigns, extendedMetrics, landingUrlsMap])
+        const extended = extendedMetrics[campaign.id]
+        return {
+          ...withUrls,
+          purchases7d: extended?.purchases7d ?? 0,
+          cpa7d: extended?.cpa7d ?? 0,
+          totalPurchases: extended?.totalPurchases ?? 0,
+          totalSpend: extended?.totalSpend ?? 0,
+          totalCpa: extended?.totalCpa ?? 0,
+        }
+      })
+  }, [campaigns, extendedMetrics, landingUrlsMap, archivedIds])
 
   const { data: adInsights, isLoading: isLoadingAdInsights } = useQuery({
     queryKey: ["ad-insights", dateRange],
@@ -235,6 +245,17 @@ export function DashboardContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
+          {archiveFeedback ? (
+            <p
+              className={
+                archiveFeedback.type === "error"
+                  ? "text-destructive mb-3 text-sm"
+                  : "mb-3 text-sm text-emerald-700 dark:text-emerald-400"
+              }
+            >
+              {archiveFeedback.message}
+            </p>
+          ) : null}
           <CampaignsTable
             data={campaignsEnriched}
             isLoading={isLoadingCampaigns}
@@ -249,6 +270,8 @@ export function DashboardContent() {
                 ? (extendedMetricsError as Error)
                 : null
             }
+            toolbarExtra={archivedMenu}
+            onArchiveCampaign={archiveCampaign}
           />
         </TabsContent>
         <TabsContent value="ads" className="min-w-0 outline-none">

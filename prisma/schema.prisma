@@ -330,6 +330,19 @@ model MetaCommentAgentRun {
   @@map("MetaCommentAgentRun")
 }
 
+/** Preferencias del dashboard Meta (singleton id=default). */
+model MetaDashboardSettings {
+  id String @id @default("default")
+  /**
+   * Campañas ocultas en la tabla de /dashboard
+   * (JSON { campaignId, name, archivedAt }[]).
+   */
+  archivedCampaigns String   @default("[]")
+  updatedAt         DateTime @updatedAt
+
+  @@map("MetaDashboardSettings")
+}
+
 /** Configuración global del agente de comentarios (singleton id=default). */
 model MetaCommentAgentSettings {
   id                      String   @id @default("default")
