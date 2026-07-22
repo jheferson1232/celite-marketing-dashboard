@@ -67,7 +67,8 @@ export function TikTokContent() {
             key.startsWith("tiktok-ad-insights") ||
             key.startsWith("tiktok-campaign-adgroups") ||
             key.startsWith("tiktok-all-campaign-adgroups") ||
-            key.startsWith("tiktok-campaign-daily-insights")
+            key.startsWith("tiktok-campaign-daily-insights") ||
+            key.startsWith("tiktok-campaign-origins")
           )
         },
       })
@@ -231,6 +232,7 @@ export function TikTokContent() {
               defaultColumnVisibility={
                 TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
               }
+              showTikTokOriginLabel
             />
           </TikTokManageProvider>
         </TabsContent>

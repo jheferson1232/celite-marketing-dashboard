@@ -30,6 +30,11 @@ import {
   CampaignProductFilter,
   useCampaignIdsForSelectedProducts,
 } from "./campaign-product-filter"
+import {
+  CampaignOriginFilter,
+  useCampaignIdsForSelectedOrigins,
+  type TikTokOriginFilterValue,
+} from "./campaign-origin-filter"
 import { CampaignStatusFilters } from "./campaign-status-filters"
 import { getCampaignColumns } from "./columns"
 import { ColumnVisibilityToggle } from "./column-visibility-toggle"
@@ -87,6 +92,8 @@ interface CampaignsTableProps {
   onArchiveCampaign?: (campaign: CampaignRow) => void
   /** Extra a la derecha del toolbar (p. ej. botón Archivados). */
   toolbarExtra?: React.ReactNode
+  /** Solo dashboard TikTok: selector IA / Reutilizado en el nombre. */
+  showTikTokOriginLabel?: boolean
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -120,6 +127,7 @@ export function CampaignsTable({
   defaultExpandedCampaignIds,
   onArchiveCampaign,
   toolbarExtra,
+  showTikTokOriginLabel = false,
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -135,10 +143,22 @@ export function CampaignsTable({
   const [selectedProductIds, setSelectedProductIds] = React.useState<
     Set<string>
   >(() => new Set())
+  const [selectedOrigins, setSelectedOrigins] = React.useState<
+    Set<TikTokOriginFilterValue>
+  >(() => new Set())
+  const tableData = data ?? EMPTY_DATA
+  const allCampaignIds = React.useMemo(
+    () => tableData.map((row) => row.id),
+    [tableData]
+  )
   const productFilterPlatform = enableTikTokManage ? "tiktok" : "meta"
   const productCampaignIds = useCampaignIdsForSelectedProducts(
     productFilterPlatform,
     selectedProductIds
+  )
+  const originCampaignIds = useCampaignIdsForSelectedOrigins(
+    selectedOrigins,
+    allCampaignIds
   )
   const { columnVisibility, setColumnVisibility } =
     usePersistedColumnVisibility(
@@ -184,8 +204,6 @@ export function CampaignsTable({
       setColumnVisibility,
     ]
   )
-
-  const tableData = data ?? EMPTY_DATA
 
   const handleToggleAdSets = React.useCallback((campaignId: string) => {
     if (!campaignId) return
@@ -339,6 +357,11 @@ export function CampaignsTable({
             productCampaignIds.has(row.id)
           )
 
+    const originFilteredRows =
+      !showTikTokOriginLabel || originCampaignIds == null
+        ? productFilteredRows
+        : productFilteredRows.filter((row) => originCampaignIds.has(row.id))
+
     let conversionsCount = 0
     let messagesCount = 0
     if (!enableTikTokManage) {
@@ -359,16 +382,18 @@ export function CampaignsTable({
       statusCounts: counts,
       activeCampaignCount: activeCount,
       totalCampaignCount: tableData.length,
-      filteredTableData: productFilteredRows,
+      filteredTableData: originFilteredRows,
       conversionsCount,
       messagesCount,
     }
   }, [
     currency,
     enableTikTokManage,
+    originCampaignIds,
     performanceCountsAtAdSetLevel,
     productCampaignIds,
     showMetaActiveCampaignFilter,
+    showTikTokOriginLabel,
     selectedObjectiveFilter,
     selectedPerformanceFilter,
     tableData,
@@ -425,6 +450,7 @@ export function CampaignsTable({
         enableMetaExtendedMetrics,
         metaLandingUrlsLoading,
         extendedMetricsLoading,
+        showTikTokOriginLabel,
         onArchiveCampaign,
       }),
     [
@@ -433,6 +459,7 @@ export function CampaignsTable({
       enableMetaExtendedMetrics,
       metaLandingUrlsLoading,
       extendedMetricsLoading,
+      showTikTokOriginLabel,
       expandedCampaignIds,
       handleToggleAdSets,
       handleOpenDetails,
@@ -493,6 +520,13 @@ export function CampaignsTable({
             selectedProductIds={selectedProductIds}
             onSelectedProductIdsChange={setSelectedProductIds}
           />
+          {showTikTokOriginLabel ? (
+            <CampaignOriginFilter
+              campaignIds={allCampaignIds}
+              selectedOrigins={selectedOrigins}
+              onSelectedOriginsChange={setSelectedOrigins}
+            />
+          ) : null}
           <ColumnVisibilityToggle table={table} />
           {toolbarExtra}
         </CampaignStatusFilters>

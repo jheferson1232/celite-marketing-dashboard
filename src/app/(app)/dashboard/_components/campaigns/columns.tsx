@@ -22,6 +22,7 @@ import { TikTokCampaignBudgetCell } from "@/app/(app)/tiktok/_components/tiktok-
 import { MetaCampaignLandingUrlsButton } from "./meta-campaign-landing-urls-button"
 import { CampaignProductLinkControl } from "./meta-campaign-product-link"
 import { TikTokCampaignLandingUrlsButton } from "@/app/(app)/tiktok/_components/tiktok-campaign-landing-urls-button"
+import { TikTokCampaignOriginLabel } from "@/app/(app)/tiktok/_components/tiktok-campaign-origin-label"
 
 function columnMeta(
   label: string,
@@ -39,6 +40,8 @@ interface GetCampaignColumnsOptions {
   enableMetaExtendedMetrics?: boolean
   metaLandingUrlsLoading?: boolean
   extendedMetricsLoading?: boolean
+  /** TikTok dashboard: etiqueta IA / Reutilizado. */
+  showTikTokOriginLabel?: boolean
   /** Archivar / sacar de una lista contextual (p. ej. Pausados recuperables). */
   onArchiveCampaign?: (campaign: CampaignRow) => void
 }
@@ -52,6 +55,7 @@ export function getCampaignColumns({
   enableMetaExtendedMetrics = false,
   metaLandingUrlsLoading = false,
   extendedMetricsLoading = false,
+  showTikTokOriginLabel = false,
   onArchiveCampaign,
 }: GetCampaignColumnsOptions): ColumnDef<CampaignRow>[] {
   const manageColumns = enableTikTokManage ? getTikTokCampaignManageColumns() : []
@@ -100,6 +104,9 @@ export function getCampaignColumns({
             <span className="min-w-0 truncate" title={row.original.name}>
               {row.original.name}
             </span>
+            {showTikTokOriginLabel && row.original.id ? (
+              <TikTokCampaignOriginLabel campaignId={row.original.id} />
+            ) : null}
             {row.original.id ? (
               <CampaignProductLinkControl
                 campaignId={row.original.id}

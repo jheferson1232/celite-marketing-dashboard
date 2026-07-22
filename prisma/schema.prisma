@@ -288,6 +288,17 @@ model TikTokAgentSettings {
   @@map("TikTokAgentSettings")
 }
 
+/** Origen creativo de una campaña TikTok en el dashboard (IA vs reutilizado). */
+model TikTokCampaignOrigin {
+  campaignId String   @id
+  /** "ia" | "reutilizado" */
+  origin     String
+  updatedAt  DateTime @updatedAt
+
+  @@index([origin])
+  @@map("TikTokCampaignOrigin")
+}
+
 /** Cuenta TikTok Ads conectada (credenciales para API). */
 model TikTokAdAccount {
   id           String   @id @default(cuid())
