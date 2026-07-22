@@ -20,6 +20,7 @@ import {
 import { getTikTokCampaignManageColumns } from "@/app/(app)/tiktok/_components/tiktok-campaign-manage-columns"
 import { TikTokCampaignBudgetCell } from "@/app/(app)/tiktok/_components/tiktok-campaign-budget-cell"
 import { MetaCampaignLandingUrlsButton } from "./meta-campaign-landing-urls-button"
+import { MetaCampaignProductLinkControl } from "./meta-campaign-product-link"
 import { TikTokCampaignLandingUrlsButton } from "@/app/(app)/tiktok/_components/tiktok-campaign-landing-urls-button"
 
 function columnMeta(
@@ -93,9 +94,15 @@ export function getCampaignColumns({
                   : undefined
               }
             />
-            <span className="truncate" title={row.original.name}>
+            <span className="min-w-0 truncate" title={row.original.name}>
               {row.original.name}
             </span>
+            {!enableTikTokManage ? (
+              <MetaCampaignProductLinkControl
+                campaignId={row.original.id}
+                campaignName={row.original.name}
+              />
+            ) : null}
           </div>
         )
       },

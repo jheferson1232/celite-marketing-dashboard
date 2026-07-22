@@ -218,6 +218,32 @@ export async function listProducts(): Promise<ProductRecord[]> {
   })
 }
 
+/** Índice campaña Meta → productos (para etiquetas en el dashboard). */
+export type MetaCampaignProductLink = {
+  campaignId: string
+  productId: string
+  productName: string
+}
+
+export async function listMetaCampaignProductLinks(): Promise<
+  MetaCampaignProductLink[]
+> {
+  const rows = await prisma.productCampaign.findMany({
+    where: { platform: "meta" },
+    select: {
+      campaignId: true,
+      productId: true,
+      product: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+  return rows.map((row) => ({
+    campaignId: row.campaignId,
+    productId: row.productId,
+    productName: row.product.name,
+  }))
+}
+
 export async function getProductById(id: string): Promise<ProductRecord | null> {
   return prisma.product.findUnique({
     where: { id },
