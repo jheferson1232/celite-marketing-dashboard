@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { runServerAction } from "@/lib/server-action"
 import { getTikTokAccountKpisSummary } from "../_actions/account-kpis"
@@ -21,6 +21,7 @@ import { resolveTikTokAccountCurrency } from "@/lib/services/tiktok/account-curr
 import { TikTokManageProvider } from "./tiktok-manage-provider"
 import { TikTokAccountSelect } from "./tiktok-account-select"
 import { useTikTokDashboardAccount } from "./use-tiktok-dashboard-account"
+import { useTikTokArchivedCampaigns } from "./use-tiktok-archived-campaigns"
 import {
   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
   TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
@@ -43,6 +44,12 @@ export function TikTokContent() {
     selectedAccount,
     isLoading: isLoadingAccounts,
   } = useTikTokDashboardAccount()
+  const {
+    archivedIds,
+    archivedMenu,
+    feedback: archiveFeedback,
+    archiveCampaign,
+  } = useTikTokArchivedCampaigns()
 
   const accountCurrency = resolveTikTokAccountCurrency(
     selectedAccount?.currency
@@ -68,7 +75,8 @@ export function TikTokContent() {
             key.startsWith("tiktok-campaign-adgroups") ||
             key.startsWith("tiktok-all-campaign-adgroups") ||
             key.startsWith("tiktok-campaign-daily-insights") ||
-            key.startsWith("tiktok-campaign-origins")
+            key.startsWith("tiktok-campaign-origins") ||
+            key.startsWith("tiktok-archived-campaigns")
           )
         },
       })
@@ -100,6 +108,11 @@ export function TikTokContent() {
       ),
     ...dashboardQueryOptions,
   })
+
+  const visibleCampaigns = useMemo(
+    () => campaigns?.filter((campaign) => !archivedIds.has(campaign.id)),
+    [archivedIds, campaigns]
+  )
 
   const { data: adSetsByCampaignId } = useQuery({
     queryKey: ["tiktok-all-campaign-adgroups", accountId, dateRange],
@@ -213,13 +226,24 @@ export function TikTokContent() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns" className="min-w-0 outline-none">
+          {archiveFeedback ? (
+            <p
+              className={
+                archiveFeedback.type === "error"
+                  ? "text-destructive mb-3 text-sm"
+                  : "mb-3 text-sm text-emerald-700 dark:text-emerald-400"
+              }
+            >
+              {archiveFeedback.message}
+            </p>
+          ) : null}
           <TikTokManageProvider
             accountId={accountId}
             currency={accountCurrency}
           >
             <CampaignsTable
               key={accountId ?? "no-account"}
-              data={campaigns}
+              data={visibleCampaigns}
               isLoading={isLoadingCampaigns || isLoadingAccounts}
               currency={accountCurrency}
               adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
@@ -233,6 +257,8 @@ export function TikTokContent() {
                 TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
               }
               showTikTokOriginLabel
+              toolbarExtra={archivedMenu}
+              onArchiveCampaign={archiveCampaign}
             />
           </TikTokManageProvider>
         </TabsContent>

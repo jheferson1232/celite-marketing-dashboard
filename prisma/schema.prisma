@@ -299,6 +299,19 @@ model TikTokCampaignOrigin {
   @@map("TikTokCampaignOrigin")
 }
 
+/** Preferencias del dashboard TikTok (singleton id=default). */
+model TikTokDashboardSettings {
+  id String @id @default("default")
+  /**
+   * Campañas ocultas en la tabla de /tiktok
+   * (JSON { campaignId, name, archivedAt }[]).
+   */
+  archivedCampaigns String   @default("[]")
+  updatedAt         DateTime @updatedAt
+
+  @@map("TikTokDashboardSettings")
+}
+
 /** Cuenta TikTok Ads conectada (credenciales para API). */
 model TikTokAdAccount {
   id           String   @id @default(cuid())
