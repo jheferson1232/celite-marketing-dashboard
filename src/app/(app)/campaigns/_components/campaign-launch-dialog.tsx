@@ -154,6 +154,10 @@ export function CampaignLaunchDialog({
 
   const progressValue = progressPercent(launchProgress)
 
+  if (!open) {
+    return null
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg" showCloseButton={phase !== "launching"}>

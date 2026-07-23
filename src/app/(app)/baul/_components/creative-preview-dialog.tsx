@@ -36,7 +36,7 @@ export function CreativePreviewDialog({
   onOpenChange,
   creative,
 }: CreativePreviewDialogProps) {
-  if (!creative) return null
+  if (!open || !creative) return null
 
   const label = getCreativeLabel(creative)
 

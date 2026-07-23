@@ -73,10 +73,9 @@ function DialogContent({
               variant="ghost"
               className="absolute top-4 right-4"
               size="icon-sm"
+              aria-label="Cerrar"
             >
-              <RiCloseLine
-              />
-              <span className="sr-only">Close</span>
+              <RiCloseLine />
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -115,7 +114,9 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline" aria-label="Cerrar">
+            Cerrar
+          </Button>
         </DialogPrimitive.Close>
       )}
     </div>

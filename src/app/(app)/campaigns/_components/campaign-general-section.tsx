@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { RiPlayFill } from "@remixicon/react"
 import { CAMPAIGN_STATUS_VALUES } from "@/lib/campaigns/status"
@@ -22,6 +22,7 @@ import { isTikTokMediaHostname } from "@/lib/services/sociavault/tiktok-media-ho
 import {
   formatTikTokVideoCreateTime,
   isTikTokPostVideoAsset,
+  toSparkVideoSelectionId,
   type TikTokAdVideoAsset,
 } from "@/lib/services/tiktok/ad-video-asset"
 import { runServerAction } from "@/lib/server-action"
@@ -145,9 +146,16 @@ function TikTokAdVideoPreviewDialog({
   const durationLabel = formatVideoDuration(video?.durationMs ?? null)
   const loading = !cachedPreview && (isLoading || isFetching)
 
+  if (!open || !video) {
+    return null
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm gap-4 p-0 sm:max-w-md">
+      <DialogContent
+        className="max-w-sm gap-4 p-0 sm:max-w-md"
+        showCloseButton
+      >
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="truncate pr-8">
             {profileLabel}
@@ -211,12 +219,19 @@ export function CampaignGeneralSection({
 }: CampaignGeneralSectionProps) {
   const [debouncedAuthCode, setDebouncedAuthCode] = useState(authCode.trim())
   const [previewVideo, setPreviewVideo] = useState<TikTokAdVideoAsset | null>(null)
+  const lastAutoSelectedAuthRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedAuthCode(authCode.trim())
     }, 450)
     return () => window.clearTimeout(timer)
+  }, [authCode])
+
+  useEffect(() => {
+    if (!authCode.trim()) {
+      lastAutoSelectedAuthRef.current = null
+    }
   }, [authCode])
 
   const {
@@ -254,9 +269,36 @@ export function CampaignGeneralSection({
     [selectedTikTokVideoIds]
   )
 
+  // Al reconocer el código, agregar/seleccionar el post Spark (antes solo mostraba miniatura).
+  useEffect(() => {
+    const preview = sparkPreviewQuery.data
+    if (!preview?.itemId || sparkPreviewQuery.isFetching) return
+    if (lastAutoSelectedAuthRef.current === preview.authCode) return
+
+    const selectionId = toSparkVideoSelectionId(preview.itemId)
+    lastAutoSelectedAuthRef.current = preview.authCode
+
+    if (selectedTikTokSet.has(selectionId)) return
+
+    if (maxTikTokVideos === 1) {
+      onSelectedTikTokVideoIdsChange([selectionId])
+      return
+    }
+
+    onSelectedTikTokVideoIdsChange([...selectedTikTokVideoIds, selectionId])
+  }, [
+    maxTikTokVideos,
+    onSelectedTikTokVideoIdsChange,
+    selectedTikTokSet,
+    selectedTikTokVideoIds,
+    sparkPreviewQuery.data,
+    sparkPreviewQuery.isFetching,
+  ])
+
   const tikTokPostVideos = useMemo(() => {
     const posts = tikTokVideos.filter(isTikTokPostVideoAsset)
     const byId = new Map(posts.map((video) => [video.id, video]))
+    const sparkPreview = sparkPreviewQuery.data
 
     for (const id of selectedTikTokVideoIds) {
       if (byId.has(id)) continue
@@ -265,15 +307,22 @@ export function CampaignGeneralSection({
         byId.set(id, fromList)
         continue
       }
+
+      const previewMatches =
+        sparkPreview?.itemId != null &&
+        toSparkVideoSelectionId(sparkPreview.itemId) === id
+
       byId.set(id, {
         id,
-        name: "Seleccionado",
-        profileName: null,
-        itemId: null,
+        name: previewMatches
+          ? sparkPreview.userName || "Post autorizado"
+          : "Seleccionado",
+        profileName: previewMatches ? sparkPreview.userName : null,
+        itemId: previewMatches ? sparkPreview.itemId : null,
         identityId: null,
-        identityType: null,
-        coverUrl: null,
-        previewUrl: null,
+        identityType: previewMatches ? "AUTH_CODE" : null,
+        coverUrl: previewMatches ? sparkPreview.coverUrl : null,
+        previewUrl: previewMatches ? sparkPreview.videoUrl : null,
         durationMs: null,
         width: null,
         height: null,
@@ -291,7 +340,7 @@ export function CampaignGeneralSection({
         "es"
       )
     })
-  }, [selectedTikTokVideoIds, tikTokVideos])
+  }, [selectedTikTokVideoIds, sparkPreviewQuery.data, tikTokVideos])
 
   function toggleTikTokVideo(videoId: string, checked: boolean) {
     if (checked) {
@@ -572,8 +621,8 @@ export function CampaignGeneralSection({
           onChange={(event) => onAuthCodeChange(event.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Pegá el código de autorización del post (Spark Ads). Se muestra la miniatura
-          del video al reconocerlo.
+          Pegá el código Spark Ads del post. Al reconocerlo, se selecciona solo
+          para esta campaña (no cambia la estrategia).
         </p>
 
         {debouncedAuthCode.length >= 8 ? (

@@ -25,6 +25,10 @@ export function CampaignDeleteDialog({
   onConfirm,
   isPending = false,
 }: CampaignDeleteDialogProps) {
+  if (!open) {
+    return null
+  }
+
   return (
     <Dialog open={open} onOpenChange={isPending ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-md">

@@ -398,13 +398,21 @@ async function resolveAdCreativeForAdgroup(
   const sparkItemId = resolveSparkItemIdFromAdgroup(ag)
   if (sparkItemId) {
     const post = await getTikTokSparkPostByItemId(sparkItemId)
-    const identityId =
+    let identityId =
       ag.identity_id?.trim() || post?.identityId?.trim() || null
-    const identityType =
+    let identityType =
       ag.identity_type?.trim() || post?.identityType?.trim() || null
+
+    // Código pegado en la campaña: identidad Spark Ads AUTH_CODE.
+    const authCode = ctx.cfg.campaign.auth_code?.trim()
+    if ((!identityId || !identityType) && authCode) {
+      identityId = authCode
+      identityType = "AUTH_CODE"
+    }
+
     if (!identityId || !identityType) {
       throw new Error(
-        `Conjunto "${ag.name}": el post Spark ${sparkItemId} no tiene identidad (AUTH_CODE/TT_USER). Reautorizá el post.`
+        `Conjunto "${ag.name}": el post Spark ${sparkItemId} no tiene identidad (AUTH_CODE/TT_USER). Pegá el código de autorización o reautorizá el post.`
       )
     }
     return {
@@ -500,6 +508,9 @@ async function createAdgroupAndAd(
           identity_type: creative.identityType,
           identity_id: creative.identityId,
           tiktok_item_id: creative.itemId,
+          ...(creative.identityType.toUpperCase() === "AUTH_CODE"
+            ? { creative_authorized: true }
+            : {}),
           ad_text: cfg.campaign.ad_text ?? "",
           call_to_action: cta,
           landing_page_url: landingUrl,

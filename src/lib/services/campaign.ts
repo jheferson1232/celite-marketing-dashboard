@@ -90,9 +90,7 @@ function mapCampaignRecord(row: {
   const config =
     parsedConfig.strategy === "ABO"
       ? normalizeABOConfig(parsedConfig)
-      : parsedConfig.strategy === "CBO"
-        ? normalizeCBOConfig(parsedConfig)
-        : parsedConfig
+      : normalizeCBOConfig(parsedConfig)
 
   return {
     id: row.id,

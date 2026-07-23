@@ -154,20 +154,18 @@ export function DashboardAssistantPanel({
           variant="ghost"
           size="icon-sm"
           onClick={onCollapse}
-          title="Minimizar"
+          aria-label="Minimizar asistente"
         >
           <RiSubtractLine className="size-4" />
-          <span className="sr-only">Minimizar</span>
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           onClick={onClose}
-          title="Cerrar"
+          aria-label="Cerrar asistente"
         >
           <RiCloseLine className="size-4" />
-          <span className="sr-only">Cerrar</span>
         </Button>
       </header>
 

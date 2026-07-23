@@ -213,8 +213,11 @@ async function buildCampaignLaunchPreflight(
     launchCfg.adgroups[0]?.url ??
     (campaign.strategy === "ABO"
       ? (campaign.config as ABOStrategyConfig).dynamic.landingPageUrl
-      : (campaign.config as CBOStrategyConfig).dynamic.landingPageUrl) ??
+      : campaign.strategy === "CBO"
+        ? (campaign.config as CBOStrategyConfig).dynamic.landingPageUrl
+        :     "") ??
     ""
+
   checks.push({
     ok: Boolean(landingUrl.trim()),
     label: "Landing page",

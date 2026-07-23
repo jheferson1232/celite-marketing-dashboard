@@ -74,10 +74,9 @@ function SheetContent({
               variant="ghost"
               className="absolute top-4 right-4"
               size="icon-sm"
+              aria-label="Cerrar"
             >
-              <RiCloseLine
-              />
-              <span className="sr-only">Close</span>
+              <RiCloseLine />
             </Button>
           </SheetPrimitive.Close>
         )}

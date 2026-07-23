@@ -1,0 +1,1 @@
+ALTER TYPE "CampaignStrategy" ADD VALUE 'CBO_PRODUCTO';
