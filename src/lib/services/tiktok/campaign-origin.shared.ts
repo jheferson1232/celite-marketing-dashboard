@@ -1,17 +1,6 @@
-export const TIKTOK_CAMPAIGN_ORIGINS = ["ia", "reutilizado"] as const
-
-export type TikTokCampaignOriginValue =
-  (typeof TIKTOK_CAMPAIGN_ORIGINS)[number]
-
-export type TikTokCampaignOriginRow = {
-  campaignId: string
-  origin: TikTokCampaignOriginValue
-}
-
-export const TIKTOK_CAMPAIGN_ORIGIN_LABELS: Record<
-  TikTokCampaignOriginValue,
-  string
-> = {
-  ia: "IA",
-  reutilizado: "Reutilizado",
-}
+export {
+  CAMPAIGN_ORIGINS as TIKTOK_CAMPAIGN_ORIGINS,
+  CAMPAIGN_ORIGIN_LABELS as TIKTOK_CAMPAIGN_ORIGIN_LABELS,
+  type CampaignOriginValue as TikTokCampaignOriginValue,
+  type CampaignOriginRow as TikTokCampaignOriginRow,
+} from "@/lib/services/campaign-origin.shared"

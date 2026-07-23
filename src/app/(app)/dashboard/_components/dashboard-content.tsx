@@ -272,6 +272,7 @@ export function DashboardContent() {
             }
             toolbarExtra={archivedMenu}
             onArchiveCampaign={archiveCampaign}
+            originPlatform="meta"
           />
         </TabsContent>
         <TabsContent value="ads" className="min-w-0 outline-none">

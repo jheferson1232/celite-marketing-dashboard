@@ -256,7 +256,7 @@ export function TikTokContent() {
               defaultColumnVisibility={
                 TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY
               }
-              showTikTokOriginLabel
+              originPlatform="tiktok"
               toolbarExtra={archivedMenu}
               onArchiveCampaign={archiveCampaign}
             />

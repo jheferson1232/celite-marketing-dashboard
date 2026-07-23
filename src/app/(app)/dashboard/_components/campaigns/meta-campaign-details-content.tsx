@@ -15,7 +15,9 @@ import {
 import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
 import { getLastSevenDaysRange } from "@/lib/services/meta/campaign-daily-insights"
+import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
 import { getMetaCampaignDailyInsightsAction } from "../../_actions/campaign-daily-insights"
+import { getMetaCampaignVideoThumbnailsAction } from "../../_actions/campaign-video-thumbnails"
 import { TikTokCampaignDetailsChart } from "@/app/(app)/tiktok/_components/tiktok-campaign-details-chart"
 
 interface MetaCampaignDetailsContentProps {
@@ -47,9 +49,21 @@ export function MetaCampaignDetailsContent({
     enabled: Boolean(campaignId),
   })
 
+  // Diferir miniaturas hasta que los insights terminen: evita pico de QPS con Meta.
+  const thumbnailsQuery = useQuery({
+    queryKey: ["meta-campaign-video-thumbnails", campaignId],
+    queryFn: () =>
+      runServerAction(getMetaCampaignVideoThumbnailsAction(campaignId)),
+    enabled: Boolean(campaignId) && Boolean(data),
+    staleTime: 30 * 60 * 1000,
+    retry: (failureCount, error) =>
+      isMetaRateLimitError(error) ? failureCount < 2 : failureCount < 1,
+    retryDelay: (attempt) => Math.min(2_000 * 2 ** attempt, 8_000),
+  })
+
   if (isLoading) {
     return (
-      <div className="space-y-4 px-4 pb-6">
+      <div className="flex flex-col gap-4 px-4 pb-6">
         <div className="grid grid-cols-3 gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-16 rounded-lg" />
@@ -63,17 +77,20 @@ export function MetaCampaignDetailsContent({
 
   if (isError || !data) {
     return (
-      <p className="px-4 pb-6 text-sm text-destructive">
+      <p className="text-destructive px-4 pb-6 text-sm">
         {error?.message ?? "No se pudieron cargar los detalles de la campaña."}
       </p>
     )
   }
 
   const rangeLabel = `${format(parseISO(dateRange.from), "d MMM", { locale: es })} – ${format(parseISO(dateRange.to), "d MMM yyyy", { locale: es })}`
+  const thumbnails = thumbnailsQuery.data ?? []
 
   return (
-    <div className="space-y-5 overflow-y-auto px-4 pb-6">
-      <p className="text-xs text-muted-foreground">Últimos 7 días · {rangeLabel}</p>
+    <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-6">
+      <p className="text-muted-foreground text-xs">
+        Últimos 7 días · {rangeLabel}
+      </p>
 
       <div className="grid grid-cols-3 gap-3">
         <SummaryCard
@@ -100,7 +117,7 @@ export function MetaCampaignDetailsContent({
           days={data.days}
           currency={META_DASHBOARD_CURRENCY}
         />
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-2 text-xs">
           Barras: gasto ($) · Línea: compras
         </p>
       </div>
@@ -142,6 +159,61 @@ export function MetaCampaignDetailsContent({
           </Table>
         </div>
       </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-medium">Videos de la campaña</h3>
+        <p className="text-muted-foreground mb-3 text-xs">
+          Miniaturas (solo covers, sin cargar el video).
+        </p>
+        {thumbnailsQuery.isLoading || thumbnailsQuery.isFetching ? (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[9/16] w-full rounded-md" />
+            ))}
+          </div>
+        ) : thumbnailsQuery.isError ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-xs">
+              {isMetaRateLimitError(thumbnailsQuery.error)
+                ? "Meta limitó las llamadas. Espera unos segundos y reintenta."
+                : thumbnailsQuery.error instanceof Error
+                  ? thumbnailsQuery.error.message
+                  : "No se pudieron cargar las miniaturas."}
+            </p>
+            <button
+              type="button"
+              className="text-foreground w-fit text-xs underline underline-offset-2"
+              onClick={() => void thumbnailsQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : thumbnails.length === 0 ? (
+          <p className="text-muted-foreground text-xs">
+            No hay creativos con miniatura en esta campaña.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {thumbnails.map((item) => (
+              <li key={item.id} className="min-w-0">
+                <div className="bg-muted overflow-hidden rounded-md border">
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={item.name}
+                    title={item.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="aspect-[9/16] w-full object-cover"
+                  />
+                </div>
+                <p className="text-muted-foreground mt-1 truncate text-[10px]">
+                  {item.name}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -149,7 +221,7 @@ export function MetaCampaignDetailsContent({
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-muted-foreground text-xs">{label}</p>
       <p className="text-sm font-semibold tabular-nums">{value}</p>
     </div>
   )

@@ -2,7 +2,7 @@ import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 /** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev/serverless. */
-const PRISMA_CLIENT_VERSION = 20
+const PRISMA_CLIENT_VERSION = 21
 
 type GlobalPrismaStore = {
   prisma?: PrismaClient
@@ -61,6 +61,10 @@ function hasMetaLibraryEntryModel(client: PrismaClient) {
   return Boolean(client.metaLibraryEntry)
 }
 
+function hasMetaCampaignOriginModel(client: PrismaClient) {
+  return Boolean(client.metaCampaignOrigin)
+}
+
 function hasMetaDashboardSettingsModel(client: PrismaClient) {
   return Boolean(client.metaDashboardSettings)
 }
@@ -78,7 +82,8 @@ export function getPrismaClient(forceNew = false): PrismaClient {
     hasTikTokDashboardSettingsModel(globalStore.prisma) &&
     hasMetaCommentAgentModels(globalStore.prisma) &&
     hasMetaLibraryEntryModel(globalStore.prisma) &&
-    hasMetaDashboardSettingsModel(globalStore.prisma)
+    hasMetaDashboardSettingsModel(globalStore.prisma) &&
+    hasMetaCampaignOriginModel(globalStore.prisma)
   ) {
     return globalStore.prisma
   }

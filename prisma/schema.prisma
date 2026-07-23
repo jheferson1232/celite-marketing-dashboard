@@ -312,6 +312,17 @@ model TikTokDashboardSettings {
   @@map("TikTokDashboardSettings")
 }
 
+/** Origen creativo de una campaña Meta en el dashboard (IA vs reutilizado). */
+model MetaCampaignOrigin {
+  campaignId String   @id
+  /** "ia" | "reutilizado" */
+  origin     String
+  updatedAt  DateTime @updatedAt
+
+  @@index([origin])
+  @@map("MetaCampaignOrigin")
+}
+
 /** Cuenta TikTok Ads conectada (credenciales para API). */
 model TikTokAdAccount {
   id           String   @id @default(cuid())

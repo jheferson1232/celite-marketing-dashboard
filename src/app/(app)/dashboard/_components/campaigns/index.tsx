@@ -33,8 +33,9 @@ import {
 import {
   CampaignOriginFilter,
   useCampaignIdsForSelectedOrigins,
-  type TikTokOriginFilterValue,
+  type OriginFilterValue,
 } from "./campaign-origin-filter"
+import type { CampaignOriginPlatform } from "@/lib/services/campaign-origin.shared"
 import { CampaignStatusFilters } from "./campaign-status-filters"
 import { getCampaignColumns } from "./columns"
 import { ColumnVisibilityToggle } from "./column-visibility-toggle"
@@ -92,8 +93,8 @@ interface CampaignsTableProps {
   onArchiveCampaign?: (campaign: CampaignRow) => void
   /** Extra a la derecha del toolbar (p. ej. botón Archivados). */
   toolbarExtra?: React.ReactNode
-  /** Solo dashboard TikTok: selector IA / Reutilizado en el nombre. */
-  showTikTokOriginLabel?: boolean
+  /** Etiqueta + filtro IA / Reutilizado (Meta o TikTok). */
+  originPlatform?: CampaignOriginPlatform
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -127,7 +128,7 @@ export function CampaignsTable({
   defaultExpandedCampaignIds,
   onArchiveCampaign,
   toolbarExtra,
-  showTikTokOriginLabel = false,
+  originPlatform,
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -144,7 +145,7 @@ export function CampaignsTable({
     Set<string>
   >(() => new Set())
   const [selectedOrigins, setSelectedOrigins] = React.useState<
-    Set<TikTokOriginFilterValue>
+    Set<OriginFilterValue>
   >(() => new Set())
   const tableData = data ?? EMPTY_DATA
   const allCampaignIds = React.useMemo(
@@ -157,6 +158,7 @@ export function CampaignsTable({
     selectedProductIds
   )
   const originCampaignIds = useCampaignIdsForSelectedOrigins(
+    originPlatform ?? "tiktok",
     selectedOrigins,
     allCampaignIds
   )
@@ -358,7 +360,7 @@ export function CampaignsTable({
           )
 
     const originFilteredRows =
-      !showTikTokOriginLabel || originCampaignIds == null
+      !originPlatform || originCampaignIds == null
         ? productFilteredRows
         : productFilteredRows.filter((row) => originCampaignIds.has(row.id))
 
@@ -393,7 +395,7 @@ export function CampaignsTable({
     performanceCountsAtAdSetLevel,
     productCampaignIds,
     showMetaActiveCampaignFilter,
-    showTikTokOriginLabel,
+    originPlatform,
     selectedObjectiveFilter,
     selectedPerformanceFilter,
     tableData,
@@ -450,7 +452,7 @@ export function CampaignsTable({
         enableMetaExtendedMetrics,
         metaLandingUrlsLoading,
         extendedMetricsLoading,
-        showTikTokOriginLabel,
+        originPlatform,
         onArchiveCampaign,
       }),
     [
@@ -459,7 +461,7 @@ export function CampaignsTable({
       enableMetaExtendedMetrics,
       metaLandingUrlsLoading,
       extendedMetricsLoading,
-      showTikTokOriginLabel,
+      originPlatform,
       expandedCampaignIds,
       handleToggleAdSets,
       handleOpenDetails,
@@ -520,8 +522,9 @@ export function CampaignsTable({
             selectedProductIds={selectedProductIds}
             onSelectedProductIdsChange={setSelectedProductIds}
           />
-          {showTikTokOriginLabel ? (
+          {originPlatform ? (
             <CampaignOriginFilter
+              platform={originPlatform}
               campaignIds={allCampaignIds}
               selectedOrigins={selectedOrigins}
               onSelectedOriginsChange={setSelectedOrigins}

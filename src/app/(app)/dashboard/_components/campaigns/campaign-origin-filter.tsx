@@ -15,35 +15,51 @@ import {
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import {
-  TIKTOK_CAMPAIGN_ORIGINS,
-  TIKTOK_CAMPAIGN_ORIGIN_LABELS,
-  type TikTokCampaignOriginValue,
-} from "@/lib/services/tiktok/campaign-origin.shared"
+  CAMPAIGN_ORIGINS,
+  CAMPAIGN_ORIGIN_LABELS,
+  type CampaignOriginPlatform,
+  type CampaignOriginValue,
+} from "@/lib/services/campaign-origin.shared"
+import { listMetaCampaignOriginsAction } from "@/app/(app)/dashboard/_actions/campaign-origin"
 import { listTikTokCampaignOriginsAction } from "@/app/(app)/tiktok/_actions/campaign-origin"
 
-const ORIGINS_QUERY_KEY = ["tiktok-campaign-origins"] as const
+const ORIGINS_QUERY_KEY: Record<CampaignOriginPlatform, readonly string[]> = {
+  tiktok: ["tiktok-campaign-origins"],
+  meta: ["meta-campaign-origins"],
+}
 
-export type TikTokOriginFilterValue = TikTokCampaignOriginValue | "untagged"
+export type OriginFilterValue = CampaignOriginValue | "untagged"
+
+/** @deprecated Usar OriginFilterValue */
+export type TikTokOriginFilterValue = OriginFilterValue
 
 interface CampaignOriginFilterProps {
+  platform: CampaignOriginPlatform
   campaignIds: string[]
-  selectedOrigins: Set<TikTokOriginFilterValue>
-  onSelectedOriginsChange: (next: Set<TikTokOriginFilterValue>) => void
+  selectedOrigins: Set<OriginFilterValue>
+  onSelectedOriginsChange: (next: Set<OriginFilterValue>) => void
+}
+
+async function listOrigins(platform: CampaignOriginPlatform) {
+  return platform === "meta"
+    ? runServerAction(listMetaCampaignOriginsAction())
+    : runServerAction(listTikTokCampaignOriginsAction())
 }
 
 export function CampaignOriginFilter({
+  platform,
   campaignIds,
   selectedOrigins,
   onSelectedOriginsChange,
 }: CampaignOriginFilterProps) {
   const originsQuery = useQuery({
-    queryKey: ORIGINS_QUERY_KEY,
-    queryFn: () => runServerAction(listTikTokCampaignOriginsAction()),
+    queryKey: ORIGINS_QUERY_KEY[platform],
+    queryFn: () => listOrigins(platform),
     staleTime: 60_000,
   })
 
   const originByCampaignId = React.useMemo(() => {
-    const map = new Map<string, TikTokCampaignOriginValue>()
+    const map = new Map<string, CampaignOriginValue>()
     for (const row of originsQuery.data ?? []) {
       map.set(row.campaignId, row.origin)
     }
@@ -51,7 +67,7 @@ export function CampaignOriginFilter({
   }, [originsQuery.data])
 
   const counts = React.useMemo(() => {
-    const next: Record<TikTokOriginFilterValue, number> = {
+    const next: Record<OriginFilterValue, number> = {
       ia: 0,
       reutilizado: 0,
       untagged: 0,
@@ -67,7 +83,7 @@ export function CampaignOriginFilter({
   const selectedCount = selectedOrigins.size
   const hasSelection = selectedCount > 0
 
-  const toggle = (value: TikTokOriginFilterValue, checked: boolean) => {
+  const toggle = (value: OriginFilterValue, checked: boolean) => {
     const next = new Set(selectedOrigins)
     if (checked) next.add(value)
     else next.delete(value)
@@ -100,7 +116,7 @@ export function CampaignOriginFilter({
           </p>
         ) : (
           <>
-            {TIKTOK_CAMPAIGN_ORIGINS.map((origin) => (
+            {CAMPAIGN_ORIGINS.map((origin) => (
               <DropdownMenuCheckboxItem
                 key={origin}
                 checked={selectedOrigins.has(origin)}
@@ -110,7 +126,7 @@ export function CampaignOriginFilter({
                 onSelect={(event) => event.preventDefault()}
               >
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>{TIKTOK_CAMPAIGN_ORIGIN_LABELS[origin]}</span>
+                  <span>{CAMPAIGN_ORIGIN_LABELS[origin]}</span>
                   <span className="text-muted-foreground shrink-0 text-[10px]">
                     {counts[origin]}
                   </span>
@@ -152,12 +168,13 @@ export function CampaignOriginFilter({
 
 /** null = sin filtro; Set = campañas que coinciden con orígenes seleccionados. */
 export function useCampaignIdsForSelectedOrigins(
-  selectedOrigins: Set<TikTokOriginFilterValue>,
+  platform: CampaignOriginPlatform,
+  selectedOrigins: Set<OriginFilterValue>,
   campaignIds: string[]
 ): Set<string> | null {
   const originsQuery = useQuery({
-    queryKey: ORIGINS_QUERY_KEY,
-    queryFn: () => runServerAction(listTikTokCampaignOriginsAction()),
+    queryKey: ORIGINS_QUERY_KEY[platform],
+    queryFn: () => listOrigins(platform),
     staleTime: 60_000,
     enabled: selectedOrigins.size > 0,
   })
@@ -165,7 +182,7 @@ export function useCampaignIdsForSelectedOrigins(
   return React.useMemo(() => {
     if (selectedOrigins.size === 0) return null
 
-    const originByCampaignId = new Map<string, TikTokCampaignOriginValue>()
+    const originByCampaignId = new Map<string, CampaignOriginValue>()
     for (const row of originsQuery.data ?? []) {
       originByCampaignId.set(row.campaignId, row.origin)
     }
