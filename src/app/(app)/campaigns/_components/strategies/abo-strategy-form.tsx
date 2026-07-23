@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import {
   resolveEffectiveVideoCreatives,
@@ -36,6 +37,8 @@ interface AboStrategyFormProps {
   variantName: string
   selectedTikTokVideoIds?: string[]
   disabled?: boolean
+  /** Si se pasa, el card de landing se renderiza ahí (p. ej. debajo de Guardar). */
+  landingPortalTarget?: HTMLElement | null
   onChange: (payload: AboStrategyFormPayload) => void
   onValidationChange?: (valid: boolean, errors: ABODynamicFieldErrors) => void
 }
@@ -46,6 +49,7 @@ export function AboStrategyForm({
   variantName,
   selectedTikTokVideoIds = [],
   disabled = false,
+  landingPortalTarget = null,
   onChange,
   onValidationChange,
 }: AboStrategyFormProps) {
@@ -286,8 +290,21 @@ export function AboStrategyForm({
     })
   }
 
+  const landingSection = (
+    <CampaignLandingPagesSection
+      landingPages={landingPages}
+      selectedLandingPageId={landingPageId}
+      disabled={disabled}
+      onLandingPagesChange={setLandingPages}
+      onSelectLandingPage={setLandingPageId}
+    />
+  )
+
   return (
     <div className="space-y-6">
+      {landingPortalTarget
+        ? createPortal(landingSection, landingPortalTarget)
+        : null}
       <div className="space-y-2">
         <label htmlFor="abo-budget" className="text-sm font-medium">
           Presupuesto por conjunto (COP)
@@ -398,13 +415,7 @@ export function AboStrategyForm({
         </div>
       )}
 
-      <CampaignLandingPagesSection
-        landingPages={landingPages}
-        selectedLandingPageId={landingPageId}
-        disabled={disabled}
-        onLandingPagesChange={setLandingPages}
-        onSelectLandingPage={setLandingPageId}
-      />
+      {landingPortalTarget ? null : landingSection}
 
       <div className="space-y-2">
         <label htmlFor="abo-ad-text" className="text-sm font-medium">

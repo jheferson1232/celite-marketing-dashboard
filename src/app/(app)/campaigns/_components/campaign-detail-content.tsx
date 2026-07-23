@@ -64,6 +64,9 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [landingSlotEl, setLandingSlotEl] = useState<HTMLDivElement | null>(
+    null
+  )
 
   const {
     data: campaign,
@@ -307,7 +310,7 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
       <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-full max-w-xl" />
-        <Skeleton className="h-64 w-full max-w-2xl" />
+        <Skeleton className="h-64 w-full max-w-3xl" />
       </div>
     )
   }
@@ -386,64 +389,216 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
-            <Link href="/campaigns">
-              <RiArrowLeftLine className="size-4" />
-              Campaigns
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {pendingName.trim() || campaign.name}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Estrategia: {campaign.strategy}
-            </p>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <div className="space-y-2">
+            <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
+              <Link href="/campaigns">
+                <RiArrowLeftLine className="size-4" />
+                Campaigns
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {pendingName.trim() || campaign.name}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Estrategia: {campaign.strategy}
+              </p>
+            </div>
           </div>
+
+          {saveNotice ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">
+              {saveNotice}
+            </p>
+          ) : null}
+
+          {saveMutation.isError ? (
+            <p className="text-sm text-destructive">
+              {saveMutation.error instanceof Error
+                ? saveMutation.error.message
+                : "No se pudo guardar"}
+            </p>
+          ) : null}
+
+          {deleteMutation.isError ? (
+            <p className="text-sm text-destructive">
+              {deleteMutation.error instanceof Error
+                ? deleteMutation.error.message
+                : "No se pudo eliminar"}
+            </p>
+          ) : null}
+
+          <CampaignGeneralSection
+            name={pendingName}
+            status={pendingStatus}
+            pixelId={pendingPixelId}
+            authCode={pendingAuthCode}
+            selectedTikTokVideoIds={pendingTikTokVideoIds}
+            disabled={saveMutation.isPending || strategyMutation.isPending}
+            onNameChange={(name) => {
+              setPendingName(name)
+              setSaveNotice(null)
+            }}
+            onStatusChange={(status) => {
+              setPendingStatus(status)
+              setSaveNotice(null)
+            }}
+            onPixelIdChange={(pixelId) => {
+              setPendingPixelId(pixelId)
+              setSaveNotice(null)
+            }}
+            onAuthCodeChange={(code) => {
+              setPendingAuthCode(code)
+              setSaveNotice(null)
+            }}
+            onSelectedTikTokVideoIdsChange={(ids) => {
+              setPendingTikTokVideoIds(ids)
+              setSaveNotice(null)
+            }}
+          />
+
+          <section className="flex w-full max-w-3xl flex-col gap-4 rounded-xl border bg-muted/10 p-4">
+            <div>
+              <h2 className="text-sm font-semibold">Estrategia</h2>
+              <p className="text-xs text-muted-foreground">
+                Configuración específica según la estrategia seleccionada.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="campaign-strategy" className="text-sm font-medium">
+                Tipo de estrategia
+              </label>
+              <select
+                id="campaign-strategy"
+                className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                value={campaign.strategy}
+                disabled={strategyMutation.isPending || saveMutation.isPending}
+                onChange={(event) => {
+                  const nextStrategy = event.target.value as TikTokStrategyId
+                  if (nextStrategy === campaign.strategy) return
+                  strategyMutation.mutate(nextStrategy)
+                }}
+              >
+                {strategies.map((strategy) => (
+                  <option key={strategy.id} value={strategy.id}>
+                    {strategy.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {
+                  strategies.find((entry) => entry.id === campaign.strategy)
+                    ?.description
+                }
+              </p>
+            </div>
+
+            {campaign.strategy === "ABO" || campaign.strategy === "CBO" ? (
+              <CampaignVariantSelect
+                value={pendingVariantId}
+                disabled={saveMutation.isPending || strategyMutation.isPending}
+                onChange={(variantId, variantName) => {
+                  setPendingVariantId(variantId)
+                  setPendingVariantName(variantName)
+                  setSaveNotice(null)
+                }}
+              />
+            ) : null}
+
+            {campaign.strategy === "ABO" && aboConfig && pendingAbo ? (
+              <>
+                <AboStrategyForm
+                  key={`${campaign.id}-${campaign.updatedAt.toISOString()}`}
+                  config={aboConfig}
+                  variantId={pendingVariantId}
+                  variantName={pendingVariantName}
+                  selectedTikTokVideoIds={pendingTikTokVideoIds}
+                  disabled={saveMutation.isPending || strategyMutation.isPending}
+                  landingPortalTarget={landingSlotEl}
+                  onChange={handleAboChange}
+                  onValidationChange={handleAboValidationChange}
+                />
+                {!isStrategyValid ? (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {Object.values(strategyErrors)[0] ??
+                      "Revisa la configuración ABO"}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+
+            {campaign.strategy === "CBO" && cboConfig && pendingCbo ? (
+              <>
+                <CboStrategyForm
+                  key={`${campaign.id}-${campaign.updatedAt.toISOString()}`}
+                  config={cboConfig}
+                  variantId={pendingVariantId}
+                  variantName={pendingVariantName}
+                  selectedTikTokVideoIds={pendingTikTokVideoIds}
+                  disabled={saveMutation.isPending || strategyMutation.isPending}
+                  landingPortalTarget={landingSlotEl}
+                  onChange={handleCboChange}
+                  onValidationChange={handleCboValidationChange}
+                />
+                {!isStrategyValid ? (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {Object.values(strategyErrors)[0] ??
+                      "Revisa la configuración CBO"}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </section>
         </div>
 
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex flex-wrap gap-2">
-            {showDelete ? (
+        <aside className="flex w-full flex-col gap-3 lg:sticky lg:top-4">
+          <div className="flex flex-col items-stretch gap-1 sm:items-end">
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {showDelete ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={
+                    saveMutation.isPending ||
+                    strategyMutation.isPending ||
+                    deleteMutation.isPending
+                  }
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <RiDeleteBinLine className="size-4" />
+                  Eliminar
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={
-                  saveMutation.isPending ||
-                  strategyMutation.isPending ||
-                  deleteMutation.isPending
-                }
-                onClick={() => setDeleteDialogOpen(true)}
+                disabled={!canLaunch}
+                onClick={() => setLaunchDialogOpen(true)}
               >
-                <RiDeleteBinLine className="size-4" />
-                Eliminar
+                <RiRocketLine className="size-4" />
+                Lanzar en TikTok
               </Button>
+              <Button
+                type="button"
+                disabled={!canSave}
+                onClick={() => saveMutation.mutate()}
+              >
+                <RiSaveLine className="size-4" />
+                Guardar
+              </Button>
+            </div>
+            {launchBlockedReason ? (
+              <p className="text-muted-foreground text-xs sm:text-right">
+                {launchBlockedReason}
+              </p>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!canLaunch}
-              onClick={() => setLaunchDialogOpen(true)}
-            >
-              <RiRocketLine className="size-4" />
-              Lanzar en TikTok
-            </Button>
-            <Button
-              type="button"
-              disabled={!canSave}
-              onClick={() => saveMutation.mutate()}
-            >
-              <RiSaveLine className="size-4" />
-              Guardar
-            </Button>
           </div>
-          {launchBlockedReason ? (
-            <p className="text-muted-foreground text-xs">{launchBlockedReason}</p>
-          ) : null}
-        </div>
+          <div ref={setLandingSlotEl} className="min-w-0" />
+        </aside>
       </div>
 
       <CampaignLaunchDialog
@@ -462,142 +617,6 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
           onConfirm={() => deleteMutation.mutate()}
         />
       ) : null}
-
-      {saveNotice ? (
-        <p className="text-sm text-emerald-600 dark:text-emerald-400">{saveNotice}</p>
-      ) : null}
-
-      {saveMutation.isError ? (
-        <p className="text-sm text-destructive">
-          {saveMutation.error instanceof Error
-            ? saveMutation.error.message
-            : "No se pudo guardar"}
-        </p>
-      ) : null}
-
-      {deleteMutation.isError ? (
-        <p className="text-sm text-destructive">
-          {deleteMutation.error instanceof Error
-            ? deleteMutation.error.message
-            : "No se pudo eliminar"}
-        </p>
-      ) : null}
-
-      <CampaignGeneralSection
-        name={pendingName}
-        status={pendingStatus}
-        pixelId={pendingPixelId}
-        authCode={pendingAuthCode}
-        selectedTikTokVideoIds={pendingTikTokVideoIds}
-        disabled={saveMutation.isPending || strategyMutation.isPending}
-        onNameChange={(name) => {
-          setPendingName(name)
-          setSaveNotice(null)
-        }}
-        onStatusChange={(status) => {
-          setPendingStatus(status)
-          setSaveNotice(null)
-        }}
-        onPixelIdChange={(pixelId) => {
-          setPendingPixelId(pixelId)
-          setSaveNotice(null)
-        }}
-        onAuthCodeChange={(code) => {
-          setPendingAuthCode(code)
-          setSaveNotice(null)
-        }}
-        onSelectedTikTokVideoIdsChange={(ids) => {
-          setPendingTikTokVideoIds(ids)
-          setSaveNotice(null)
-        }}
-      />
-
-      <section className="max-w-2xl space-y-4 rounded-xl border bg-muted/10 p-4">
-        <div>
-          <h2 className="text-sm font-semibold">Estrategia</h2>
-          <p className="text-xs text-muted-foreground">
-            Configuración específica según la estrategia seleccionada.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="campaign-strategy" className="text-sm font-medium">
-            Tipo de estrategia
-          </label>
-          <select
-            id="campaign-strategy"
-            className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-            value={campaign.strategy}
-            disabled={strategyMutation.isPending || saveMutation.isPending}
-            onChange={(event) => {
-              const nextStrategy = event.target.value as TikTokStrategyId
-              if (nextStrategy === campaign.strategy) return
-              strategyMutation.mutate(nextStrategy)
-            }}
-          >
-            {strategies.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>
-                {strategy.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            {strategies.find((entry) => entry.id === campaign.strategy)?.description}
-          </p>
-        </div>
-
-        {campaign.strategy === "ABO" || campaign.strategy === "CBO" ? (
-          <CampaignVariantSelect
-            value={pendingVariantId}
-            disabled={saveMutation.isPending || strategyMutation.isPending}
-            onChange={(variantId, variantName) => {
-              setPendingVariantId(variantId)
-              setPendingVariantName(variantName)
-              setSaveNotice(null)
-            }}
-          />
-        ) : null}
-
-        {campaign.strategy === "ABO" && aboConfig && pendingAbo ? (
-          <>
-            <AboStrategyForm
-              key={`${campaign.id}-${campaign.updatedAt.toISOString()}`}
-              config={aboConfig}
-              variantId={pendingVariantId}
-              variantName={pendingVariantName}
-              selectedTikTokVideoIds={pendingTikTokVideoIds}
-              disabled={saveMutation.isPending || strategyMutation.isPending}
-              onChange={handleAboChange}
-              onValidationChange={handleAboValidationChange}
-            />
-            {!isStrategyValid ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {Object.values(strategyErrors)[0] ?? "Revisa la configuración ABO"}
-              </div>
-            ) : null}
-          </>
-        ) : null}
-
-        {campaign.strategy === "CBO" && cboConfig && pendingCbo ? (
-          <>
-            <CboStrategyForm
-              key={`${campaign.id}-${campaign.updatedAt.toISOString()}`}
-              config={cboConfig}
-              variantId={pendingVariantId}
-              variantName={pendingVariantName}
-              selectedTikTokVideoIds={pendingTikTokVideoIds}
-              disabled={saveMutation.isPending || strategyMutation.isPending}
-              onChange={handleCboChange}
-              onValidationChange={handleCboValidationChange}
-            />
-            {!isStrategyValid ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {Object.values(strategyErrors)[0] ?? "Revisa la configuración CBO"}
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </section>
     </div>
   )
 }

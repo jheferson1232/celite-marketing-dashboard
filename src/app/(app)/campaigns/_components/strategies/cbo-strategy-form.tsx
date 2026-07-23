@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import {
   CBO_ADGROUP_PRESETS,
@@ -43,6 +44,8 @@ interface CboStrategyFormProps {
   variantName: string
   selectedTikTokVideoIds?: string[]
   disabled?: boolean
+  /** Si se pasa, el card de landing se renderiza ahí (p. ej. debajo de Guardar). */
+  landingPortalTarget?: HTMLElement | null
   onChange: (payload: CboStrategyFormPayload) => void
   onValidationChange?: (valid: boolean, errors: CBODynamicFieldErrors) => void
 }
@@ -53,6 +56,7 @@ export function CboStrategyForm({
   variantName,
   selectedTikTokVideoIds = [],
   disabled = false,
+  landingPortalTarget = null,
   onChange,
   onValidationChange,
 }: CboStrategyFormProps) {
@@ -257,8 +261,21 @@ export function CboStrategyForm({
     : selectedCreativeIds.length
   const adgroupCount = videoCount * selectedPresets.length
 
+  const landingSection = (
+    <CampaignLandingPagesSection
+      landingPages={landingPages}
+      selectedLandingPageId={landingPageId}
+      disabled={disabled}
+      onLandingPagesChange={setLandingPages}
+      onSelectLandingPage={setLandingPageId}
+    />
+  )
+
   return (
     <div className="space-y-6">
+      {landingPortalTarget
+        ? createPortal(landingSection, landingPortalTarget)
+        : null}
       <p className="text-xs text-muted-foreground">
         Cada video se replica en los conjuntos de interés. Ejemplo: 2 videos × 3
         intereses = 6 conjuntos. Presupuesto diario a nivel de campaña.
@@ -385,13 +402,7 @@ export function CboStrategyForm({
         </div>
       )}
 
-      <CampaignLandingPagesSection
-        landingPages={landingPages}
-        selectedLandingPageId={landingPageId}
-        disabled={disabled}
-        onLandingPagesChange={setLandingPages}
-        onSelectLandingPage={setLandingPageId}
-      />
+      {landingPortalTarget ? null : landingSection}
 
       <div className="space-y-2">
         <label htmlFor="cbo-ad-text" className="text-sm font-medium">

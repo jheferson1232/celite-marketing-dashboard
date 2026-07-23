@@ -322,7 +322,7 @@ export function CampaignGeneralSection({
   const coverUrl = sparkPreviewQuery.data?.coverUrl?.trim() || null
 
   return (
-    <section className="max-w-2xl space-y-4 rounded-xl border bg-muted/10 p-4">
+    <section className="w-full max-w-3xl space-y-4 rounded-xl border bg-muted/10 p-4">
       <div>
         <h2 className="text-sm font-semibold">Información general</h2>
         <p className="text-xs text-muted-foreground">
