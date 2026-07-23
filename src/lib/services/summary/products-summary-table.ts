@@ -1,25 +1,23 @@
 import { convertPenToCop } from "@/lib/format/pen-to-cop"
+import {
+  campaignInsightsToMap,
+  fetchAllCampaignInsights,
+} from "@/lib/services/meta/campaign-insights-fetch"
+import { getMetaClient } from "@/lib/services/meta/meta"
 import { withMetaCache } from "@/lib/services/meta/meta-cache"
-import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
+import { normalizeMetaId } from "@/lib/services/meta/meta-ids"
+import { pacedMetaRequest } from "@/lib/services/meta/meta-request-pacing"
+import { getPurchaseSpendAndCpaFromInsight } from "@/lib/services/meta/purchase-metrics"
 import type { DateRange } from "@/lib/services/meta/types"
+import { listProducts, type ProductRecord } from "@/lib/services/product"
 import {
-  buildTotals,
-  listProducts,
-  mergeMetaDailyInsights,
-  mergeTikTokDailyInsights,
-  type ProductDailyInsight,
-  type ProductRecord,
-  type ProductSalesTotals,
-} from "@/lib/services/product"
-import {
-  getTikTokCampaignDailyInsights,
-  type TikTokCampaignDailyInsightsSummary,
-} from "@/lib/services/tiktok/campaign-daily-insights"
+  fetchCachedCampaignMetricsByDateRange,
+  getPurchaseSpendAndCpa,
+} from "@/lib/services/tiktok/report"
 import { getProductCoverImage } from "@/lib/products/cover-image"
 import { computeBlendedCpaCop, safeNum } from "./safe-number"
 
 const SUMMARY_PRODUCTS_TTL_MS = 2 * 60 * 1000
-const META_OBJECTIVE = "OUTCOME_SALES"
 
 export type SummaryProductPlatformMetrics = {
   spend: number
@@ -47,36 +45,34 @@ export type SummaryProductsTable = {
   rows: SummaryProductTableRow[]
 }
 
-function totalsToMetrics(totals: ProductSalesTotals): SummaryProductPlatformMetrics | null {
-  const { spend, purchases, cpa } = totals
-  if (spend <= 0 && purchases <= 0) return null
-  return { spend, purchases, cpa }
-}
-
-function buildPlatformMetricsFromCampaignIds(
+function aggregatePlatformMetrics(
   campaignIds: string[],
-  summaries: Array<{ days: ProductDailyInsight[] }>
+  byCampaign: Map<string, SummaryProductPlatformMetrics>,
+  normalizeId: (id: string) => string = (id) => id
 ): SummaryProductPlatformMetrics | null {
   if (campaignIds.length === 0) return null
-  const days = mergeMetaDailyInsights(summaries)
-  return totalsToMetrics(buildTotals(days))
-}
 
-function buildTikTokMetricsFromSummaries(
-  summaries: TikTokCampaignDailyInsightsSummary[]
-): SummaryProductPlatformMetrics | null {
-  if (summaries.length === 0) return null
-  const days = mergeTikTokDailyInsights(summaries)
-  return totalsToMetrics(buildTotals(days))
+  let spend = 0
+  let purchases = 0
+  for (const id of campaignIds) {
+    const metrics = byCampaign.get(normalizeId(id))
+    if (!metrics) continue
+    spend += metrics.spend
+    purchases += metrics.purchases
+  }
+
+  if (spend <= 0 && purchases <= 0) return null
+  return {
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : 0,
+  }
 }
 
 function buildRow(
   product: ProductRecord,
-  metaByCampaign: Map<string, Awaited<ReturnType<typeof getMetaCampaignDailyInsights>>>,
-  tiktokByCampaign: Map<
-    string,
-    Awaited<ReturnType<typeof getTikTokCampaignDailyInsights>>
-  >
+  metaByCampaign: Map<string, SummaryProductPlatformMetrics>,
+  tiktokByCampaign: Map<string, SummaryProductPlatformMetrics>
 ): SummaryProductTableRow {
   const metaIds = product.campaigns
     .filter((c) => c.platform === "meta")
@@ -85,24 +81,8 @@ function buildRow(
     .filter((c) => c.platform === "tiktok")
     .map((c) => c.campaignId)
 
-  const metaSummaries = metaIds
-    .map((id) => metaByCampaign.get(id))
-    .filter((s): s is NonNullable<typeof s> => s != null)
-    .map((s) => ({
-      days: s.days.map((d) => ({
-        date: d.date,
-        spend: d.spend,
-        purchases: d.purchases,
-        cpa: d.cpa,
-      })),
-    }))
-
-  const tiktokSummaries = tiktokIds
-    .map((id) => tiktokByCampaign.get(id))
-    .filter((s): s is TikTokCampaignDailyInsightsSummary => s != null)
-
-  const meta = buildPlatformMetricsFromCampaignIds(metaIds, metaSummaries)
-  const tiktok = buildTikTokMetricsFromSummaries(tiktokSummaries)
+  const meta = aggregatePlatformMetrics(metaIds, metaByCampaign, normalizeMetaId)
+  const tiktok = aggregatePlatformMetrics(tiktokIds, tiktokByCampaign)
 
   const metaSpendCop = safeNum(meta?.spend)
   const tiktokSpendCop = convertPenToCop(safeNum(tiktok?.spend))
@@ -125,62 +105,47 @@ function buildRow(
   }
 }
 
-async function loadUniqueCampaignInsights(
-  dateRange: DateRange,
-  products: ProductRecord[]
-) {
-  const metaIds = [
-    ...new Set(
-      products.flatMap((p) =>
-        p.campaigns
-          .filter((c) => c.platform === "meta")
-          .map((c) => c.campaignId)
-      )
-    ),
-  ]
-  const tiktokIds = [
-    ...new Set(
-      products.flatMap((p) =>
-        p.campaigns
-          .filter((c) => c.platform === "tiktok")
-          .map((c) => c.campaignId)
-      )
-    ),
-  ]
+/** Una consulta Meta + una TikTok por rango (totales por campaña), sin N llamadas serializadas. */
+async function loadBatchCampaignMetrics(dateRange: DateRange): Promise<{
+  metaByCampaign: Map<string, SummaryProductPlatformMetrics>
+  tiktokByCampaign: Map<string, SummaryProductPlatformMetrics>
+}> {
+  const [metaByCampaign, tiktokByCampaign] = await Promise.all([
+    pacedMetaRequest(async () => {
+      const api = getMetaClient()
+      const rows = await fetchAllCampaignInsights(api, dateRange)
+      const byInsight = campaignInsightsToMap(rows)
+      const metrics = new Map<string, SummaryProductPlatformMetrics>()
 
-  const [metaEntries, tiktokEntries] = await Promise.all([
-    Promise.all(
-      metaIds.map(async (id) => {
-        const summary = await getMetaCampaignDailyInsights(
-          id,
-          dateRange,
-          META_OBJECTIVE
-        )
-        return [id, summary] as const
-      })
-    ),
-    Promise.all(
-      tiktokIds.map(async (id) => {
-        const summary = await getTikTokCampaignDailyInsights(id, dateRange)
-        return [id, summary] as const
-      })
-    ),
+      for (const [campaignId, insight] of byInsight) {
+        const { spend, purchases, cpa } = getPurchaseSpendAndCpaFromInsight(insight)
+        if (spend <= 0 && purchases <= 0) continue
+        metrics.set(campaignId, { spend, purchases, cpa })
+      }
+
+      return metrics
+    }),
+    fetchCachedCampaignMetricsByDateRange(dateRange).then((raw) => {
+      const metrics = new Map<string, SummaryProductPlatformMetrics>()
+      for (const [campaignId, row] of raw) {
+        const { spend, purchases, cpa } = getPurchaseSpendAndCpa(row)
+        if (spend <= 0 && purchases <= 0) continue
+        metrics.set(campaignId, { spend, purchases, cpa })
+      }
+      return metrics
+    }),
   ])
 
-  return {
-    metaByCampaign: new Map(metaEntries),
-    tiktokByCampaign: new Map(tiktokEntries),
-  }
+  return { metaByCampaign, tiktokByCampaign }
 }
 
 async function fetchSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const products = await listProducts()
-  const { metaByCampaign, tiktokByCampaign } = await loadUniqueCampaignInsights(
-    dateRange,
-    products
-  )
+  const [products, { metaByCampaign, tiktokByCampaign }] = await Promise.all([
+    listProducts(),
+    loadBatchCampaignMetrics(dateRange),
+  ])
 
   const rows = products.map((product) =>
     buildRow(product, metaByCampaign, tiktokByCampaign)
@@ -198,7 +163,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v2:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v3:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )

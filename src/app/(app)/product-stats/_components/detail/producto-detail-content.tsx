@@ -64,7 +64,7 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
     tiktokAdSetsByCampaignId,
     extendedMetricsLoading,
     extendedMetricsError,
-  } = useProductoLinkedCampaigns(linkedTikTokIds, linkedMetaIds, dateRange)
+  } = useProductoLinkedCampaigns(linkedTikTokIds, linkedMetaIds)
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["products"] })

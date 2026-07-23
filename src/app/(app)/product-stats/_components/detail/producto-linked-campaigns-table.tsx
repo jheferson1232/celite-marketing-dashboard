@@ -79,6 +79,7 @@ export function ProductoLinkedCampaignsTable({
                 fetchCampaignAdSets={getTikTokCampaignAdGroups}
                 enableTikTokManage
                 tikTokAdSetsByCampaignId={tiktokAdSetsByCampaignId}
+                originPlatform="tiktok"
                 columnVisibilityStorageKey={
                   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY
                 }
@@ -118,6 +119,7 @@ export function ProductoLinkedCampaignsTable({
               enableMetaExtendedMetrics
               extendedMetricsLoading={extendedMetricsLoading}
               extendedMetricsError={extendedMetricsError}
+              originPlatform="meta"
               columnVisibilityStorageKey={META_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
               defaultColumnVisibility={META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
             />

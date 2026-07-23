@@ -2,11 +2,12 @@
 
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { getTodayDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
 import { getCampaignsExtendedMetrics } from "@/app/(app)/dashboard/_actions/campaigns-extended-metrics"
 import { getTikTokAllCampaignAdGroupsAction } from "@/app/(app)/tiktok/_actions/all-campaign-adgroups"
 import { getTikTokCampaignsListAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
-import type { CampaignRow, DateRange } from "@/lib/services/meta/types"
+import type { CampaignRow } from "@/lib/services/meta/types"
 import { runServerAction } from "@/lib/server-action"
 
 const dashboardQueryOptions = {
@@ -19,26 +20,28 @@ const extendedQueryOptions = {
   refetchOnWindowFocus: false,
 } as const
 
+/** Métricas de periodo (Gasto, Compras, CPA) = hoy, como en el dashboard. Ventas 7d viene de extended metrics. */
 export function useProductoLinkedCampaigns(
   linkedTikTokIds: Set<string>,
-  linkedMetaIds: Set<string>,
-  dateRange: DateRange
+  linkedMetaIds: Set<string>
 ) {
   const hasTikTok = linkedTikTokIds.size > 0
   const hasMeta = linkedMetaIds.size > 0
+  const todayRange = getTodayDateRange()
 
   const { data: tiktokCampaignsAll = [], isLoading: isLoadingTikTokCampaigns } =
     useQuery({
-      queryKey: ["tiktok-campaigns", dateRange],
-      queryFn: () => runServerAction(getTikTokCampaignsListAction({ dateRange })),
+      queryKey: ["tiktok-campaigns", todayRange],
+      queryFn: () =>
+        runServerAction(getTikTokCampaignsListAction({ dateRange: todayRange })),
       enabled: hasTikTok,
       ...dashboardQueryOptions,
     })
 
   const { data: metaCampaignsAll = [], isLoading: isLoadingMetaCampaigns } =
     useQuery({
-      queryKey: ["meta-campaigns", dateRange],
-      queryFn: () => runServerAction(getCampaignsList(dateRange)),
+      queryKey: ["meta-campaigns", todayRange],
+      queryFn: () => runServerAction(getCampaignsList(todayRange)),
       enabled: hasMeta,
       ...dashboardQueryOptions,
     })
@@ -57,9 +60,11 @@ export function useProductoLinkedCampaigns(
   })
 
   const { data: tiktokAdSetsByCampaignId } = useQuery({
-    queryKey: ["tiktok-all-campaign-adgroups", dateRange],
+    queryKey: ["tiktok-all-campaign-adgroups", todayRange],
     queryFn: () =>
-      runServerAction(getTikTokAllCampaignAdGroupsAction({ dateRange })),
+      runServerAction(
+        getTikTokAllCampaignAdGroupsAction({ dateRange: todayRange })
+      ),
     enabled: hasTikTok,
     ...dashboardQueryOptions,
   })
