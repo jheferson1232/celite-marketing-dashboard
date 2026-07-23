@@ -20,6 +20,7 @@ import {
 import { runServerAction } from "@/lib/server-action"
 import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 import { getTikTokCampaignDailyInsightsAction } from "../_actions/campaign-daily-insights"
+import { getTikTokCampaignVideoThumbnailsAction } from "../_actions/campaign-video-thumbnails"
 import { TikTokCampaignDetailsChart } from "./tiktok-campaign-details-chart"
 
 interface TikTokCampaignDetailsContentProps {
@@ -42,9 +43,17 @@ export function TikTokCampaignDetailsContent({
     enabled: Boolean(campaignId),
   })
 
+  const thumbnailsQuery = useQuery({
+    queryKey: ["tiktok-campaign-video-thumbnails", campaignId],
+    queryFn: () =>
+      runServerAction(getTikTokCampaignVideoThumbnailsAction(campaignId)),
+    enabled: Boolean(campaignId),
+    staleTime: 5 * 60 * 1000,
+  })
+
   if (isLoading) {
     return (
-      <div className="space-y-4 px-4 pb-6">
+      <div className="flex flex-col gap-4 px-4 pb-6">
         <div className="grid grid-cols-3 gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-16 rounded-lg" />
@@ -58,17 +67,20 @@ export function TikTokCampaignDetailsContent({
 
   if (isError || !data) {
     return (
-      <p className="px-4 pb-6 text-sm text-destructive">
+      <p className="text-destructive px-4 pb-6 text-sm">
         {error?.message ?? "No se pudieron cargar los detalles de la campaña."}
       </p>
     )
   }
 
   const rangeLabel = `${format(parseISO(dateRange.from), "d MMM", { locale: es })} – ${format(parseISO(dateRange.to), "d MMM yyyy", { locale: es })}`
+  const thumbnails = thumbnailsQuery.data ?? []
 
   return (
-    <div className="space-y-5 overflow-y-auto px-4 pb-6">
-      <p className="text-xs text-muted-foreground">Últimos 7 días · {rangeLabel}</p>
+    <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-6">
+      <p className="text-muted-foreground text-xs">
+        Últimos 7 días · {rangeLabel}
+      </p>
 
       <div className="grid grid-cols-3 gap-3">
         <SummaryCard
@@ -92,7 +104,7 @@ export function TikTokCampaignDetailsContent({
       <div>
         <h3 className="mb-2 text-sm font-medium">Gasto diario y compras</h3>
         <TikTokCampaignDetailsChart days={data.days} currency={currency} />
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-2 text-xs">
           Barras: gasto ({currency === "PEN" ? "S/" : "$"}) · Línea: compras
         </p>
       </div>
@@ -134,6 +146,50 @@ export function TikTokCampaignDetailsContent({
           </Table>
         </div>
       </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-medium">Videos de la campaña</h3>
+        <p className="text-muted-foreground mb-3 text-xs">
+          Miniaturas (solo covers, sin cargar el video).
+        </p>
+        {thumbnailsQuery.isLoading ? (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[9/16] w-full rounded-md" />
+            ))}
+          </div>
+        ) : thumbnailsQuery.isError ? (
+          <p className="text-destructive text-xs">
+            {thumbnailsQuery.error instanceof Error
+              ? thumbnailsQuery.error.message
+              : "No se pudieron cargar las miniaturas."}
+          </p>
+        ) : thumbnails.length === 0 ? (
+          <p className="text-muted-foreground text-xs">
+            No hay creativos con miniatura en esta campaña.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {thumbnails.map((item) => (
+              <li key={item.id} className="min-w-0">
+                <div className="bg-muted overflow-hidden rounded-md border">
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={item.name}
+                    title={item.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="aspect-[9/16] w-full object-cover"
+                  />
+                </div>
+                <p className="text-muted-foreground mt-1 truncate text-[10px]">
+                  {item.name}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -141,7 +197,7 @@ export function TikTokCampaignDetailsContent({
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-muted-foreground text-xs">{label}</p>
       <p className="text-sm font-semibold tabular-nums">{value}</p>
     </div>
   )
