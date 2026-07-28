@@ -16,7 +16,6 @@ import {
   formatNumber,
   formatPercent,
   getCostPerResultCellClassName,
-  getTikTokCampaignPerformanceStatus,
 } from "./utils"
 import { getTikTokCampaignManageColumns } from "@/app/(app)/tiktok/_components/tiktok-campaign-manage-columns"
 import { TikTokCampaignBudgetCell } from "@/app/(app)/tiktok/_components/tiktok-campaign-budget-cell"
@@ -103,17 +102,7 @@ export function getCampaignColumns({
               {row.original.name}
             </span>
             {originPlatform === "tiktok" && row.original.id ? (
-              <TikTokCampaignLaunchSourceLabel
-                campaignId={row.original.id}
-                performanceStatus={
-                  enableTikTokManage
-                    ? getTikTokCampaignPerformanceStatus(
-                        row.original,
-                        currency
-                      )
-                    : null
-                }
-              />
+              <TikTokCampaignLaunchSourceLabel campaignId={row.original.id} />
             ) : null}
             {originPlatform === "tiktok" && row.original.id ? (
               <TikTokCampaignOriginLabel campaignId={row.original.id} />

@@ -16,6 +16,7 @@ import {
 } from "@/lib/services/tiktok/report"
 import { backfillDashboardLaunchSourcesFromTikTokCampaigns } from "@/lib/services/tiktok/campaign-launch-source"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
+import type { TikTokCampaignKanbanOutcomeRow } from "./campaign-kanban-outcome.shared"
 
 export type CampaignOutcomeMetrics = {
   totalSpend: number
@@ -135,5 +136,52 @@ export async function listCampaignsForKanban(
     }
 
     return enriched
+  })
+}
+
+export type { TikTokCampaignKanbanOutcomeRow } from "./campaign-kanban-outcome.shared"
+
+/**
+ * Mapa TikTok campaign_id → ganador/perdedor según el kanban de /campaigns
+ * (match por nombre + misma clasificación lifetime).
+ */
+export async function listTikTokCampaignKanbanOutcomes(
+  accountId?: string
+): Promise<TikTokCampaignKanbanOutcomeRow[]> {
+  return withTikTokDashboardAccount(accountId, async () => {
+    const kanban = await listCampaignsForKanban(accountId)
+
+    const outcomeByName = new Map<string, "winner" | "loser">()
+    for (const campaign of kanban) {
+      if (campaign.status === "winner" || campaign.status === "loser") {
+        outcomeByName.set(normalizeCampaignName(campaign.name), campaign.status)
+      }
+    }
+
+    if (outcomeByName.size === 0) return []
+
+    let tiktokCampaigns: TikTokCampaignRow[] = []
+    try {
+      const loaded = await loadTikTokCampaignsAndMetrics()
+      tiktokCampaigns = loaded.campaigns
+    } catch (error) {
+      console.error(
+        "[campaigns-kanban] No se pudieron cargar campañas TikTok para outcomes:",
+        error
+      )
+      return []
+    }
+
+    const rows: TikTokCampaignKanbanOutcomeRow[] = []
+    for (const campaign of tiktokCampaigns) {
+      const outcome = outcomeByName.get(
+        normalizeCampaignName(campaign.campaign_name || "")
+      )
+      if (outcome) {
+        rows.push({ campaignId: campaign.campaign_id, outcome })
+      }
+    }
+
+    return rows
   })
 }

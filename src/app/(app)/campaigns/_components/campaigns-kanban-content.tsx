@@ -25,6 +25,7 @@ import {
   type CampaignKanbanStatus,
 } from "@/lib/campaigns/status"
 import type { CampaignKanbanRecord } from "@/lib/services/campaign-kanban-outcomes"
+import { KANBAN_OUTCOMES_QUERY_KEY } from "@/lib/services/campaign-kanban-outcome.shared"
 import {
   listCampaignsForKanbanAction,
   updateCampaignStatusAction,
@@ -121,6 +122,7 @@ export function CampaignsKanbanContent() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["campaigns-kanban"] })
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] })
+      void queryClient.invalidateQueries({ queryKey: KANBAN_OUTCOMES_QUERY_KEY })
     },
   })
 

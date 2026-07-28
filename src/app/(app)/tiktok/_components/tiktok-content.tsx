@@ -22,7 +22,10 @@ import { TikTokManageProvider } from "./tiktok-manage-provider"
 import { TikTokAccountSelect } from "./tiktok-account-select"
 import { useTikTokDashboardAccount } from "./use-tiktok-dashboard-account"
 import { useTikTokArchivedCampaigns } from "./use-tiktok-archived-campaigns"
-import { LAUNCH_SOURCES_QUERY_KEY } from "./tiktok-campaign-launch-source-label"
+import {
+  KANBAN_OUTCOMES_QUERY_KEY,
+  LAUNCH_SOURCES_QUERY_KEY,
+} from "./tiktok-campaign-launch-source-label"
 import {
   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
   TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
@@ -78,6 +81,7 @@ export function TikTokContent() {
             key.startsWith("tiktok-campaign-daily-insights") ||
             key.startsWith("tiktok-campaign-origins") ||
             key.startsWith("tiktok-campaign-launch-sources") ||
+            key.startsWith("tiktok-campaign-kanban-outcomes") ||
             key.startsWith("tiktok-archived-campaigns")
           )
         },
@@ -109,6 +113,7 @@ export function TikTokContent() {
         })
       )
       await queryClient.invalidateQueries({ queryKey: LAUNCH_SOURCES_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: KANBAN_OUTCOMES_QUERY_KEY })
       return rows
     },
     ...dashboardQueryOptions,
