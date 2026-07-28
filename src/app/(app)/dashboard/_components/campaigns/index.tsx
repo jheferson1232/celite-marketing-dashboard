@@ -560,7 +560,7 @@ export function CampaignsTable({
                       key={header.id}
                       className={cn(
                         isNameCol &&
-                          "sticky left-0 z-[2] min-w-[12rem] max-w-[20rem] bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
+                          "sticky left-0 z-[2] min-w-[22rem] max-w-[40rem] whitespace-normal bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
                       )}
                     >
                       {header.isPlaceholder
@@ -599,7 +599,7 @@ export function CampaignsTable({
                             key={cell.id}
                             className={cn(
                               isNameCol &&
-                                "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/50 group-aria-[expanded=true]:bg-muted/50 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
+                                "sticky left-0 z-[1] min-w-[22rem] max-w-[40rem] whitespace-normal bg-background shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/50 group-aria-[expanded=true]:bg-muted/50 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]"
                             )}
                           >
                             {flexRender(

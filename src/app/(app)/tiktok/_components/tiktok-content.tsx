@@ -22,6 +22,7 @@ import { TikTokManageProvider } from "./tiktok-manage-provider"
 import { TikTokAccountSelect } from "./tiktok-account-select"
 import { useTikTokDashboardAccount } from "./use-tiktok-dashboard-account"
 import { useTikTokArchivedCampaigns } from "./use-tiktok-archived-campaigns"
+import { LAUNCH_SOURCES_QUERY_KEY } from "./tiktok-campaign-launch-source-label"
 import {
   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY,
   TIKTOK_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY,
@@ -76,6 +77,7 @@ export function TikTokContent() {
             key.startsWith("tiktok-all-campaign-adgroups") ||
             key.startsWith("tiktok-campaign-daily-insights") ||
             key.startsWith("tiktok-campaign-origins") ||
+            key.startsWith("tiktok-campaign-launch-sources") ||
             key.startsWith("tiktok-archived-campaigns")
           )
         },
@@ -99,13 +101,16 @@ export function TikTokContent() {
 
   const { data: campaigns, isLoading: isLoadingCampaigns } = useQuery({
     queryKey: ["tiktok-campaigns", accountId, dateRange],
-    queryFn: () =>
-      runServerAction(
+    queryFn: async () => {
+      const rows = await runServerAction(
         getTikTokCampaignsListAction({
           dateRange,
           accountId: accountId ?? undefined,
         })
-      ),
+      )
+      await queryClient.invalidateQueries({ queryKey: LAUNCH_SOURCES_QUERY_KEY })
+      return rows
+    },
     ...dashboardQueryOptions,
   })
 

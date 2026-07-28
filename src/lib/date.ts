@@ -112,6 +112,18 @@ export function formatDashboardDayNumeric(dateStr: string): string {
   })
 }
 
+/** ej. 27/07 (día/mes en zona Lima, siempre 2 dígitos). */
+export function formatDayMonth(value: Date | string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: DASHBOARD_TIMEZONE,
+    day: "2-digit",
+    month: "2-digit",
+  }).formatToParts(new Date(value))
+  const day = parts.find((p) => p.type === "day")?.value ?? "00"
+  const month = parts.find((p) => p.type === "month")?.value ?? "00"
+  return `${day}/${month}`
+}
+
 /** ej. domingo, 20 de julio de 2026 */
 export function formatDashboardDayLong(dateStr: string): string {
   return formatDateOnly(dateStr, {

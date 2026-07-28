@@ -23,6 +23,7 @@ import { MetaCampaignLandingUrlsButton } from "./meta-campaign-landing-urls-butt
 import { CampaignProductLinkControl } from "./meta-campaign-product-link"
 import { TikTokCampaignLandingUrlsButton } from "@/app/(app)/tiktok/_components/tiktok-campaign-landing-urls-button"
 import type { CampaignOriginPlatform } from "@/lib/services/campaign-origin.shared"
+import { TikTokCampaignLaunchSourceLabel } from "@/app/(app)/tiktok/_components/tiktok-campaign-launch-source-label"
 import { TikTokCampaignOriginLabel } from "@/app/(app)/tiktok/_components/tiktok-campaign-origin-label"
 import { MetaCampaignOriginLabel } from "./meta-campaign-origin-label"
 
@@ -83,13 +84,7 @@ export function getCampaignColumns({
       cell: ({ row }) => {
         const isActive = row.original.status === "ACTIVE"
         return (
-          <div
-            className={cn(
-              "flex min-w-0 items-center gap-2 pl-3 font-medium",
-              enableTikTokManage &&
-                "max-w-[10rem] sm:max-w-[14rem] md:max-w-[18rem] lg:max-w-none"
-            )}
-          >
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-0.5 pl-3 font-medium">
             <div
               className={cn(
                 "h-2 w-2 shrink-0 rounded-full",
@@ -103,9 +98,12 @@ export function getCampaignColumns({
                   : undefined
               }
             />
-            <span className="min-w-0 truncate" title={row.original.name}>
+            <span className="whitespace-normal break-words leading-snug">
               {row.original.name}
             </span>
+            {originPlatform === "tiktok" && row.original.id ? (
+              <TikTokCampaignLaunchSourceLabel campaignId={row.original.id} />
+            ) : null}
             {originPlatform === "tiktok" && row.original.id ? (
               <TikTokCampaignOriginLabel campaignId={row.original.id} />
             ) : null}

@@ -299,6 +299,19 @@ model TikTokCampaignOrigin {
   @@map("TikTokCampaignOrigin")
 }
 
+/** Canal de lanzamiento: desde el dashboard o manual en TikTok Ads. */
+model TikTokCampaignLaunchSource {
+  campaignId String   @id
+  /** "dashboard" | "manual" */
+  source     String
+  /** Fecha mostrada en el badge (ej. createdAt de la campaña del kanban). */
+  launchedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([source])
+  @@map("TikTokCampaignLaunchSource")
+}
+
 /** Preferencias del dashboard TikTok (singleton id=default). */
 model TikTokDashboardSettings {
   id String @id @default("default")

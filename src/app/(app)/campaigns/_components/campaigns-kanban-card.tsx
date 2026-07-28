@@ -6,8 +6,10 @@ import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { RiDeleteBinLine } from "@remixicon/react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/format"
+import { formatDayMonth } from "@/lib/date"
 import {
   CAMPAIGN_OUTCOME_MIN_SPEND_PEN,
   canDeleteCampaign,
@@ -71,9 +73,18 @@ export function CampaignKanbanCardView({
           "hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         )}
       >
-        <p className="truncate text-sm font-semibold leading-tight">
-          {campaign.name}
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="truncate text-sm font-semibold leading-tight">
+            {campaign.name}
+          </p>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-sky-500/40 bg-sky-500/10 px-1.5 py-0 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+            title={`Lanzada desde el dashboard · ${formatDayMonth(campaign.createdAt)}`}
+          >
+            {formatDayMonth(campaign.createdAt)}
+          </Badge>
+        </div>
         <p className="truncate text-[11px] text-muted-foreground">
           {campaign.config.adgroups.length} conjuntos ·{" "}
           {formatUpdatedAt(campaign.updatedAt)}

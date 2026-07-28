@@ -21,6 +21,7 @@ import {
   getTikTokRequestContext,
 } from "./tiktok-api.server"
 import { resolveTikTokCredentials } from "./tiktok-credentials.server"
+import { markTikTokCampaignLaunchedFromDashboard } from "./campaign-launch-source"
 import { clearTikTokCache } from "./tiktok-cache"
 import { pacedTikTokRequest } from "./tiktok-request-pacing"
 import type { TikTokCampaign } from "./types"
@@ -683,6 +684,8 @@ export async function launchTikTokCampaign(
   }
 
   clearTikTokCache()
+
+  await markTikTokCampaignLaunchedFromDashboard(campaignId)
 
   if (ctx.progressCampaignId) {
     setLaunchProgress(ctx.progressCampaignId, {

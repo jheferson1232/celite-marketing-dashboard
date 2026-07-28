@@ -14,6 +14,7 @@ import {
   getPurchaseSpendAndCpa,
   getTikTokLifetimeDateRange,
 } from "@/lib/services/tiktok/report"
+import { backfillDashboardLaunchSourcesFromTikTokCampaigns } from "@/lib/services/tiktok/campaign-launch-source"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
 
 export type CampaignOutcomeMetrics = {
@@ -24,22 +25,25 @@ export type CampaignOutcomeMetrics = {
 
 export type CampaignKanbanRecord = CampaignRecord & {
   metrics: CampaignOutcomeMetrics | null
+  /** Canal de lanzamiento: las del kanban son del dashboard. */
+  launchSource: "dashboard"
 }
 
 function normalizeCampaignName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-async function loadTikTokLifetimeMetricsByName(): Promise<
-  Map<string, CampaignOutcomeMetrics>
-> {
+type TikTokCampaignRow = { campaign_id: string; campaign_name: string }
+
+async function loadTikTokCampaignsAndMetrics(): Promise<{
+  metricsByName: Map<string, CampaignOutcomeMetrics>
+  campaigns: TikTokCampaignRow[]
+}> {
   const lifetimeRange = getTikTokLifetimeDateRange()
   const metricsById = await fetchCachedCampaignMetricsByDateRange(lifetimeRange)
 
-  // Necesitamos nombres: reutilizar campaign/get liviano
   const { fetchAllPages } = await import("@/lib/services/tiktok/fetch-all-pages")
-  type TikTokCampaign = { campaign_id: string; campaign_name: string }
-  const campaigns = await fetchAllPages<TikTokCampaign>("campaign/get/")
+  const campaigns = await fetchAllPages<TikTokCampaignRow>("campaign/get/")
 
   const byName = new Map<string, CampaignOutcomeMetrics>()
   for (const campaign of campaigns) {
@@ -65,7 +69,7 @@ async function loadTikTokLifetimeMetricsByName(): Promise<
       totalCpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
     })
   }
-  return byName
+  return { metricsByName: byName, campaigns }
 }
 
 /**
@@ -79,13 +83,20 @@ export async function listCampaignsForKanban(
     const campaigns = await listCampaigns()
 
     let metricsByName = new Map<string, CampaignOutcomeMetrics>()
+    let tiktokCampaigns: TikTokCampaignRow[] = []
     try {
-      metricsByName = await loadTikTokLifetimeMetricsByName()
+      const loaded = await loadTikTokCampaignsAndMetrics()
+      metricsByName = loaded.metricsByName
+      tiktokCampaigns = loaded.campaigns
     } catch (error) {
       console.error(
         "[campaigns-kanban] No se pudieron cargar métricas TikTok:",
         error
       )
+    }
+
+    if (tiktokCampaigns.length > 0) {
+      await backfillDashboardLaunchSourcesFromTikTokCampaigns(tiktokCampaigns)
     }
 
     const enriched: CampaignKanbanRecord[] = []
@@ -115,7 +126,12 @@ export async function listCampaignsForKanban(
         }
       }
 
-      enriched.push({ ...campaign, status, metrics })
+      enriched.push({
+        ...campaign,
+        status,
+        metrics,
+        launchSource: "dashboard",
+      })
     }
 
     return enriched

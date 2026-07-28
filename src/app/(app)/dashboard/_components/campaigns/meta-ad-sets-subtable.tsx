@@ -35,7 +35,7 @@ function getSubtableHeadClassName(
 
   return cn(
     columnId === "name" &&
-      "sticky left-0 z-[2] w-[300px] min-w-[12rem] max-w-[20rem] bg-muted pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
+      "sticky left-0 z-[2] w-[360px] min-w-[22rem] max-w-[40rem] bg-muted pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
@@ -49,7 +49,7 @@ function getSubtableCellClassName(
 
   return cn(
     columnId === "name" &&
-      "sticky left-0 z-[1] min-w-[12rem] max-w-[20rem] bg-muted/80 pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted dark:bg-muted/60 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
+      "sticky left-0 z-[1] min-w-[22rem] max-w-[40rem] bg-muted/80 pl-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted dark:bg-muted/60 dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.4)]",
     columnId !== "name" && "text-right",
     meta.align === "left" && "text-left"
   )
