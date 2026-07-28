@@ -9,6 +9,7 @@ import {
   TIKTOK_CAMPAIGN_LAUNCH_SOURCE_LABELS,
   type TikTokCampaignLaunchSourceValue,
 } from "@/lib/services/tiktok/campaign-launch-source.shared"
+import type { CampaignPerformanceStatus } from "@/app/(app)/dashboard/_components/campaigns/types"
 import { listTikTokCampaignLaunchSourcesAction } from "../_actions/campaign-launch-source"
 
 export const LAUNCH_SOURCES_QUERY_KEY = [
@@ -22,6 +23,14 @@ const SOURCE_BADGE_CLASS: Record<TikTokCampaignLaunchSourceValue, string> = {
     "border-zinc-500/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 }
 
+const PERFORMANCE_BADGE_CLASS: Partial<
+  Record<CampaignPerformanceStatus, string>
+> = {
+  EXCELENTE:
+    "border-emerald-500/40 bg-emerald-500/15 text-emerald-900 dark:text-emerald-100",
+  CRITICO: "border-destructive/40 bg-destructive/15 text-destructive",
+}
+
 function badgeLabel(
   source: TikTokCampaignLaunchSourceValue,
   markedAt: string
@@ -30,11 +39,26 @@ function badgeLabel(
   return TIKTOK_CAMPAIGN_LAUNCH_SOURCE_LABELS[source]
 }
 
+function badgeClassName(
+  source: TikTokCampaignLaunchSourceValue,
+  performanceStatus?: CampaignPerformanceStatus | null
+): string {
+  if (source === "dashboard" && performanceStatus) {
+    return (
+      PERFORMANCE_BADGE_CLASS[performanceStatus] ?? SOURCE_BADGE_CLASS.dashboard
+    )
+  }
+  return SOURCE_BADGE_CLASS[source]
+}
+
 /** Solo lectura: se marca al lanzar desde el dashboard (sin edición manual). */
 export function TikTokCampaignLaunchSourceLabel({
   campaignId,
+  performanceStatus = null,
 }: {
   campaignId: string
+  /** Excelente → verde, crítico → rojo (dashboard TikTok). */
+  performanceStatus?: CampaignPerformanceStatus | null
 }) {
   const sourcesQuery = useQuery({
     queryKey: LAUNCH_SOURCES_QUERY_KEY,
@@ -54,7 +78,7 @@ export function TikTokCampaignLaunchSourceLabel({
       variant="outline"
       className={cn(
         "shrink-0 px-1.5 py-0 text-[10px] font-medium",
-        SOURCE_BADGE_CLASS[currentRow.source]
+        badgeClassName(currentRow.source, performanceStatus)
       )}
       title={
         currentRow.source === "dashboard"

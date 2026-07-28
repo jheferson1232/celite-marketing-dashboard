@@ -18,7 +18,18 @@ import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import type { CampaignKanbanRecord } from "@/lib/services/campaign-kanban-outcomes"
 import { deleteCampaignAction } from "../_actions/campaigns"
+import { CAMPAIGN_STATUS_BADGE_CLASS } from "../_lib/status-labels"
 import { CampaignDeleteDialog } from "./campaign-delete-dialog"
+
+const DATE_BADGE_FALLBACK_CLASS =
+  "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+
+function dateBadgeClass(status: CampaignKanbanRecord["status"]): string {
+  if (status === "winner" || status === "loser") {
+    return CAMPAIGN_STATUS_BADGE_CLASS[status]
+  }
+  return DATE_BADGE_FALLBACK_CLASS
+}
 
 interface CampaignsKanbanCardProps {
   campaign: CampaignKanbanRecord
@@ -79,7 +90,10 @@ export function CampaignKanbanCardView({
           </p>
           <Badge
             variant="outline"
-            className="shrink-0 border-sky-500/40 bg-sky-500/10 px-1.5 py-0 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+            className={cn(
+              "shrink-0 px-1.5 py-0 text-[10px] font-medium",
+              dateBadgeClass(campaign.status)
+            )}
             title={`Publicada desde Campaigns · ${formatDayMonth(campaign.createdAt)}`}
           >
             {formatDayMonth(campaign.createdAt)}
