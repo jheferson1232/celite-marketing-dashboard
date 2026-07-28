@@ -58,7 +58,7 @@ export function TikTokCampaignLaunchSourceLabel({
       )}
       title={
         currentRow.source === "dashboard"
-          ? `Lanzada desde el dashboard · ${label}`
+          ? `Publicada desde Campaigns · ${label}`
           : `Lanzamiento: ${label}`
       }
     >

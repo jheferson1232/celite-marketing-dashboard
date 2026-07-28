@@ -27,6 +27,7 @@ import {
   setLaunchProgress,
 } from "./launch-progress"
 import type { LaunchCheckItem } from "./launch-preflight"
+import { markTikTokCampaignLaunchedFromDashboard } from "./campaign-launch-source"
 import { stageCampaignAdgroupVideosFromBlob } from "./stage-campaign-videos"
 import { hasTikTokCredentialsConfigured } from "./tiktok-credentials.server"
 
@@ -397,6 +398,11 @@ export async function launchTikTokCampaignFromCampaign(
     await metrics.time("update_status", async () => {
       await updateCampaignStatus(campaignId, "running")
     })
+
+    await markTikTokCampaignLaunchedFromDashboard(
+      result.campaignId,
+      campaign.createdAt
+    )
 
     const metricsSnapshot = metrics.finish()
     logLaunchMetrics(campaignId, metricsSnapshot)

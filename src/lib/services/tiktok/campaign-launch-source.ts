@@ -13,6 +13,9 @@ export {
   type TikTokCampaignLaunchSourceValue,
 } from "./campaign-launch-source.shared"
 
+/** Solo campañas del kanban que ya se lanzaron (no borradores). */
+const LAUNCHED_CAMPAIGN_STATUSES = ["running", "winner", "loser"] as const
+
 function assertModel() {
   if (!prisma.tikTokCampaignLaunchSource) {
     throw new ServerActionError(
@@ -91,7 +94,7 @@ export async function setTikTokCampaignLaunchSource(input: {
   return toRow(row)
 }
 
-/** Marca una campaña como lanzada desde el dashboard (idempotente). */
+/** Marca una campaña como lanzada desde /campaigns (idempotente). */
 export async function markTikTokCampaignLaunchedFromDashboard(
   campaignId: string,
   launchedAt?: Date
@@ -118,9 +121,8 @@ function normalizeCampaignName(name: string): string {
 }
 
 /**
- * Marca como Dashboard las campañas TikTok que coinciden por nombre con
- * campañas internas del kanban (usa createdAt del kanban como fecha del badge),
- * o que ya están linkeadas a un producto.
+ * Solo campañas publicadas desde /campaigns (match por nombre con el kanban).
+ * Quita marcas falsas (p. ej. solo linkeadas a un producto a mano).
  */
 export async function backfillDashboardLaunchSourcesFromTikTokCampaigns(
   tiktokCampaigns: Array<{ campaign_id: string; campaign_name?: string }>
@@ -128,13 +130,10 @@ export async function backfillDashboardLaunchSourcesFromTikTokCampaigns(
   if (tiktokCampaigns.length === 0) return 0
   assertModel()
 
-  const [internalCampaigns, productLinks] = await Promise.all([
-    prisma.campaign.findMany({ select: { name: true, createdAt: true } }),
-    prisma.productCampaign.findMany({
-      where: { platform: "tiktok" },
-      select: { campaignId: true, createdAt: true },
-    }),
-  ])
+  const internalCampaigns = await prisma.campaign.findMany({
+    where: { status: { in: [...LAUNCHED_CAMPAIGN_STATUSES] } },
+    select: { name: true, createdAt: true },
+  })
 
   const createdAtByName = new Map<string, Date>()
   for (const campaign of internalCampaigns) {
@@ -147,26 +146,28 @@ export async function backfillDashboardLaunchSourcesFromTikTokCampaigns(
   }
 
   const launchedAtByTikTokId = new Map<string, Date>()
-
-  for (const link of productLinks) {
-    if (link.campaignId) {
-      launchedAtByTikTokId.set(link.campaignId, link.createdAt)
-    }
-  }
-
   for (const campaign of tiktokCampaigns) {
     const name = normalizeCampaignName(campaign.campaign_name || "")
     const createdAt = name ? createdAtByName.get(name) : undefined
     if (createdAt && campaign.campaign_id) {
-      // La fecha del kanban tiene prioridad sobre el link a producto.
       launchedAtByTikTokId.set(campaign.campaign_id, createdAt)
     }
   }
 
-  if (launchedAtByTikTokId.size === 0) return 0
+  const validIds = [...launchedAtByTikTokId.keys()]
 
   let written = 0
   try {
+    // Quitar marcas que no corresponden a un lanzamiento desde /campaigns.
+    await prisma.tikTokCampaignLaunchSource.deleteMany({
+      where: {
+        source: "dashboard",
+        ...(validIds.length > 0
+          ? { campaignId: { notIn: validIds } }
+          : {}),
+      },
+    })
+
     for (const [campaignId, launchedAt] of launchedAtByTikTokId) {
       const existing = await prisma.tikTokCampaignLaunchSource.findUnique({
         where: { campaignId },

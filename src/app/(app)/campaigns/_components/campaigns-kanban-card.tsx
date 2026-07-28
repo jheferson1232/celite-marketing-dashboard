@@ -80,7 +80,7 @@ export function CampaignKanbanCardView({
           <Badge
             variant="outline"
             className="shrink-0 border-sky-500/40 bg-sky-500/10 px-1.5 py-0 text-[10px] font-medium text-sky-700 dark:text-sky-300"
-            title={`Lanzada desde el dashboard · ${formatDayMonth(campaign.createdAt)}`}
+            title={`Publicada desde Campaigns · ${formatDayMonth(campaign.createdAt)}`}
           >
             {formatDayMonth(campaign.createdAt)}
           </Badge>
