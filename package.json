@@ -22,7 +22,8 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "r2:cors": "node --env-file=.env scripts/configure-r2-cors.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",

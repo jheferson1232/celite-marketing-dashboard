@@ -55,11 +55,18 @@ export async function uploadCreativeFileClient(
     type,
   })
 
-  const uploadResponse = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: contentType ? { "Content-Type": contentType } : undefined,
-    body: normalizedFile,
-  })
+  let uploadResponse: Response
+  try {
+    uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: contentType ? { "Content-Type": contentType } : undefined,
+      body: normalizedFile,
+    })
+  } catch {
+    throw new Error(
+      "No se pudo subir a R2 (Failed to fetch). Revisá la política CORS del bucket en Cloudflare."
+    )
+  }
 
   if (!uploadResponse.ok) {
     throw new Error(
