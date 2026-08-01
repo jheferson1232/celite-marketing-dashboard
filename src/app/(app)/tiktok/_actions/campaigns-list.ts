@@ -1,7 +1,10 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
-import { getTikTokCampaignsList } from "@/lib/services/tiktok/campaigns-list"
+import {
+  getTikTokCampaignsList,
+  getTikTokCampaignsListAllAccounts,
+} from "@/lib/services/tiktok/campaigns-list"
 import { backfillDashboardLaunchSourcesFromTikTokCampaigns } from "@/lib/services/tiktok/campaign-launch-source"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
 import type { CampaignRow, DateRange } from "@/lib/services/meta/types"
@@ -21,4 +24,10 @@ export const getTikTokCampaignsListAction = createServerAction(
       )
       return rows
     })
+)
+
+/** Todas las cuentas TikTok (nombres prefijados con la cuenta). Para productos / Resumen. */
+export const getTikTokCampaignsListAllAccountsAction = createServerAction(
+  async (input: { dateRange: DateRange }): Promise<CampaignRow[]> =>
+    getTikTokCampaignsListAllAccounts(input.dateRange)
 )

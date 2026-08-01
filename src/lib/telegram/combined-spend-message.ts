@@ -5,7 +5,7 @@ import {
 } from "@/lib/format"
 import { getAccountKpis } from "@/lib/services/meta/account-kpis"
 import type { DateRange } from "@/lib/services/meta/types"
-import { getTikTokAccountKpis } from "@/lib/services/tiktok/account-kpis"
+import { getTikTokAllAccountsKpis } from "@/lib/services/tiktok/account-kpis"
 
 function formatPlatformBlock(
   platformLabel: string,
@@ -33,7 +33,7 @@ export async function formatCombinedSpendMessage(
 ): Promise<string> {
   const [meta, tiktok] = await Promise.all([
     getAccountKpis(dateRange),
-    getTikTokAccountKpis(dateRange),
+    getTikTokAllAccountsKpis(dateRange),
   ])
 
   const metaBlock = formatPlatformBlock(

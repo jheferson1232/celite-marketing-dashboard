@@ -6,7 +6,7 @@ import { getTodayDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
 import { getCampaignsExtendedMetrics } from "@/app/(app)/dashboard/_actions/campaigns-extended-metrics"
 import { getTikTokAllCampaignAdGroupsAction } from "@/app/(app)/tiktok/_actions/all-campaign-adgroups"
-import { getTikTokCampaignsListAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
+import { getTikTokCampaignsListAllAccountsAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
 import type { CampaignRow } from "@/lib/services/meta/types"
 import { runServerAction } from "@/lib/server-action"
 
@@ -31,9 +31,11 @@ export function useProductoLinkedCampaigns(
 
   const { data: tiktokCampaignsAll = [], isLoading: isLoadingTikTokCampaigns } =
     useQuery({
-      queryKey: ["tiktok-campaigns", todayRange],
+      queryKey: ["tiktok-campaigns-all-accounts", todayRange],
       queryFn: () =>
-        runServerAction(getTikTokCampaignsListAction({ dateRange: todayRange })),
+        runServerAction(
+          getTikTokCampaignsListAllAccountsAction({ dateRange: todayRange })
+        ),
       enabled: hasTikTok,
       ...dashboardQueryOptions,
     })

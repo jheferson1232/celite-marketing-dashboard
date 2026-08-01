@@ -19,10 +19,13 @@ export function assertTikTokAdAccountPrisma() {
   }
 }
 
-export const resolveTikTokCredentials = cache(
-  async (): Promise<TikTokCredentials> => {
+/**
+ * Cache keyed by dashboard account id so parallel multi-account fetches
+ * in the same request don't share the wrong credentials.
+ */
+const resolveTikTokCredentialsCached = cache(
+  async (dashboardAccountId: string): Promise<TikTokCredentials> => {
     if (prisma.tikTokAdAccount) {
-      const dashboardAccountId = getTikTokDashboardAccountId()
       if (dashboardAccountId) {
         const selected = await prisma.tikTokAdAccount.findFirst({
           where: { id: dashboardAccountId, status: "active" },
@@ -62,6 +65,10 @@ export const resolveTikTokCredentials = cache(
     )
   }
 )
+
+export async function resolveTikTokCredentials(): Promise<TikTokCredentials> {
+  return resolveTikTokCredentialsCached(getTikTokDashboardAccountId() ?? "")
+}
 
 export async function hasTikTokCredentialsConfigured(): Promise<boolean> {
   if (prisma.tikTokAdAccount) {

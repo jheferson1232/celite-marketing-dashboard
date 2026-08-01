@@ -10,10 +10,12 @@ import { pacedMetaRequest } from "@/lib/services/meta/meta-request-pacing"
 import { getPurchaseSpendAndCpaFromInsight } from "@/lib/services/meta/purchase-metrics"
 import type { DateRange } from "@/lib/services/meta/types"
 import { listProducts, type ProductRecord } from "@/lib/services/product"
+import { listTikTokAdAccounts } from "@/lib/services/tiktok/ad-accounts"
 import {
   fetchCachedCampaignMetricsByDateRange,
   getPurchaseSpendAndCpa,
 } from "@/lib/services/tiktok/report"
+import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
 import { getProductCoverImage } from "@/lib/products/cover-image"
 import { computeBlendedCpaCop, safeNum } from "./safe-number"
 
@@ -105,7 +107,75 @@ function buildRow(
   }
 }
 
-/** Una consulta Meta + una TikTok por rango (totales por campaña), sin N llamadas serializadas. */
+function metricsFromTikTokReport(
+  raw: Map<string, Record<string, string>>
+): Map<string, SummaryProductPlatformMetrics> {
+  const metrics = new Map<string, SummaryProductPlatformMetrics>()
+  for (const [campaignId, row] of raw) {
+    const { spend, purchases, cpa } = getPurchaseSpendAndCpa(row)
+    if (spend <= 0 && purchases <= 0) continue
+    metrics.set(campaignId, { spend, purchases, cpa })
+  }
+  return metrics
+}
+
+function mergePlatformMetricsMaps(
+  maps: Map<string, SummaryProductPlatformMetrics>[]
+): Map<string, SummaryProductPlatformMetrics> {
+  const merged = new Map<string, SummaryProductPlatformMetrics>()
+  for (const map of maps) {
+    for (const [campaignId, metrics] of map) {
+      const existing = merged.get(campaignId)
+      if (!existing) {
+        merged.set(campaignId, metrics)
+        continue
+      }
+      const spend = existing.spend + metrics.spend
+      const purchases = existing.purchases + metrics.purchases
+      merged.set(campaignId, {
+        spend,
+        purchases,
+        cpa: purchases > 0 ? spend / purchases : 0,
+      })
+    }
+  }
+  return merged
+}
+
+/** Métricas de campaña TikTok sumadas desde todas las cuentas activas. */
+async function loadTikTokCampaignMetricsAllAccounts(
+  dateRange: DateRange
+): Promise<Map<string, SummaryProductPlatformMetrics>> {
+  const accounts = await listTikTokAdAccounts()
+
+  if (accounts.length === 0) {
+    return metricsFromTikTokReport(
+      await fetchCachedCampaignMetricsByDateRange(dateRange)
+    )
+  }
+
+  const maps = await Promise.all(
+    accounts.map(async (account) => {
+      try {
+        return await withTikTokDashboardAccount(account.id, async () =>
+          metricsFromTikTokReport(
+            await fetchCachedCampaignMetricsByDateRange(dateRange)
+          )
+        )
+      } catch (error) {
+        console.warn(
+          `[summary-products] No se pudieron obtener campañas TikTok de ${account.advertiserId} (${account.name}):`,
+          error
+        )
+        return new Map<string, SummaryProductPlatformMetrics>()
+      }
+    })
+  )
+
+  return mergePlatformMetricsMaps(maps)
+}
+
+/** Una consulta Meta + TikTok multi-cuenta por rango (totales por campaña). */
 async function loadBatchCampaignMetrics(dateRange: DateRange): Promise<{
   metaByCampaign: Map<string, SummaryProductPlatformMetrics>
   tiktokByCampaign: Map<string, SummaryProductPlatformMetrics>
@@ -125,15 +195,7 @@ async function loadBatchCampaignMetrics(dateRange: DateRange): Promise<{
 
       return metrics
     }),
-    fetchCachedCampaignMetricsByDateRange(dateRange).then((raw) => {
-      const metrics = new Map<string, SummaryProductPlatformMetrics>()
-      for (const [campaignId, row] of raw) {
-        const { spend, purchases, cpa } = getPurchaseSpendAndCpa(row)
-        if (spend <= 0 && purchases <= 0) continue
-        metrics.set(campaignId, { spend, purchases, cpa })
-      }
-      return metrics
-    }),
+    loadTikTokCampaignMetricsAllAccounts(dateRange),
   ])
 
   return { metaByCampaign, tiktokByCampaign }
@@ -163,7 +225,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v3:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v4:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )

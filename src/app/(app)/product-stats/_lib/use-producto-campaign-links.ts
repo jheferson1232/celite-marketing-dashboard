@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
-import { getTikTokCampaignsListAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
+import { getTikTokCampaignsListAllAccountsAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
 import { runServerAction } from "@/lib/server-action"
 import type { ProductPlatform, ProductRecord } from "@/lib/services/product"
 import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
@@ -25,8 +25,11 @@ export function useProductoCampaignLinks({
   const dateRange = getLastSevenDaysRange()
 
   const { data: tiktokCampaigns = [] } = useQuery({
-    queryKey: ["tiktok-campaigns", dateRange],
-    queryFn: () => runServerAction(getTikTokCampaignsListAction({ dateRange })),
+    queryKey: ["tiktok-campaigns-all-accounts", dateRange],
+    queryFn: () =>
+      runServerAction(
+        getTikTokCampaignsListAllAccountsAction({ dateRange })
+      ),
     enabled,
     staleTime: 2 * 60 * 1000,
   })

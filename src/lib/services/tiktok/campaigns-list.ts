@@ -1,4 +1,5 @@
 import type { CampaignRow, DateRange } from "@/lib/services/meta/types"
+import { listTikTokAdAccounts } from "./ad-accounts"
 import {
   CAMPAIGN_METRICS,
   fetchCachedCampaignMetricsByDateRange,
@@ -16,6 +17,7 @@ import { fetchAllPages } from "./fetch-all-pages"
 import { withTikTokCache } from "./tiktok-cache"
 import { buildTikTokCacheKey } from "./tiktok-api.server"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
+import { withTikTokDashboardAccount } from "./tiktok-dashboard-account.server"
 import type { TikTokAd, TikTokAdGroup, TikTokCampaign } from "./types"
 
 const CAMPAIGNS_TTL_MS = 2 * 60 * 1000
@@ -36,6 +38,59 @@ export async function getTikTokCampaignsList(
   return withTikTokCache(cacheKey, CAMPAIGNS_TTL_MS, () =>
     fetchTikTokCampaignsList(dateRange)
   )
+}
+
+/**
+ * Campañas de todas las cuentas activas (vinculación de productos / Resumen).
+ * Prefija el nombre con la cuenta cuando hay más de una.
+ */
+export async function getTikTokCampaignsListAllAccounts(
+  dateRange: DateRange
+): Promise<CampaignRow[]> {
+  const cacheKey = `tiktok:all-accounts:campaigns:${dateRange.from}:${dateRange.to}`
+  return withTikTokCache(cacheKey, CAMPAIGNS_TTL_MS, () =>
+    fetchTikTokCampaignsListAllAccounts(dateRange)
+  )
+}
+
+async function fetchTikTokCampaignsListAllAccounts(
+  dateRange: DateRange
+): Promise<CampaignRow[]> {
+  const accounts = await listTikTokAdAccounts()
+
+  if (accounts.length === 0) {
+    return getTikTokCampaignsList(dateRange)
+  }
+
+  if (accounts.length === 1) {
+    return withTikTokDashboardAccount(accounts[0].id, () =>
+      getTikTokCampaignsList(dateRange)
+    )
+  }
+
+  const lists = await Promise.all(
+    accounts.map(async (account) => {
+      try {
+        const rows = await withTikTokDashboardAccount(account.id, () =>
+          getTikTokCampaignsList(dateRange)
+        )
+        return rows.map((row) => ({
+          ...row,
+          name: `${account.name} · ${row.name}`,
+        }))
+      } catch (error) {
+        console.warn(
+          `[tiktok] No se pudieron listar campañas de ${account.advertiserId} (${account.name}):`,
+          error
+        )
+        return [] as CampaignRow[]
+      }
+    })
+  )
+
+  return lists
+    .flat()
+    .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name, "es"))
 }
 
 async function fetchTikTokCampaignsList(
