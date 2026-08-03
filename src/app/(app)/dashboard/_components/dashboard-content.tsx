@@ -18,7 +18,8 @@ import { Button } from "@/components/ui/button"
 import { KpiCards } from "./kpi-cards"
 import { CampaignsTable } from "./campaigns"
 import { AdsView } from "./ads"
-import { DateRangePicker } from "./date-range-picker"
+import { MetaAudienceSection } from "./audience/meta-audience-section"
+import { PeriodPicker } from "@/components/period-picker"
 import { MetaApiStatusIndicator } from "./meta-api-status-indicator"
 import { useMetaArchivedCampaigns } from "./campaigns/use-meta-archived-campaigns"
 import {
@@ -59,6 +60,7 @@ export function DashboardContent() {
             "meta-landing-urls-map",
             "meta-adset-insights-warm",
             "meta-archived-campaigns",
+            "meta-audience-breakdowns",
           ].includes(String(query.queryKey[0])),
       })
     } finally {
@@ -196,31 +198,35 @@ export function DashboardContent() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Meta</h1>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+              Meta
+            </h1>
+          </div>
           <MetaApiStatusIndicator status={metaApiStatus} />
-          <DateRangePicker
-            from={dateRange.from}
-            to={dateRange.to}
-            onRangeChange={(range) => setDateRange(range)}
-            className="w-full sm:w-auto"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 min-w-0 gap-2 px-3"
-            onClick={handleReload}
-            disabled={isReloading}
-          >
-            <RiRefreshLine
-              className={isReloading ? "size-4 animate-spin" : "size-4"}
-            />
-            Reload
-          </Button>
         </div>
+        <PeriodPicker
+          from={dateRange.from}
+          to={dateRange.to}
+          onRangeChange={(range) => setDateRange(range)}
+          endAction={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[34px] shrink-0 gap-1.5 px-3"
+              onClick={handleReload}
+              disabled={isReloading}
+            >
+              <RiRefreshLine
+                className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
+              />
+              Reload
+            </Button>
+          }
+        />
       </div>
 
       <KpiCards
@@ -228,6 +234,8 @@ export function DashboardContent() {
         isLoading={isLoadingKpis}
         lastMetric="addToCart"
       />
+
+      <MetaAudienceSection />
 
       <Tabs
         value={activeTab}
