@@ -3,14 +3,9 @@
 import type { UIMessage } from "ai"
 import { type ReactNode, useEffect, useState, useTransition } from "react"
 import { usePathname } from "next/navigation"
-import { RiSparklingLine } from "@remixicon/react"
-import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-} from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
+import { AssistantLauncher } from "./assistant-launcher"
 import { DashboardAssistantPanel } from "./dashboard-assistant-panel"
 import { createAssistantChatAction } from "../_actions/chat"
 import { useAssistantPanel } from "../_lib/use-assistant-panel"
@@ -29,20 +24,6 @@ interface DashboardShellProps {
   initialMessages: UIMessage[]
 }
 
-function useLargeScreen() {
-  const [isLarge, setIsLarge] = useState(true)
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)")
-    const update = () => setIsLarge(mq.matches)
-    update()
-    mq.addEventListener("change", update)
-    return () => mq.removeEventListener("change", update)
-  }, [])
-
-  return isLarge
-}
-
 export function DashboardShell({
   children,
   chats,
@@ -51,28 +32,26 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const pathname = usePathname()
   const [{ assistant, chat: chatFromUrl }, setPanel] = useAssistantPanel()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [isOpening, startOpening] = useTransition()
   const [openError, setOpenError] = useState<string | null>(null)
-  const isLargeScreen = useLargeScreen()
-  const isOpen = assistant !== false && !isCollapsed
 
+  const chatOpen = assistant !== false
   const activeChatId = chatFromUrl || serverChatId
   const initialMessages =
     chatFromUrl && chatFromUrl === serverChatId ? serverMessages : []
 
   function openAssistant() {
     setOpenError(null)
+    setMenuOpen(false)
     startOpening(async () => {
       try {
         const result = await runServerAction(createAssistantChatAction())
         if (!result?.id) {
           setOpenError("No se pudo crear la conversación.")
           setPanel({ assistant: true, chat: null })
-          setIsCollapsed(false)
           return
         }
-        setIsCollapsed(false)
         setPanel({ assistant: true, chat: result.id })
       } catch (error) {
         setOpenError(
@@ -80,17 +59,16 @@ export function DashboardShell({
             ? error.message
             : "No se pudo abrir el asistente. Intenta de nuevo."
         )
-        setIsCollapsed(false)
         setPanel({ assistant: true, chat: null })
       }
     })
   }
 
-  useEffect(() => {
-    if (assistant !== false) {
-      setIsCollapsed(false)
-    }
-  }, [assistant])
+  function closeAssistant() {
+    setOpenError(null)
+    setMenuOpen(false)
+    setPanel({ assistant: false, chat: null })
+  }
 
   useEffect(() => {
     if (assistant !== false && !activeChatId && !isOpening && !openError) {
@@ -107,65 +85,33 @@ export function DashboardShell({
     isLoading: isOpening || (!activeChatId && !openError),
     openError,
     onRetryOpen: openAssistant,
-    onCollapse: () => setIsCollapsed(true),
-    onClose: () => {
-      setOpenError(null)
-      setPanel({ assistant: false, chat: null })
-    },
+    onCollapse: closeAssistant,
+    onClose: closeAssistant,
   }
 
   return (
     <div className="flex h-dvh min-h-0 w-full overflow-hidden">
-      <div
-        className={cn(
-          "min-h-0 min-w-0 flex-1 overflow-y-auto",
-          isOpen && isLargeScreen && "lg:max-w-[calc(100%-min(420px,32vw))]"
-        )}
-      >
-        {children}
-      </div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
 
-      {isOpen && isLargeScreen ? (
-        <div className="hidden h-full w-[min(420px,32vw)] shrink-0 lg:flex">
+      {chatOpen ? (
+        <div
+          className={cn(
+            "fixed right-4 bottom-4 z-40 flex w-[min(100vw-2rem,24rem)] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl",
+            "h-[min(70dvh,36rem)]"
+          )}
+        >
           <DashboardAssistantPanel {...panelProps} />
         </div>
-      ) : null}
-
-      {!isLargeScreen ? (
-        <Sheet
-          open={isOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              setIsCollapsed(true)
-              setPanel({ assistant: false, chat: null })
-            } else {
-              openAssistant()
-            }
-          }}
-        >
-          <SheetContent
-            side="right"
-            showCloseButton={false}
-            className="flex h-[100dvh] max-h-[100dvh] w-full max-w-md flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
-          >
-            <DashboardAssistantPanel {...panelProps} />
-          </SheetContent>
-        </Sheet>
-      ) : null}
-
-      {!isOpen ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="fixed right-4 bottom-4 z-40 gap-2 shadow-md"
-          onClick={openAssistant}
-          disabled={isOpening}
-        >
-          <RiSparklingLine className="size-4" />
-          Asistente IA
-        </Button>
-      ) : null}
+      ) : (
+        <AssistantLauncher
+          menuOpen={menuOpen}
+          chatOpen={chatOpen}
+          isOpening={isOpening}
+          onToggleMenu={() => setMenuOpen((prev) => !prev)}
+          onOpenChat={openAssistant}
+          onCloseMenu={() => setMenuOpen(false)}
+        />
+      )}
     </div>
   )
 }

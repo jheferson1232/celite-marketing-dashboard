@@ -80,7 +80,7 @@ export function DashboardAssistantPanel({
   const suggestions =
     platform === "tiktok" ? TIKTOK_SUGGESTIONS : META_SUGGESTIONS
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col border-l bg-background">
+    <aside className="flex h-full min-h-0 w-full flex-col bg-background">
       <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2.5">
         <Popover>
           <PopoverTrigger asChild>
