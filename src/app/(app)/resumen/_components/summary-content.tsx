@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
 import { useDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
-import { DateRangePicker } from "@/app/(app)/dashboard/_components/date-range-picker"
 import { getSummaryKpisAction } from "../_actions/summary-kpis"
 import { clearSummaryCacheAction } from "../_actions/clear-summary-cache"
 import {
@@ -23,6 +22,7 @@ import {
   formatSummarySpendCop,
 } from "./summary-pin-card"
 import { SummaryMobileThemeToggle } from "./summary-mobile-theme-toggle"
+import { SummaryPeriodPicker } from "./summary-period-picker"
 import { SummaryProductsTableSection } from "./summary-products-table"
 
 function SummarySection({
@@ -85,37 +85,35 @@ export function SummaryContent() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Resumen</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Según el rango de fechas seleccionado (usa «Hoy» para ver el día
-            actual)
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+              Resumen
+            </h1>
+          </div>
+          <SummaryMobileThemeToggle />
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <DateRangePicker
-            from={dateRange.from}
-            to={dateRange.to}
-            onRangeChange={(range) => setDateRange(range)}
-            className="w-full sm:w-auto"
-          />
-          <div className="flex w-full gap-2 sm:w-auto">
-            <SummaryMobileThemeToggle />
+        <SummaryPeriodPicker
+          from={dateRange.from}
+          to={dateRange.to}
+          onRangeChange={(range) => setDateRange(range)}
+          endAction={
             <Button
               type="button"
               variant="outline"
-              className="h-9 min-w-0 flex-1 gap-2 px-3 sm:flex-none sm:w-auto"
+              size="sm"
+              className="h-[34px] shrink-0 gap-1.5 px-3"
               onClick={handleReload}
               disabled={isReloading}
             >
-            <RiRefreshLine
-              className={isReloading ? "size-4 animate-spin" : "size-4"}
-            />
-            Reload
+              <RiRefreshLine
+                className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
+              />
+              Reload
             </Button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {isError ? (
