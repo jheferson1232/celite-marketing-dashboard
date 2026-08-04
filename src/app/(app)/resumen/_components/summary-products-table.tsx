@@ -2,13 +2,15 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { useState } from "react"
 import {
   RiArchiveLine,
   RiFacebookCircleFill,
   RiImageLine,
+  RiLinkM,
   RiTiktokFill,
 } from "@remixicon/react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -28,6 +30,7 @@ import type {
 } from "@/lib/services/summary/products-summary-table"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
+import { autoLinkTikTokCampaignsAction } from "../_actions/auto-link-tiktok"
 import { getSummaryProductsTableAction } from "../_actions/summary-products-table"
 import {
   formatSummaryCpa,
@@ -212,6 +215,8 @@ function TableSkeleton() {
 export function SummaryProductsTableSection({
   dateRange,
 }: SummaryProductsTableSectionProps) {
+  const queryClient = useQueryClient()
+  const [linkFeedback, setLinkFeedback] = useState<string | null>(null)
   const { archivedIds, archiveProduct, archivedMenu } =
     useSummaryArchivedProducts()
 
@@ -220,6 +225,30 @@ export function SummaryProductsTableSection({
     queryFn: () => runServerAction(getSummaryProductsTableAction(dateRange)),
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+  })
+
+  const autoLinkMutation = useMutation({
+    mutationFn: () => runServerAction(autoLinkTikTokCampaignsAction()),
+    onSuccess: async (result) => {
+      if (!result) return
+      setLinkFeedback(
+        `Vinculadas ${result.linked} campañas TikTok` +
+          (result.unmatched > 0
+            ? ` · ${result.unmatched} sin match claro`
+            : "")
+      )
+      await queryClient.invalidateQueries({
+        queryKey: ["summary-products-table"],
+      })
+      await queryClient.invalidateQueries({ queryKey: ["products"] })
+    },
+    onError: (err) => {
+      setLinkFeedback(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron vincular las campañas TikTok."
+      )
+    },
   })
 
   const rowsWithCampaigns =
@@ -253,16 +282,50 @@ export function SummaryProductsTableSection({
         <TableSkeleton />
       ) : data ? (
         !hasAnyLinked ? (
-          <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No hay productos con campañas vinculadas. Configúralas en{" "}
-            <Link href="/products" className="font-medium text-foreground underline">
-              Products
-            </Link>
-            .
-          </p>
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No hay productos con campañas vinculadas.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={autoLinkMutation.isPending}
+              onClick={() => autoLinkMutation.mutate()}
+            >
+              <RiLinkM className="size-3.5" />
+              {autoLinkMutation.isPending
+                ? "Vinculando TikTok…"
+                : "Vincular campañas TikTok"}
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-end">{archivedMenu}</div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                disabled={autoLinkMutation.isPending}
+                onClick={() => {
+                  setLinkFeedback(null)
+                  autoLinkMutation.mutate()
+                }}
+              >
+                <RiLinkM className="size-3.5" />
+                {autoLinkMutation.isPending
+                  ? "Vinculando…"
+                  : "Vincular TikTok"}
+              </Button>
+              {archivedMenu}
+            </div>
+            {linkFeedback ? (
+              <p className="text-muted-foreground text-right text-xs">
+                {linkFeedback}
+              </p>
+            ) : null}
             {rowsWithCampaigns.length === 0 ? (
               <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                 Todos los productos están archivados en este resumen. Usa
