@@ -2,8 +2,28 @@ import type { AudienceSegment } from "@/lib/services/meta/audience-breakdowns"
 import { audienceBarColor } from "@/lib/services/meta/audience-breakdowns"
 import {
   formatAudienceCpa,
+  formatAudiencePurchases,
   formatAudienceSpend,
 } from "@/lib/services/meta/audience-breakdowns"
+
+function segmentMetaLine(
+  segment: AudienceSegment,
+  cpaAvailable: boolean
+): string {
+  const parts = [`${segment.percent}%`]
+
+  if (segment.purchases > 0) {
+    parts.push(`${formatAudiencePurchases(segment.purchases)} ventas`)
+  }
+
+  if (cpaAvailable && segment.cpa > 0) {
+    parts.push(`CPA ${formatAudienceCpa(segment.cpa)}`)
+  } else if (!cpaAvailable && segment.spend > 0) {
+    parts.push(formatAudienceSpend(segment.spend))
+  }
+
+  return parts.join(" · ")
+}
 
 export function AudienceBarsView({
   segments,
@@ -25,12 +45,7 @@ export function AudienceBarsView({
           <div className="mb-1 flex items-center justify-between gap-2 text-sm">
             <span className="truncate font-medium">{segment.label}</span>
             <span className="shrink-0 text-muted-foreground tabular-nums">
-              {segment.percent}%
-              {cpaAvailable && segment.cpa > 0
-                ? ` · CPA ${formatAudienceCpa(segment.cpa)}`
-                : segment.spend > 0
-                  ? ` · ${formatAudienceSpend(segment.spend)}`
-                  : ""}
+              {segmentMetaLine(segment, cpaAvailable)}
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { ReactNode } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { RiArchiveLine, RiInboxUnarchiveLine } from "@remixicon/react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,27 +13,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { runServerAction } from "@/lib/server-action"
+import {
+  archiveSummaryProductAction,
+  listArchivedSummaryProductsAction,
+  mergeArchivedSummaryProductsAction,
+  unarchiveSummaryProductAction,
+} from "../_actions/archived-products"
 
-const STORAGE_KEY = "summary-archived-products:v1"
+const LEGACY_STORAGE_KEY = "summary-archived-products:v1"
+const LEGACY_MIGRATED_KEY = "summary-archived-products:migrated-v1"
 
-export type SummaryArchivedProduct = {
+type LegacyArchivedProduct = {
   productId: string
   name: string
   archivedAt: string
 }
 
-type Listener = () => void
-
-const listeners = new Set<Listener>()
-
-function emit() {
-  for (const listener of listeners) listener()
-}
-
-function readArchived(): SummaryArchivedProduct[] {
+function readLegacyLocalArchived(): LegacyArchivedProduct[] {
   if (typeof window === "undefined") return []
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
@@ -53,68 +55,92 @@ function readArchived(): SummaryArchivedProduct[] {
             typeof row.archivedAt === "string" && row.archivedAt
               ? row.archivedAt
               : new Date().toISOString(),
-        } satisfies SummaryArchivedProduct
+        } satisfies LegacyArchivedProduct
       })
-      .filter((item): item is SummaryArchivedProduct => item != null)
+      .filter((item): item is LegacyArchivedProduct => item != null)
   } catch {
     return []
   }
 }
 
-function writeArchived(items: SummaryArchivedProduct[]) {
+function markLegacyMigrated() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    localStorage.setItem(LEGACY_MIGRATED_KEY, "1")
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
   } catch {
-    // quota / private mode
-  }
-  emit()
-}
-
-function subscribe(listener: Listener) {
-  listeners.add(listener)
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) listener()
-  }
-  window.addEventListener("storage", onStorage)
-  return () => {
-    listeners.delete(listener)
-    window.removeEventListener("storage", onStorage)
+    // ignore
   }
 }
 
-function getSnapshot() {
-  return JSON.stringify(readArchived())
-}
-
-function getServerSnapshot() {
-  return "[]"
+function wasLegacyMigrated(): boolean {
+  try {
+    return localStorage.getItem(LEGACY_MIGRATED_KEY) === "1"
+  } catch {
+    return false
+  }
 }
 
 export function useSummaryArchivedProducts() {
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot
+  const queryClient = useQueryClient()
+  const migratingRef = useRef(false)
+
+  const archivedQuery = useQuery({
+    queryKey: ["summary-archived-products"],
+    queryFn: () => runServerAction(listArchivedSummaryProductsAction()),
+  })
+
+  const archived = archivedQuery.data ?? []
+  const archivedIds = useMemo(
+    () => new Set(archived.map((item) => item.productId)),
+    [archived]
   )
-  const archived: SummaryArchivedProduct[] = JSON.parse(snapshot)
-  const archivedIds = new Set(archived.map((item) => item.productId))
 
-  const archiveProduct = useCallback((product: { id: string; name: string }) => {
-    const current = readArchived()
-    if (current.some((item) => item.productId === product.id)) return
-    writeArchived([
-      {
-        productId: product.id,
-        name: product.name,
-        archivedAt: new Date().toISOString(),
-      },
-      ...current,
-    ])
-  }, [])
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["summary-archived-products"] })
 
-  const unarchiveProduct = useCallback((productId: string) => {
-    writeArchived(readArchived().filter((item) => item.productId !== productId))
-  }, [])
+  const archiveMutation = useMutation({
+    mutationFn: (product: { id: string; name: string }) =>
+      runServerAction(
+        archiveSummaryProductAction({
+          productId: product.id,
+          name: product.name,
+        })
+      ),
+    onSuccess: async () => {
+      await invalidate()
+    },
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (productId: string) =>
+      runServerAction(unarchiveSummaryProductAction(productId)),
+    onSuccess: async () => {
+      await invalidate()
+    },
+  })
+
+  const mergeMutation = useMutation({
+    mutationFn: (items: LegacyArchivedProduct[]) =>
+      runServerAction(mergeArchivedSummaryProductsAction(items)),
+    onSuccess: async () => {
+      markLegacyMigrated()
+      await invalidate()
+    },
+  })
+
+  useEffect(() => {
+    if (!archivedQuery.isSuccess || migratingRef.current) return
+    if (wasLegacyMigrated()) return
+    const legacy = readLegacyLocalArchived()
+    if (legacy.length === 0) {
+      markLegacyMigrated()
+      return
+    }
+    migratingRef.current = true
+    mergeMutation.mutate(legacy)
+    // Solo al cargar la lista desde el servidor la primera vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeMutation.mutate es estable
+  }, [archivedQuery.isSuccess])
 
   const archivedMenu: ReactNode = (
     <DropdownMenu>
@@ -134,7 +160,11 @@ export function useSummaryArchivedProducts() {
           Archivados en este resumen
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {archived.length === 0 ? (
+        {archivedQuery.isLoading ? (
+          <div className="px-3 py-3">
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : archived.length === 0 ? (
           <p className="px-3 py-3 text-sm text-muted-foreground">
             No hay productos archivados.
           </p>
@@ -153,9 +183,10 @@ export function useSummaryArchivedProducts() {
                   variant="outline"
                   size="sm"
                   className="shrink-0 gap-1.5"
+                  disabled={unarchiveMutation.isPending}
                   onClick={(e) => {
                     e.preventDefault()
-                    unarchiveProduct(item.productId)
+                    unarchiveMutation.mutate(item.productId)
                   }}
                 >
                   <RiInboxUnarchiveLine className="size-3.5" />
@@ -172,8 +203,14 @@ export function useSummaryArchivedProducts() {
   return {
     archived,
     archivedIds,
-    archiveProduct,
-    unarchiveProduct,
+    archiveProduct: (product: { id: string; name: string }) => {
+      if (archiveMutation.isPending) return
+      archiveMutation.mutate(product)
+    },
+    unarchiveProduct: (productId: string) => {
+      if (unarchiveMutation.isPending) return
+      unarchiveMutation.mutate(productId)
+    },
     archivedMenu,
   }
 }

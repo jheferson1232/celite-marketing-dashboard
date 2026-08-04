@@ -391,6 +391,19 @@ model MetaDashboardSettings {
   @@map("MetaDashboardSettings")
 }
 
+/** Preferencias del resumen /resumen (singleton id=default). */
+model SummaryDashboardSettings {
+  id String @id @default("default")
+  /**
+   * Productos ocultos en la tabla de /resumen
+   * (JSON { productId, name, archivedAt }[]).
+   */
+  archivedProducts String   @default("[]")
+  updatedAt        DateTime @updatedAt
+
+  @@map("SummaryDashboardSettings")
+}
+
 /** Configuración global del agente de comentarios (singleton id=default). */
 model MetaCommentAgentSettings {
   id                      String   @id @default("default")

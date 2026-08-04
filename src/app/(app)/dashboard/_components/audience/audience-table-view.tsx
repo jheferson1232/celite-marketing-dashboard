@@ -9,6 +9,7 @@ import {
 import type { AudienceSegment } from "@/lib/services/meta/audience-breakdowns"
 import {
   formatAudienceCpa,
+  formatAudiencePurchases,
   formatAudienceSpend,
 } from "@/lib/services/meta/audience-breakdowns"
 
@@ -31,6 +32,7 @@ export function AudienceTableView({
         <TableRow className="hover:bg-transparent">
           <TableHead className="h-8 text-xs">Segmento</TableHead>
           <TableHead className="h-8 text-right text-xs">%</TableHead>
+          <TableHead className="h-8 text-right text-xs">Ventas</TableHead>
           <TableHead className="h-8 text-right text-xs">Gasto</TableHead>
           {cpaAvailable ? (
             <TableHead className="h-8 text-right text-xs">CPA</TableHead>
@@ -43,6 +45,9 @@ export function AudienceTableView({
             <TableCell className="py-2 text-sm">{segment.label}</TableCell>
             <TableCell className="py-2 text-right text-sm tabular-nums">
               {segment.percent}%
+            </TableCell>
+            <TableCell className="py-2 text-right text-sm tabular-nums">
+              {formatAudiencePurchases(segment.purchases)}
             </TableCell>
             <TableCell className="py-2 text-right text-sm tabular-nums">
               {formatAudienceSpend(segment.spend)}

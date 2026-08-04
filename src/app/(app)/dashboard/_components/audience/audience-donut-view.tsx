@@ -8,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import type { AudienceSegment } from "@/lib/services/meta/audience-breakdowns"
+import { formatAudiencePurchases } from "@/lib/services/meta/audience-breakdowns"
 
 const DONUT_COLORS = [
   "hsl(330 70% 55%)",
@@ -43,6 +44,7 @@ export function AudienceDonutView({
     key: segment.key,
     label: segment.label,
     value: segment.percent,
+    purchases: segment.purchases,
     fill: DONUT_COLORS[index % DONUT_COLORS.length],
   }))
 
@@ -55,11 +57,18 @@ export function AudienceDonutView({
           content={
             <ChartTooltipContent
               hideLabel
-              formatter={(value, _name, item) => (
-                <span>
-                  {item.payload?.label}: {value}%
-                </span>
-              )}
+              formatter={(value, _name, item) => {
+                const purchases = Number(item.payload?.purchases ?? 0)
+                const ventas =
+                  purchases > 0
+                    ? ` · ${formatAudiencePurchases(purchases)} ventas`
+                    : ""
+                return (
+                  <span>
+                    {item.payload?.label}: {value}%{ventas}
+                  </span>
+                )
+              }}
             />
           }
         />

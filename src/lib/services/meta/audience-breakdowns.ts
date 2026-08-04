@@ -434,6 +434,11 @@ export function formatAudienceSpend(value: number): string {
   return `$ ${Math.round(value).toLocaleString("es-CO")}`
 }
 
+export function formatAudiencePurchases(value: number): string {
+  if (value <= 0) return "—"
+  return Math.round(value).toLocaleString("es-CO")
+}
+
 export function isGoodAudienceCoverage(
   classified: number,
   total: number
