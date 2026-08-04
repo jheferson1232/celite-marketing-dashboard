@@ -17,17 +17,41 @@ interface TikTokRequestConfig extends InternalAxiosRequestConfig {
   __tiktokRetryCount?: number
 }
 
+function isQpsMessage(message: string | undefined): boolean {
+  return (message ?? "").toLowerCase().includes("qps")
+}
+
 function isRateLimitError(error: unknown): boolean {
   if (!axios.isAxiosError(error)) return false
 
   const status = error.response?.status
-  const code = (error.response?.data as { code?: number } | undefined)?.code
+  const body = error.response?.data as
+    | { code?: number; message?: string }
+    | undefined
+  const code = body?.code
 
-  return status === 429 || code === 40100 || code === 40101
+  return (
+    status === 429 ||
+    code === 40100 ||
+    code === 40101 ||
+    isQpsMessage(body?.message)
+  )
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function retryTikTokRequest(
+  client: AxiosInstance,
+  config: TikTokRequestConfig
+) {
+  const retryCount = config.__tiktokRetryCount ?? 0
+  if (retryCount >= MAX_RETRIES) return null
+
+  config.__tiktokRetryCount = retryCount + 1
+  await sleep(RETRY_DELAY_MS * config.__tiktokRetryCount)
+  return client(config)
 }
 
 export function readTikTokEnvCredentials(): TikTokCredentials | null {
@@ -53,11 +77,22 @@ export function createTikTokClient(accessToken: string): AxiosInstance {
   })
 
   client.interceptors.response.use(
-    (response) => {
+    async (response) => {
       const data = response.data as { code?: number; message?: string }
       if (data?.code !== undefined && data.code !== 0) {
-        const err = new Error(data.message || `TikTok API error ${data.code}`)
-        return Promise.reject(err)
+        const message = data.message || `TikTok API error ${data.code}`
+        const isQps =
+          data.code === 40100 ||
+          data.code === 40101 ||
+          isQpsMessage(message)
+
+        if (isQps) {
+          const config = response.config as TikTokRequestConfig
+          const retried = await retryTikTokRequest(client, config)
+          if (retried) return retried
+        }
+
+        return Promise.reject(new Error(message))
       }
       return response
     },
@@ -72,14 +107,9 @@ export function createTikTokClient(accessToken: string): AxiosInstance {
         return Promise.reject(error)
       }
 
-      const retryCount = config.__tiktokRetryCount ?? 0
-      if (retryCount >= MAX_RETRIES) {
-        return Promise.reject(error)
-      }
-
-      config.__tiktokRetryCount = retryCount + 1
-      await sleep(RETRY_DELAY_MS * config.__tiktokRetryCount)
-      return client(config)
+      const retried = await retryTikTokRequest(client, config)
+      if (retried) return retried
+      return Promise.reject(error)
     }
   )
 

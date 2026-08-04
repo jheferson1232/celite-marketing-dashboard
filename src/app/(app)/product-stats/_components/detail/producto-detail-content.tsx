@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { RiArrowLeftLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
@@ -47,24 +47,15 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
     staleTime: 30 * 1000,
   })
 
-  const { linkedTikTokIds, linkedMetaIds } = useMemo(() => {
-    const tiktok = new Set<string>()
-    const meta = new Set<string>()
-    for (const link of product?.campaigns ?? []) {
-      if (link.platform === "meta") meta.add(link.campaignId)
-      else tiktok.add(link.campaignId)
-    }
-    return { linkedTikTokIds: tiktok, linkedMetaIds: meta }
-  }, [product?.campaigns])
-
   const {
     tiktokCampaigns,
     metaCampaigns,
     isLoadingCampaigns,
     tiktokAdSetsByCampaignId,
+    tiktokCampaignsError,
     extendedMetricsLoading,
     extendedMetricsError,
-  } = useProductoLinkedCampaigns(linkedTikTokIds, linkedMetaIds)
+  } = useProductoLinkedCampaigns(product?.campaigns ?? [])
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["products"] })
@@ -177,6 +168,7 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
           metaCampaigns={metaCampaigns}
           isLoading={isLoadingCampaigns}
           tiktokAdSetsByCampaignId={tiktokAdSetsByCampaignId}
+          tiktokCampaignsError={tiktokCampaignsError}
           extendedMetricsLoading={extendedMetricsLoading}
           extendedMetricsError={extendedMetricsError}
         />

@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useMemo } from "react"
+import { getTodayDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
 import { getTikTokCampaignsListAllAccountsAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
 import { runServerAction } from "@/lib/server-action"
 import type { ProductPlatform, ProductRecord } from "@/lib/services/product"
-import { getLastSevenDaysRange } from "@/lib/services/tiktok/campaign-daily-insights.shared"
 import {
   linkProductCampaignAction,
   unlinkProductCampaignAction,
@@ -22,7 +22,8 @@ export function useProductoCampaignLinks({
   enabled = true,
 }: UseProductoCampaignLinksOptions) {
   const queryClient = useQueryClient()
-  const dateRange = getLastSevenDaysRange()
+  // Mismo rango que el detalle → comparte caché de React Query y evita doble QPS.
+  const dateRange = getTodayDateRange()
 
   const { data: tiktokCampaigns = [] } = useQuery({
     queryKey: ["tiktok-campaigns-all-accounts", dateRange],

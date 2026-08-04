@@ -18,9 +18,47 @@ import { withTikTokCache } from "./tiktok-cache"
 import { buildTikTokCacheKey } from "./tiktok-api.server"
 import { isTikTokEditableDailyBudget } from "./budget-mode"
 import { withTikTokDashboardAccount } from "./tiktok-dashboard-account.server"
+import { pacedTikTokRequest } from "./tiktok-request-pacing"
 import type { TikTokAd, TikTokAdGroup, TikTokCampaign } from "./types"
 
 const CAMPAIGNS_TTL_MS = 2 * 60 * 1000
+/** TikTok QPS ~10; no abrir varias cuentas a la vez. */
+const ACCOUNT_FETCH_CONCURRENCY = 2
+const ACCOUNT_FETCH_RETRIES = 3
+
+function isLikelyTikTokQpsError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.toLowerCase().includes("qps")
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return []
+  const results: R[] = new Array(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(items[index])
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  )
+  await Promise.all(workers)
+  return results
+}
 
 function normalizeStatus(status?: string): CampaignRow["status"] {
   if (status === "ENABLE" || status === "ACTIVE") return "ACTIVE"
@@ -68,16 +106,12 @@ async function fetchTikTokCampaignsListAllAccounts(
     )
   }
 
-  const lists = await Promise.all(
-    accounts.map(async (account) => {
+  const lists = await mapPool(
+    accounts,
+    ACCOUNT_FETCH_CONCURRENCY,
+    async (account) => {
       try {
-        const rows = await withTikTokDashboardAccount(account.id, () =>
-          getTikTokCampaignsList(dateRange)
-        )
-        return rows.map((row) => ({
-          ...row,
-          name: `${account.name} · ${row.name}`,
-        }))
+        return await fetchAccountCampaignsWithRetry(account.id, dateRange)
       } catch (error) {
         console.warn(
           `[tiktok] No se pudieron listar campañas de ${account.advertiserId} (${account.name}):`,
@@ -85,12 +119,36 @@ async function fetchTikTokCampaignsListAllAccounts(
         )
         return [] as CampaignRow[]
       }
-    })
+    }
   )
 
   return lists
     .flat()
     .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name, "es"))
+}
+
+async function fetchAccountCampaignsWithRetry(
+  accountId: string,
+  dateRange: DateRange
+): Promise<CampaignRow[]> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < ACCOUNT_FETCH_RETRIES; attempt++) {
+    try {
+      return await withTikTokDashboardAccount(accountId, () =>
+        getTikTokCampaignsList(dateRange)
+      )
+    } catch (error) {
+      lastError = error
+      if (attempt < ACCOUNT_FETCH_RETRIES - 1 && isLikelyTikTokQpsError(error)) {
+        await sleep(500 * (attempt + 1))
+        continue
+      }
+      throw error
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("No se pudieron listar campañas TikTok")
 }
 
 async function fetchTikTokCampaignsList(
@@ -99,34 +157,41 @@ async function fetchTikTokCampaignsList(
   const lifetimeRange = getTikTokLifetimeDateRange()
   const range7d = getLastSevenDaysRange()
 
+  // Serializar vía pacedTikTokRequest: 6 en paralelo superan el QPS (~10).
   const [campaigns, reportRows, metrics7d, lifetimeMetrics, adGroups, ads] =
     await Promise.all([
-      fetchAllPages<TikTokCampaign>("campaign/get/"),
-      fetchIntegratedReport(
-        "AUCTION_CAMPAIGN",
-        ["campaign_id"],
-        [...CAMPAIGN_METRICS],
-        dateRange.from,
-        dateRange.to
+      pacedTikTokRequest(() => fetchAllPages<TikTokCampaign>("campaign/get/")),
+      pacedTikTokRequest(() =>
+        fetchIntegratedReport(
+          "AUCTION_CAMPAIGN",
+          ["campaign_id"],
+          [...CAMPAIGN_METRICS],
+          dateRange.from,
+          dateRange.to
+        )
       ),
-      fetchCachedCampaignMetricsByDateRange(range7d),
-      fetchCachedCampaignMetricsByDateRange(lifetimeRange),
-      fetchAllPages<TikTokAdGroup>("adgroup/get/"),
-      fetchAllPages<TikTokAd>("/ad/get/", {
-        fields: JSON.stringify([
-          "ad_id",
-          "ad_name",
-          "campaign_id",
-          "campaign_name",
-          "adgroup_id",
-          "operation_status",
-          "landing_page_url",
-          "landing_page_urls",
-          "campaign_automation_type",
-          "video_id",
-          "image_ids",
-        ]),
-      }),
+      pacedTikTokRequest(() => fetchCachedCampaignMetricsByDateRange(range7d)),
+      pacedTikTokRequest(() =>
+        fetchCachedCampaignMetricsByDateRange(lifetimeRange)
+      ),
+      pacedTikTokRequest(() => fetchAllPages<TikTokAdGroup>("adgroup/get/")),
+      pacedTikTokRequest(() =>
+        fetchAllPages<TikTokAd>("/ad/get/", {
+          fields: JSON.stringify([
+            "ad_id",
+            "ad_name",
+            "campaign_id",
+            "campaign_name",
+            "adgroup_id",
+            "operation_status",
+            "landing_page_url",
+            "landing_page_urls",
+            "campaign_automation_type",
+            "video_id",
+            "image_ids",
+          ]),
+        })
+      ),
     ])
 
   const landingUrlsByCampaign = collectUniqueLandingUrlsByCampaign(ads)

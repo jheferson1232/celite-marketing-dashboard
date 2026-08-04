@@ -24,6 +24,7 @@ interface ProductoLinkedCampaignsTableProps {
   metaCampaigns: CampaignRow[]
   isLoading: boolean
   tiktokAdSetsByCampaignId?: Record<string, CampaignAdSetRow[]>
+  tiktokCampaignsError?: Error | null
   extendedMetricsLoading?: boolean
   extendedMetricsError?: Error | null
 }
@@ -34,6 +35,7 @@ export function ProductoLinkedCampaignsTable({
   metaCampaigns,
   isLoading,
   tiktokAdSetsByCampaignId,
+  tiktokCampaignsError = null,
   extendedMetricsLoading = false,
   extendedMetricsError = null,
 }: ProductoLinkedCampaignsTableProps) {
@@ -64,6 +66,11 @@ export function ProductoLinkedCampaignsTable({
                 </span>
               ) : null}
             </div>
+          ) : null}
+          {tiktokCampaignsError ? (
+            <p className="mb-3 text-sm text-destructive">
+              {tiktokCampaignsError.message}
+            </p>
           ) : null}
           {tiktokCampaigns.length === 0 ? (
             <p className="text-sm text-muted-foreground">
