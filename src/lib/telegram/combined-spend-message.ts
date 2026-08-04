@@ -46,9 +46,9 @@ export async function formatCombinedSpendMessage(
 
   const tiktokBlock = formatPlatformBlock(
     "TikTok",
-    tiktok.totalSpend,
+    tiktok.spendPen,
     tiktok.purchases,
-    tiktok.cpa,
+    tiktok.cpaPen,
     TIKTOK_DASHBOARD_CURRENCY
   )
 

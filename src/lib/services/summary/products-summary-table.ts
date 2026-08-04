@@ -154,23 +154,30 @@ async function loadTikTokCampaignMetricsAllAccounts(
     )
   }
 
-  const maps = await Promise.all(
-    accounts.map(async (account) => {
-      try {
-        return await withTikTokDashboardAccount(account.id, async () =>
-          metricsFromTikTokReport(
-            await fetchCachedCampaignMetricsByDateRange(dateRange)
+  // Concurrencia baja: TikTok QPS tumba cuentas si se piden todas a la vez.
+  const maps: Map<string, SummaryProductPlatformMetrics>[] = []
+  const concurrency = 2
+  for (let i = 0; i < accounts.length; i += concurrency) {
+    const batch = accounts.slice(i, i + concurrency)
+    const batchMaps = await Promise.all(
+      batch.map(async (account) => {
+        try {
+          return await withTikTokDashboardAccount(account.id, async () =>
+            metricsFromTikTokReport(
+              await fetchCachedCampaignMetricsByDateRange(dateRange)
+            )
           )
-        )
-      } catch (error) {
-        console.warn(
-          `[summary-products] No se pudieron obtener campañas TikTok de ${account.advertiserId} (${account.name}):`,
-          error
-        )
-        return new Map<string, SummaryProductPlatformMetrics>()
-      }
-    })
-  )
+        } catch (error) {
+          console.warn(
+            `[summary-products] No se pudieron obtener campañas TikTok de ${account.advertiserId} (${account.name}):`,
+            error
+          )
+          return new Map<string, SummaryProductPlatformMetrics>()
+        }
+      })
+    )
+    maps.push(...batchMaps)
+  }
 
   return mergePlatformMetricsMaps(maps)
 }
@@ -225,7 +232,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v4:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v5:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )
