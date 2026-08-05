@@ -21,7 +21,7 @@ import {
   formatSummaryOrders,
   formatSummarySpendCop,
 } from "./summary-pin-card"
-import { SummaryMobileThemeToggle } from "./summary-mobile-theme-toggle"
+import { ThemeToggleButton } from "@/app/(app)/dashboard/_components/theme-toggle-button"
 import { SummaryPeriodPicker } from "./summary-period-picker"
 import { SummaryProductsTableSection } from "./summary-products-table"
 
@@ -86,32 +86,32 @@ export function SummaryContent() {
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-              Resumen
-            </h1>
-          </div>
-          <SummaryMobileThemeToggle />
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            Resumen
+          </h1>
         </div>
         <SummaryPeriodPicker
           from={dateRange.from}
           to={dateRange.to}
           onRangeChange={(range) => setDateRange(range)}
           endAction={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-[34px] shrink-0 gap-1.5 px-3"
-              onClick={handleReload}
-              disabled={isReloading}
-            >
-              <RiRefreshLine
-                className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
-              />
-              Reload
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggleButton className="size-[34px]" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-[34px] shrink-0 gap-1.5 px-3"
+                onClick={handleReload}
+                disabled={isReloading}
+              >
+                <RiRefreshLine
+                  className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
+                />
+                Reload
+              </Button>
+            </div>
           }
         />
       </div>

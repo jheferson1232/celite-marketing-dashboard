@@ -20,6 +20,7 @@ import { CampaignsTable } from "./campaigns"
 import { AdsView } from "./ads"
 import { MetaAudienceSection } from "./audience/meta-audience-section"
 import { PeriodPicker } from "@/components/period-picker"
+import { ThemeToggleButton } from "./theme-toggle-button"
 import { MetaApiStatusIndicator } from "./meta-api-status-indicator"
 import { useMetaArchivedCampaigns } from "./campaigns/use-meta-archived-campaigns"
 import {
@@ -212,19 +213,22 @@ export function DashboardContent() {
           to={dateRange.to}
           onRangeChange={(range) => setDateRange(range)}
           endAction={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-[34px] shrink-0 gap-1.5 px-3"
-              onClick={handleReload}
-              disabled={isReloading}
-            >
-              <RiRefreshLine
-                className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
-              />
-              Reload
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggleButton className="size-[34px]" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-[34px] shrink-0 gap-1.5 px-3"
+                onClick={handleReload}
+                disabled={isReloading}
+              >
+                <RiRefreshLine
+                  className={isReloading ? "size-3.5 animate-spin" : "size-3.5"}
+                />
+                Reload
+              </Button>
+            </div>
           }
         />
       </div>
