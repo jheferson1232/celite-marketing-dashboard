@@ -26,6 +26,15 @@ function tikTokPostUrl(
   return `https://www.tiktok.com/video/${itemId}`
 }
 
+function formatCommentWhen(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  return formatDistanceToNow(date, {
+    addSuffix: true,
+    locale: es,
+  })
+}
+
 function actionBadge(action: string) {
   if (action === "hide") {
     return (
@@ -49,10 +58,7 @@ function actionBadge(action: string) {
 }
 
 function ActivityRow({ row }: { row: TikTokCommentDecisionRecord }) {
-  const when = formatDistanceToNow(new Date(row.createdAt), {
-    addSuffix: true,
-    locale: es,
-  })
+  const when = formatCommentWhen(row.createdAt)
 
   return (
     <div className="flex gap-3 border-b px-4 py-4 last:border-b-0">
@@ -94,10 +100,7 @@ function ActivityRow({ row }: { row: TikTokCommentDecisionRecord }) {
 }
 
 function LiveCommentRow({ row }: { row: TikTokLiveComment }) {
-  const when = formatDistanceToNow(new Date(row.createdTime), {
-    addSuffix: true,
-    locale: es,
-  })
+  const when = formatCommentWhen(row.createdTime)
   const postUrl = tikTokPostUrl(row.profileName, row.tiktokItemId)
 
   return (
@@ -117,6 +120,11 @@ function LiveCommentRow({ row }: { row: TikTokLiveComment }) {
           <span className="text-muted-foreground text-xs">{when}</span>
           {row.profileName ? (
             <span className="text-xs font-medium">@{row.profileName}</span>
+          ) : null}
+          {row.accountName ? (
+            <span className="text-muted-foreground text-xs">
+              · {row.accountName}
+            </span>
           ) : null}
           <span className="text-muted-foreground text-xs">· {row.adName}</span>
           {postUrl ? (
@@ -148,6 +156,7 @@ export function TikTokCommentsActivity({
   liveMeta,
   loading,
   liveLoading,
+  liveError,
   filter,
   onFilterChange,
   view,
@@ -163,6 +172,7 @@ export function TikTokCommentsActivity({
   }
   loading: boolean
   liveLoading: boolean
+  liveError?: string | null
   filter: TikTokCommentActivityFilter
   onFilterChange: (filter: TikTokCommentActivityFilter) => void
   view: "live" | "processed"
@@ -212,6 +222,11 @@ export function TikTokCommentsActivity({
             <div className="space-y-3 p-5">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
+            </div>
+          ) : liveError ? (
+            <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+              <p className="font-medium">No se pudieron leer los comentarios</p>
+              <p className="text-destructive mt-2 max-w-md text-sm">{liveError}</p>
             </div>
           ) : liveItems?.length ? (
             <div>

@@ -1,10 +1,11 @@
 import "server-only"
 
 import { getTikTokRequestContext } from "../tiktok-api.server"
+import { withTikTokDashboardAccount } from "../tiktok-dashboard-account.server"
 import type { TikTokActiveAdRef } from "./types"
 import type { TikTokCommentActionKind } from "./types"
 
-export async function applyTikTokCommentAction(input: {
+async function applyWithCurrentCredentials(input: {
   commentId: string
   action: TikTokCommentActionKind
   replyText: string | null
@@ -66,4 +67,18 @@ export async function applyTikTokCommentAction(input: {
       error instanceof Error ? error.message : "Error al aplicar acción TikTok"
     return { applied: false, errorMessage: message }
   }
+}
+
+export async function applyTikTokCommentAction(input: {
+  commentId: string
+  action: TikTokCommentActionKind
+  replyText: string | null
+  ad: TikTokActiveAdRef
+}): Promise<{ applied: boolean; errorMessage: string | null }> {
+  if (input.ad.accountId) {
+    return withTikTokDashboardAccount(input.ad.accountId, () =>
+      applyWithCurrentCredentials(input)
+    )
+  }
+  return applyWithCurrentCredentials(input)
 }

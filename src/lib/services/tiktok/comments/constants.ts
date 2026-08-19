@@ -11,8 +11,13 @@ export const TIKTOK_COMMENT_TRIGGER_LABEL: Record<string, string> = {
 /** Perfiles Spark prioritarios para Comentarios IA. */
 export const TIKTOK_COMMENT_SPARK_PROFILES = [
   "calzados_urbanos",
+  "calzados urbanos",
   "calzados elite",
 ] as const
+
+export const TIKTOK_COMMENT_FETCH_CONCURRENCY = 4
+export const TIKTOK_COMMENT_ACCOUNT_CONCURRENCY = 2
+export const TIKTOK_LIVE_COMMENTS_LIMIT = 80
 
 export function matchesTikTokCommentSparkProfile(
   profileName: string | null | undefined

@@ -72,6 +72,8 @@ export type TikTokActiveAdRef = {
   videoId: string | null
   profileName: string | null
   isSparkTarget: boolean
+  accountId: string | null
+  accountName: string | null
 }
 
 /** TikTok solo permite search_field=ADGROUP_ID en /comment/list/. */
@@ -95,6 +97,7 @@ export type TikTokLiveComment = TikTokFetchedComment & {
   adgroupId: string | null
   profileName: string | null
   tiktokItemId: string | null
+  accountName: string | null
   processed: boolean
 }
 

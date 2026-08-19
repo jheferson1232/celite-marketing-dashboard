@@ -1,10 +1,17 @@
 import "server-only"
 
+import { mapWithConcurrency } from "../concurrency"
 import { getTikTokRequestContext } from "../tiktok-api.server"
+import { withTikTokDashboardAccount } from "../tiktok-dashboard-account.server"
 import type { TikTokApiResponse, TikTokPageInfo } from "../types"
-import { listTikTokCommentSearchUnits } from "./fetch-active-ads"
-import { TIKTOK_COMMENT_WINDOW_HOURS } from "./constants"
+import {
+  TIKTOK_COMMENT_FETCH_CONCURRENCY,
+  TIKTOK_COMMENT_WINDOW_HOURS,
+  TIKTOK_LIVE_COMMENTS_LIMIT,
+} from "./constants"
+import { listTikTokCommentSearchUnitsAllAccounts } from "./fetch-active-ads"
 import type {
+  TikTokCommentSearchUnit,
   TikTokFetchedComment,
   TikTokLiveComment,
 } from "./types"
@@ -49,30 +56,36 @@ function pickString(...values: Array<string | number | undefined | null>): strin
   return ""
 }
 
+function toIsoTime(rawTime: string | number | undefined): string {
+  if (typeof rawTime === "number" && Number.isFinite(rawTime)) {
+    const ms = rawTime > 1e12 ? rawTime : rawTime * 1000
+    const date = new Date(ms)
+    if (!Number.isNaN(date.getTime())) return date.toISOString()
+  }
+
+  if (rawTime) {
+    const normalized = String(rawTime)
+      .trim()
+      .replace(" UTC", "")
+      .replace(" ", "T")
+    const parsed = Date.parse(normalized)
+    if (!Number.isNaN(parsed)) return new Date(parsed).toISOString()
+  }
+
+  return new Date().toISOString()
+}
+
 function mapCommentRow(row: TikTokCommentRow): TikTokFetchedComment | null {
   const id = pickString(row.comment_id, row.id)
-  const message = pickString(row.text, row.content, row.comment_content)
+  const message = pickString(row.content, row.text, row.comment_content)
   if (!id || !message) return null
-
-  const rawTime = row.create_time
-  let createdTime = new Date().toISOString()
-  if (typeof rawTime === "number") {
-    createdTime = new Date(
-      rawTime > 1e12 ? rawTime : rawTime * 1000
-    ).toISOString()
-  } else if (rawTime) {
-    const parsed = Date.parse(String(rawTime).replace(" UTC", ""))
-    createdTime = Number.isNaN(parsed)
-      ? pickString(rawTime) || createdTime
-      : new Date(parsed).toISOString()
-  }
 
   return {
     id,
     message,
-    createdTime,
+    createdTime: toIsoTime(row.create_time),
     authorName:
-      pickString(row.display_name, row.user_name, row.username, row.nickname) ||
+      pickString(row.user_name, row.username, row.display_name, row.nickname) ||
       null,
     status: pickString(row.comment_status, row.status) || null,
     adId: pickString(row.ad_id) || null,
@@ -113,13 +126,14 @@ export async function fetchRecentAdgroupComments(
       },
     })
 
-    const rows = data.data.comments ?? data.data.list ?? []
+    const payload = data.data
+    const rows = payload?.comments ?? payload?.list ?? []
     for (const row of rows) {
       const mapped = mapCommentRow(row)
       if (mapped) items.push(mapped)
     }
 
-    totalPage = data.data.page_info?.total_page ?? 1
+    totalPage = payload?.page_info?.total_page ?? 1
     page += 1
   }
 
@@ -136,7 +150,67 @@ export async function fetchRecentAdComments(
   )
 }
 
-/** Comentarios en vivo de adgroups Spark Urbanos/Elite (o todos si no hay). */
+function groupUnitsByAccount(units: TikTokCommentSearchUnit[]) {
+  const groups = new Map<string, TikTokCommentSearchUnit[]>()
+  for (const unit of units) {
+    const key = unit.ad.accountId ?? "__current__"
+    const list = groups.get(key)
+    if (list) list.push(unit)
+    else groups.set(key, [unit])
+  }
+  return [...groups.entries()]
+}
+
+async function fetchCommentsForUnits(units: TikTokCommentSearchUnit[]): Promise<{
+  comments: TikTokLiveComment[]
+  fetchErrors: string[]
+}> {
+  const fetchErrors: string[] = []
+  const byId = new Map<string, TikTokLiveComment>()
+
+  const results = await mapWithConcurrency(
+    units,
+    TIKTOK_COMMENT_FETCH_CONCURRENCY,
+    async (unit) => {
+      try {
+        const rows = await fetchRecentAdgroupComments(unit.adgroupId)
+        return { unit, rows, error: null as string | null }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Error al leer comentarios"
+        return {
+          unit,
+          rows: [] as TikTokFetchedComment[],
+          error: `${unit.ad.profileName ?? unit.ad.adName} (${unit.adgroupId}): ${message}`,
+        }
+      }
+    }
+  )
+
+  for (const result of results) {
+    if (result.error) {
+      fetchErrors.push(result.error)
+      continue
+    }
+    for (const row of result.rows) {
+      if (byId.has(row.id)) continue
+      byId.set(row.id, {
+        ...row,
+        adId: row.adId || result.unit.ad.adId,
+        adName: result.unit.ad.adName,
+        adgroupId: result.unit.adgroupId,
+        profileName: result.unit.ad.profileName,
+        tiktokItemId: result.unit.ad.tiktokItemId,
+        accountName: result.unit.ad.accountName,
+        processed: false,
+      })
+    }
+  }
+
+  return { comments: [...byId.values()], fetchErrors }
+}
+
+/** Comentarios en vivo de adgroups Spark Urbanos/Elite (todas las cuentas). */
 export async function fetchLiveTikTokAdComments(): Promise<{
   adsScanned: number
   sparkTargetAds: number
@@ -145,41 +219,37 @@ export async function fetchLiveTikTokAdComments(): Promise<{
   fetchErrors: string[]
 }> {
   const { units, adsScanned, sparkTargetAds } =
-    await listTikTokCommentSearchUnits()
+    await listTikTokCommentSearchUnitsAllAccounts()
+
+  const grouped = groupUnitsByAccount(units)
+  const parts = await mapWithConcurrency(
+    grouped,
+    TIKTOK_COMMENT_FETCH_CONCURRENCY > 2 ? 2 : 1,
+    async ([accountId, accountUnits]) => {
+      const run = () => fetchCommentsForUnits(accountUnits)
+      if (accountId === "__current__") return run()
+      return withTikTokDashboardAccount(accountId, run)
+    }
+  )
+
   const byId = new Map<string, TikTokLiveComment>()
   const fetchErrors: string[] = []
-
-  for (const unit of units) {
-    try {
-      const rows = await fetchRecentAdgroupComments(unit.adgroupId)
-      for (const row of rows) {
-        if (byId.has(row.id)) continue
-        byId.set(row.id, {
-          ...row,
-          adId: row.adId || unit.ad.adId,
-          adName: unit.ad.adName,
-          adgroupId: unit.adgroupId,
-          profileName: unit.ad.profileName,
-          tiktokItemId: unit.ad.tiktokItemId,
-          processed: false,
-        })
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Error al leer comentarios"
-      fetchErrors.push(
-        `${unit.ad.profileName ?? unit.ad.adName} (${unit.adgroupId}): ${message}`
-      )
+  for (const part of parts) {
+    fetchErrors.push(...part.fetchErrors)
+    for (const comment of part.comments) {
+      if (!byId.has(comment.id)) byId.set(comment.id, comment)
     }
   }
+
+  const comments = [...byId.values()]
+    .sort((a, b) => b.createdTime.localeCompare(a.createdTime))
+    .slice(0, TIKTOK_LIVE_COMMENTS_LIMIT)
 
   return {
     adsScanned,
     sparkTargetAds,
     adgroupsScanned: units.length,
-    comments: [...byId.values()].sort((a, b) =>
-      b.createdTime.localeCompare(a.createdTime)
-    ),
+    comments,
     fetchErrors,
   }
 }

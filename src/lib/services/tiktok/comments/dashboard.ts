@@ -1,7 +1,7 @@
 import "server-only"
 
 import prisma from "@/lib/prisma"
-import { listTikTokCommentSearchUnits } from "./fetch-active-ads"
+import { listTikTokCommentSearchUnitsAllAccounts } from "./fetch-active-ads"
 import type {
   TikTokCommentActivityFilter,
   TikTokCommentDashboardMetrics,
@@ -93,7 +93,7 @@ export async function getTikTokCommentDashboardMetrics(
           ],
         },
       }),
-      listTikTokCommentSearchUnits()
+      listTikTokCommentSearchUnitsAllAccounts()
         .then((r) => r.adsScanned)
         .catch(() => 0),
     ])

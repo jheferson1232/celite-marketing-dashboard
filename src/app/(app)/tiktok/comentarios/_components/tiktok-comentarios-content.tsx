@@ -74,6 +74,7 @@ export function TikTokComentariosContent() {
     queryFn: () => runServerAction(listTikTokLiveCommentsAction()),
     enabled: ready,
     refetchInterval: 60_000,
+    staleTime: 30_000,
   })
 
   const invalidateDashboard = async () => {
@@ -210,6 +211,13 @@ export function TikTokComentariosContent() {
         }
         loading={activityQuery.isLoading}
         liveLoading={liveCommentsQuery.isLoading}
+        liveError={
+          liveCommentsQuery.error instanceof Error
+            ? liveCommentsQuery.error.message
+            : liveCommentsQuery.error
+              ? "Error al leer comentarios de TikTok"
+              : null
+        }
         filter={activityFilter}
         onFilterChange={setActivityFilter}
         view={activityView}
