@@ -170,6 +170,8 @@ export interface CampaignRow {
   totalCpa?: number
   /** URLs de destino únicas configuradas en anuncios de la campaña. */
   landingUrls?: string[]
+  /** Cuenta TikTok Ads (dashboard) que posee la campaña. */
+  tiktokAccountId?: string
 }
 
 export interface MetaAdCreativeObjectStorySpec {

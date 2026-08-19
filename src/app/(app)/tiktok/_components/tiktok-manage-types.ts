@@ -10,6 +10,7 @@ export type TikTokManageEntity =
       operationStatus?: "ENABLE" | "DISABLE"
       dailyBudget?: number | null
       budgetMode?: string | null
+      accountId?: string
     }
   | {
       type: "adgroup"
@@ -19,6 +20,7 @@ export type TikTokManageEntity =
       campaignId?: string
       dailyBudget?: number | null
       budgetMode?: string | null
+      accountId?: string
     }
 
 export function getTikTokEntityIsActive(entity: TikTokManageEntity): boolean {

@@ -1,6 +1,8 @@
 import { addDaysToDateString, getDashboardToday } from "@/lib/date"
 import { OBJECTIVE_TO_ACTION_TYPE } from "./objective"
 import { getMetaClient } from "./meta"
+import { metaGraphGet } from "./meta-graph-retry"
+import { normalizeMetaId } from "./meta-ids"
 import { withMetaCache } from "./meta-cache"
 import {
   isMetaRateLimitAxiosError,
@@ -165,4 +167,148 @@ async function fetchMetaCampaignDailyInsights(
       cpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
     },
   }
+}
+
+function emptyMetaDailySummary(
+  campaignId: string,
+  dateRange: DateRange
+): MetaCampaignDailyInsightsSummary {
+  const days = buildDayKeys(dateRange.from, dateRange.to).map((date) => ({
+    date,
+    spend: 0,
+    purchases: 0,
+    cpa: 0,
+  }))
+  return {
+    campaignId,
+    dateRange,
+    days,
+    totals: { spend: 0, purchases: 0, cpa: 0 },
+  }
+}
+
+function summaryFromMetaDays(
+  campaignId: string,
+  dateRange: DateRange,
+  byDate: Map<string, MetaCampaignDailyInsight>
+): MetaCampaignDailyInsightsSummary {
+  const days = buildDayKeys(dateRange.from, dateRange.to).map(
+    (date) =>
+      byDate.get(date) ?? {
+        date,
+        spend: 0,
+        purchases: 0,
+        cpa: 0,
+      }
+  )
+  const totalSpend = days.reduce((sum, d) => sum + d.spend, 0)
+  const totalPurchases = days.reduce((sum, d) => sum + d.purchases, 0)
+  return {
+    campaignId,
+    dateRange,
+    days,
+    totals: {
+      spend: totalSpend,
+      purchases: totalPurchases,
+      cpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
+    },
+  }
+}
+
+async function fetchMetaCampaignsDailyInsights(
+  campaignIds: string[],
+  dateRange: DateRange,
+  objective: string
+): Promise<Map<string, Map<string, MetaCampaignDailyInsight>>> {
+  const api = getMetaClient()
+  const timeRange = JSON.stringify({
+    since: dateRange.from,
+    until: dateRange.to,
+  })
+  const campaignFilter = JSON.stringify([
+    {
+      field: "campaign.id",
+      operator: "IN",
+      value: campaignIds,
+    },
+  ])
+
+  const rows: MetaInsightRow[] = []
+  let response = await api.get<MetaInsightsResponse>("/insights", {
+    params: {
+      level: "campaign",
+      fields: "campaign_id,date_start,spend,actions",
+      filtering: campaignFilter,
+      time_range: timeRange,
+      time_increment: "1",
+      limit: "500",
+    },
+  })
+  rows.push(...(response.data.data ?? []))
+
+  let nextUrl = response.data.paging?.next
+  while (nextUrl) {
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    rows.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
+  }
+
+  const byCampaign = new Map<string, Map<string, MetaCampaignDailyInsight>>()
+  for (const row of rows) {
+    const campaignId = normalizeMetaId(row.campaign_id)
+    const dayKey = row.date_start?.slice(0, 10)
+    if (!campaignId || !dayKey) continue
+    const spend = parseFloat(row.spend || "0")
+    const purchases = getPurchases(row, objective)
+    const days = byCampaign.get(campaignId) ?? new Map()
+    days.set(dayKey, {
+      date: dayKey,
+      spend,
+      purchases,
+      cpa: purchases > 0 ? spend / purchases : 0,
+    })
+    byCampaign.set(campaignId, days)
+  }
+  return byCampaign
+}
+
+/** Historial diario de varias campañas Meta en 1 request (no N). */
+export async function getMetaCampaignsDailyInsightsByIds(
+  campaignIds: string[],
+  dateRange: DateRange,
+  objective: string
+): Promise<MetaCampaignDailyInsightsSummary[]> {
+  const uniqueIds = [
+    ...new Set(campaignIds.map(normalizeMetaId).filter(Boolean)),
+  ]
+  if (uniqueIds.length === 0) return []
+
+  const cacheKey = `meta-campaigns-daily:${uniqueIds.toSorted().join(",")}:${dateRange.from}:${dateRange.to}:${objective}`
+  return withMetaCache(cacheKey, DAILY_INSIGHTS_TTL_MS, () =>
+    pacedMetaRequest(async () => {
+      let lastError: unknown
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const byCampaign = await fetchMetaCampaignsDailyInsights(
+            uniqueIds,
+            dateRange,
+            objective
+          )
+          return uniqueIds.map((id) => {
+            const byDate = byCampaign.get(id)
+            if (!byDate) return emptyMetaDailySummary(id, dateRange)
+            return summaryFromMetaDays(id, dateRange, byDate)
+          })
+        } catch (error) {
+          lastError = error
+          const message = error instanceof Error ? error.message : ""
+          const rateLimited =
+            isMetaRateLimitAxiosError(error) || isMetaRateLimitMessage(message)
+          if (!rateLimited || attempt >= MAX_RETRIES) throw error
+          await sleep(RETRY_DELAY_MS * (attempt + 1))
+        }
+      }
+      throw lastError
+    })
+  )
 }

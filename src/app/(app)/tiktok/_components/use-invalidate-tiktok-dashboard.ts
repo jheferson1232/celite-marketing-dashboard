@@ -44,6 +44,10 @@ export function useInvalidateTikTokDashboard() {
           queryKey: ["tiktok-all-campaign-adgroups"],
           refetchType: "active",
         })
+        await queryClient.invalidateQueries({
+          queryKey: ["product-linked-tiktok-campaigns"],
+          refetchType: "active",
+        })
         if (options?.campaignId) {
           await queryClient.invalidateQueries({
             predicate: (query) =>

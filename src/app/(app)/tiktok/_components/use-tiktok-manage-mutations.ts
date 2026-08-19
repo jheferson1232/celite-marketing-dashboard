@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { runServerAction, useServerAction } from "@/lib/server-action"
+import type { CampaignRow } from "@/lib/services/meta/types"
 import { listPendingActivateCampaignsAction } from "../_actions/pending-6am"
 import {
   duplicateTikTokAdGroupAction,
@@ -21,6 +22,32 @@ function removePendingKey(current: Set<string>, key: string): Set<string> {
   const next = new Set(current)
   next.delete(key)
   return next
+}
+
+function patchCampaignOperationStatus(
+  queryClient: ReturnType<typeof useQueryClient>,
+  campaignId: string,
+  operationStatus: "ENABLE" | "DISABLE"
+) {
+  const status = operationStatus === "ENABLE" ? "ACTIVE" : "PAUSED"
+  const patch = (data: unknown) => {
+    if (!Array.isArray(data)) return data
+    return (data as CampaignRow[]).map((row) =>
+      row.id === campaignId
+        ? { ...row, operationStatus, status }
+        : row
+    )
+  }
+
+  queryClient.setQueriesData(
+    { queryKey: ["product-linked-tiktok-campaigns"] },
+    patch
+  )
+  queryClient.setQueriesData({ queryKey: ["tiktok-campaigns"] }, patch)
+  queryClient.setQueriesData(
+    { queryKey: ["tiktok-campaigns-all-accounts"] },
+    patch
+  )
 }
 
 export function useTikTokManageMutations(accountId?: string) {
@@ -163,16 +190,18 @@ export function useTikTokManageMutations(accountId?: string) {
       const settled = () => clearPending(key)
 
       if (entity.type === "campaign") {
+        patchCampaignOperationStatus(queryClient, entity.id, operationStatus)
         campaignStatusMutation.mutate(
           {
             campaignId: entity.id,
             campaignName: entity.name,
             operationStatus,
-            accountId,
+            accountId: entity.accountId ?? accountId,
           },
           {
             onSuccess: (result) => {
               if (result?.scheduledFor6am) {
+                patchCampaignOperationStatus(queryClient, entity.id, "DISABLE")
                 setQueuedCampaignIds((current) =>
                   new Set(current).add(entity.id)
                 )
@@ -195,7 +224,14 @@ export function useTikTokManageMutations(accountId?: string) {
               }
               invalidateAfterManageChange({ campaignId: entity.id })
             },
-            onError: (error) => setEntityError(key, error.message),
+            onError: (error) => {
+              patchCampaignOperationStatus(
+                queryClient,
+                entity.id,
+                operationStatus === "ENABLE" ? "DISABLE" : "ENABLE"
+              )
+              setEntityError(key, error.message)
+            },
             onSettled: settled,
           }
         )
@@ -203,7 +239,11 @@ export function useTikTokManageMutations(accountId?: string) {
       }
 
       adGroupStatusMutation.mutate(
-        { adgroupId: entity.id, operationStatus, accountId },
+        {
+          adgroupId: entity.id,
+          operationStatus,
+          accountId: entity.accountId ?? accountId,
+        },
         {
           onSuccess: () => {
             invalidateAfterManageChange({
@@ -237,7 +277,7 @@ export function useTikTokManageMutations(accountId?: string) {
 
       if (entity.type === "campaign") {
         campaignBudgetMutation.mutate(
-          { campaignId: entity.id, budget, accountId },
+          { campaignId: entity.id, budget, accountId: entity.accountId ?? accountId },
           {
             onSuccess: () => {
               invalidateAfterManageChange({ campaignId: entity.id })
@@ -250,7 +290,7 @@ export function useTikTokManageMutations(accountId?: string) {
       }
 
       adGroupBudgetMutation.mutate(
-        { adgroupId: entity.id, budget, accountId },
+        { adgroupId: entity.id, budget, accountId: entity.accountId ?? accountId },
         {
           onSuccess: () => {
             invalidateAfterManageChange({

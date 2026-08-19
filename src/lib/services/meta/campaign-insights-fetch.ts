@@ -38,6 +38,50 @@ export async function fetchAllCampaignInsights(
   return insights
 }
 
+/** Insights solo de las campañas pedidas (filtro IN). */
+export async function fetchCampaignInsightsByIds(
+  api: MetaApiClient,
+  dateRange: DateRange,
+  campaignIds: string[]
+): Promise<MetaInsightRow[]> {
+  const ids = [...new Set(campaignIds.map(normalizeMetaId).filter(Boolean))]
+  if (ids.length === 0) return []
+
+  const timeRange = JSON.stringify({
+    since: dateRange.from,
+    until: dateRange.to,
+  })
+  const filtering = JSON.stringify([
+    {
+      field: "campaign.id",
+      operator: "IN",
+      value: ids,
+    },
+  ])
+
+  const insights: MetaInsightRow[] = []
+  let response = await api.get<MetaInsightsResponse>("/insights", {
+    params: {
+      level: "campaign",
+      fields: CAMPAIGN_INSIGHT_FIELDS,
+      time_range: timeRange,
+      filtering,
+      limit: "500",
+    },
+  })
+
+  insights.push(...(response.data.data ?? []))
+
+  let nextUrl = response.data.paging?.next
+  while (nextUrl) {
+    const nextResponse = await metaGraphGet<MetaInsightsResponse>(nextUrl)
+    insights.push(...(nextResponse.data ?? []))
+    nextUrl = nextResponse.paging?.next
+  }
+
+  return insights
+}
+
 export function campaignInsightsToMap(
   rows: MetaInsightRow[]
 ): Map<string, MetaInsightRow> {

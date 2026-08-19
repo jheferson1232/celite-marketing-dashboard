@@ -12,11 +12,13 @@ export function useProductoSalesHistory(
   const { dateRange } = useProductoDateRange()
 
   return useQuery({
-    queryKey: ["product-sales-history", productId, dateRange],
+    queryKey: ["product-sales-history", "cop", productId, dateRange],
     queryFn: () =>
       runServerAction(
         getProductSalesHistoryAction({ productId, dateRange })
       ),
     enabled: Boolean(productId) && campaignCount > 0,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   })
 }

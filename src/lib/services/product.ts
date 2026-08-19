@@ -10,10 +10,10 @@ import {
   detachCreativeFromVariant,
 } from "@/lib/services/creative"
 import { fetchLandingPagePreviewImage } from "@/lib/services/landing-page-preview"
-import { getMetaCampaignDailyInsights } from "@/lib/services/meta/campaign-daily-insights"
+import { getMetaCampaignsDailyInsightsByIds } from "@/lib/services/meta/campaign-daily-insights"
 import type { DateRange } from "@/lib/services/meta/types"
 import {
-  getTikTokCampaignDailyInsights,
+  getTikTokCampaignsDailyInsightsByIds,
   type TikTokCampaignDailyInsightsSummary,
 } from "@/lib/services/tiktok/campaign-daily-insights"
 import {
@@ -646,19 +646,18 @@ async function fetchPlatformSalesHistory(
   if (campaignIds.length === 0) return null
 
   if (platform === "tiktok") {
-    const summaries = await Promise.all(
-      campaignIds.map((campaignId) =>
-        getTikTokCampaignDailyInsights(campaignId, dateRange)
-      )
+    const summaries = await getTikTokCampaignsDailyInsightsByIds(
+      campaignIds,
+      dateRange
     )
     const days = mergeTikTokDailyInsights(summaries)
     return { campaignIds, days, totals: buildTotals(days) }
   }
 
-  const summaries = await Promise.all(
-    campaignIds.map((campaignId) =>
-      getMetaCampaignDailyInsights(campaignId, dateRange, "OUTCOME_SALES")
-    )
+  const summaries = await getMetaCampaignsDailyInsightsByIds(
+    campaignIds,
+    dateRange,
+    "OUTCOME_SALES"
   )
   const days = mergeMetaDailyInsights(
     summaries.map((s) => ({

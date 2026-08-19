@@ -15,6 +15,7 @@ import {
   META_DASHBOARD_CURRENCY,
   TIKTOK_DASHBOARD_CURRENCY,
 } from "@/lib/format"
+import { PRODUCT_STATS_TIKTOK_CURRENCY } from "../../_lib/producto-stats-currency"
 import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
 import { useProductoPlatformFilter } from "../../_lib/use-producto-platform-filter"
 
@@ -82,6 +83,7 @@ export function ProductoLinkedCampaignsTable({
                 data={tiktokCampaigns}
                 isLoading={isLoading}
                 currency={TIKTOK_DASHBOARD_CURRENCY}
+                metricsCurrency={PRODUCT_STATS_TIKTOK_CURRENCY}
                 adSetsQueryKeyPrefix="tiktok-campaign-adgroups"
                 fetchCampaignAdSets={getTikTokCampaignAdGroups}
                 enableTikTokManage

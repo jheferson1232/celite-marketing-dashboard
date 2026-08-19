@@ -32,10 +32,15 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
   const errorMessage = getEntityError(entity)
 
   React.useEffect(() => {
-    if (!isPending) {
+    if (errorMessage || queuedFor6am) {
+      setOptimisticActive(null)
+      return
+    }
+    if (isPending || optimisticActive === null) return
+    if (serverActive === optimisticActive) {
       setOptimisticActive(null)
     }
-  }, [isPending, serverActive, queuedFor6am])
+  }, [errorMessage, isPending, optimisticActive, queuedFor6am, serverActive])
 
   return (
     <div
@@ -59,8 +64,11 @@ export function TikTokStatusSwitch({ entity }: TikTokStatusSwitchProps) {
         className={cn(isPending && "opacity-60")}
       />
       {errorMessage ? (
-        <span className="max-w-[72px] text-center text-[10px] leading-tight text-destructive">
-          {errorMessage}
+        <span
+          className="max-w-[72px] text-center text-[10px] leading-tight text-destructive"
+          title={errorMessage}
+        >
+          {errorMessage.length > 28 ? "No se pudo actualizar" : errorMessage}
         </span>
       ) : queuedFor6am ? (
         <span

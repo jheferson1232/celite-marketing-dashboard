@@ -39,6 +39,7 @@ export function getTikTokCampaignManageColumns(): ColumnDef<CampaignRow>[] {
                 operationStatus: campaign.operationStatus,
                 dailyBudget: campaign.dailyBudget,
                 budgetMode: campaign.budgetMode,
+                accountId: campaign.tiktokAccountId,
               }}
             />
           </div>

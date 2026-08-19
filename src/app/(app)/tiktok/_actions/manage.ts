@@ -9,6 +9,7 @@ import {
   updateTikTokCampaignBudget,
   type TikTokOperationStatus,
 } from "@/lib/services/tiktok/manage"
+import { withTikTokAccountForCampaign } from "@/lib/services/tiktok/resolve-campaign-account"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
 
 export const setTikTokCampaignStatusAction = createServerAction(
@@ -17,14 +18,20 @@ export const setTikTokCampaignStatusAction = createServerAction(
     operationStatus: TikTokOperationStatus
     campaignName?: string
     accountId?: string
-  }) =>
-    withTikTokDashboardAccount(input.accountId, () =>
+  }) => {
+    const run = () =>
       applyTikTokCampaignStatusWith6amQueue({
         campaignId: input.campaignId,
         name: input.campaignName,
         operationStatus: input.operationStatus,
       })
-    )
+
+    if (input.accountId?.trim()) {
+      return withTikTokDashboardAccount(input.accountId, run)
+    }
+
+    return withTikTokAccountForCampaign(input.campaignId, run)
+  }
 )
 
 export const setTikTokAdGroupStatusAction = createServerAction(

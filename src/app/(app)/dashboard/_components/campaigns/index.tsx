@@ -73,6 +73,8 @@ interface CampaignsTableProps {
   isLoading: boolean
   error?: Error | null
   currency?: CurrencyCode
+  /** Formato de gasto y CPA. Por defecto igual a `currency`. */
+  metricsCurrency?: CurrencyCode
   adSetsQueryKeyPrefix?: string
   fetchCampaignAdSets?: FetchCampaignAdSetsAction
   enableTikTokManage?: boolean
@@ -111,6 +113,7 @@ export function CampaignsTable({
   isLoading,
   error = null,
   currency = META_DASHBOARD_CURRENCY,
+  metricsCurrency = currency,
   adSetsQueryKeyPrefix,
   fetchCampaignAdSets,
   enableTikTokManage = false,
@@ -258,8 +261,8 @@ export function CampaignsTable({
           ? isMetaCampaignActive(row)
           : false
       const performanceStatus = enableTikTokManage
-        ? getTikTokCampaignPerformanceStatus(row, currency)
-        : getCampaignPerformanceStatus(row, currency)
+        ? getTikTokCampaignPerformanceStatus(row, metricsCurrency)
+        : getCampaignPerformanceStatus(row, metricsCurrency)
 
       return {
         row,
@@ -390,6 +393,7 @@ export function CampaignsTable({
     }
   }, [
     currency,
+    metricsCurrency,
     enableTikTokManage,
     originCampaignIds,
     performanceCountsAtAdSetLevel,
@@ -448,6 +452,7 @@ export function CampaignsTable({
         onToggleAdSets: handleToggleAdSets,
         onOpenDetails: handleOpenDetails,
         currency,
+        metricsCurrency,
         enableTikTokManage,
         enableMetaExtendedMetrics,
         metaLandingUrlsLoading,
@@ -457,6 +462,7 @@ export function CampaignsTable({
       }),
     [
       currency,
+      metricsCurrency,
       enableTikTokManage,
       enableMetaExtendedMetrics,
       metaLandingUrlsLoading,

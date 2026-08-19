@@ -5,10 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { TikTokCampaignDetailsChart } from "@/app/(app)/tiktok/_components/tiktok-campaign-details-chart"
 import {
   META_DASHBOARD_CURRENCY,
-  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
 import type { ProductDailyInsight } from "@/lib/services/product"
+import { PRODUCT_STATS_TIKTOK_CURRENCY } from "../../_lib/producto-stats-currency"
 import { useProductoPlatformFilter } from "../../_lib/use-producto-platform-filter"
 import { useProductoSalesHistory } from "../../_lib/use-producto-sales-history"
 
@@ -101,7 +101,7 @@ export function ProductoSalesChart({
           label="TikTok"
           icon={<RiTiktokFill className="size-3.5" />}
           days={data.tiktok!.days}
-          currency={TIKTOK_DASHBOARD_CURRENCY}
+          currency={PRODUCT_STATS_TIKTOK_CURRENCY}
         />
       ) : null}
       {showMeta ? (

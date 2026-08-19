@@ -50,6 +50,15 @@ export function useProductoCampaignLinks({
     void queryClient.invalidateQueries({
       queryKey: ["product-sales-history"],
     })
+    void queryClient.invalidateQueries({
+      queryKey: ["product-linked-tiktok-campaigns"],
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ["product-linked-meta-campaigns"],
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ["product-linked-meta-extended"],
+    })
   }
 
   const linkCampaignMutation = useMutation({

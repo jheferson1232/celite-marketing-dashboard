@@ -3,10 +3,11 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { getTodayDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
-import { getCampaignsList } from "@/app/(app)/dashboard/_actions/campaigns-list"
-import { getCampaignsExtendedMetrics } from "@/app/(app)/dashboard/_actions/campaigns-extended-metrics"
-import { getTikTokAllCampaignAdGroupsAction } from "@/app/(app)/tiktok/_actions/all-campaign-adgroups"
-import { getTikTokCampaignsListAllAccountsAction } from "@/app/(app)/tiktok/_actions/campaigns-list"
+import {
+  getMetaLinkedCampaignsAction,
+  getMetaLinkedExtendedMetricsAction,
+  getTikTokLinkedCampaignsAction,
+} from "../_actions/linked-campaigns"
 import type { CampaignRow } from "@/lib/services/meta/types"
 import { runServerAction } from "@/lib/server-action"
 
@@ -59,7 +60,11 @@ function mergeLinkedCampaigns(
   )
 }
 
-/** Métricas de periodo (Gasto, Compras, CPA) = hoy, como en el dashboard. Ventas 7d viene de extended metrics. */
+function sortedIds(links: LinkedCampaign[]): string[] {
+  return links.map((c) => c.campaignId).toSorted()
+}
+
+/** Métricas de periodo (Gasto, Compras, CPA) = hoy, como en el dashboard. */
 export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
   const linkedTikTok = useMemo(
     () => productCampaigns.filter((c) => c.platform !== "meta"),
@@ -70,38 +75,41 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
     [productCampaigns]
   )
 
-  const linkedTikTokIds = useMemo(
-    () => new Set(linkedTikTok.map((c) => c.campaignId)),
-    [linkedTikTok]
-  )
-  const linkedMetaIds = useMemo(
-    () => new Set(linkedMeta.map((c) => c.campaignId)),
-    [linkedMeta]
-  )
+  const tiktokIds = useMemo(() => sortedIds(linkedTikTok), [linkedTikTok])
+  const metaIds = useMemo(() => sortedIds(linkedMeta), [linkedMeta])
 
-  const hasTikTok = linkedTikTokIds.size > 0
-  const hasMeta = linkedMetaIds.size > 0
+  const hasTikTok = tiktokIds.length > 0
+  const hasMeta = metaIds.length > 0
   const todayRange = getTodayDateRange()
 
   const {
-    data: tiktokCampaignsAll = [],
+    data: tiktokCampaignsFromApi = [],
     isLoading: isLoadingTikTokCampaigns,
     isError: isTikTokCampaignsError,
     error: tiktokCampaignsError,
   } = useQuery({
-    queryKey: ["tiktok-campaigns-all-accounts", todayRange],
+    queryKey: ["product-linked-tiktok-campaigns", tiktokIds, todayRange],
     queryFn: () =>
       runServerAction(
-        getTikTokCampaignsListAllAccountsAction({ dateRange: todayRange })
+        getTikTokLinkedCampaignsAction({
+          campaignIds: tiktokIds,
+          dateRange: todayRange,
+        })
       ),
     enabled: hasTikTok,
     ...dashboardQueryOptions,
   })
 
-  const { data: metaCampaignsAll = [], isLoading: isLoadingMetaCampaigns } =
+  const { data: metaCampaignsFromApi = [], isLoading: isLoadingMetaCampaigns } =
     useQuery({
-      queryKey: ["meta-campaigns", todayRange],
-      queryFn: () => runServerAction(getCampaignsList(todayRange)),
+      queryKey: ["product-linked-meta-campaigns", metaIds, todayRange],
+      queryFn: () =>
+        runServerAction(
+          getMetaLinkedCampaignsAction({
+            campaignIds: metaIds,
+            dateRange: todayRange,
+          })
+        ),
       enabled: hasMeta,
       ...dashboardQueryOptions,
     })
@@ -113,36 +121,22 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
     isError: isExtendedMetricsError,
     error: extendedMetricsError,
   } = useQuery({
-    queryKey: ["campaigns-extended-metrics"],
-    queryFn: () => runServerAction(getCampaignsExtendedMetrics()),
+    queryKey: ["product-linked-meta-extended", metaIds],
+    queryFn: () =>
+      runServerAction(
+        getMetaLinkedExtendedMetricsAction({ campaignIds: metaIds })
+      ),
     enabled: hasMeta,
     ...extendedQueryOptions,
   })
 
-  const { data: tiktokAdSetsByCampaignId } = useQuery({
-    queryKey: ["tiktok-all-campaign-adgroups", todayRange],
-    queryFn: () =>
-      runServerAction(
-        getTikTokAllCampaignAdGroupsAction({ dateRange: todayRange })
-      ),
-    enabled: hasTikTok,
-    ...dashboardQueryOptions,
-  })
-
   const tiktokCampaigns = useMemo(
-    () =>
-      mergeLinkedCampaigns(
-        linkedTikTok,
-        tiktokCampaignsAll.filter((c) => linkedTikTokIds.has(c.id))
-      ),
-    [linkedTikTok, tiktokCampaignsAll, linkedTikTokIds]
+    () => mergeLinkedCampaigns(linkedTikTok, tiktokCampaignsFromApi),
+    [linkedTikTok, tiktokCampaignsFromApi]
   )
 
   const metaCampaigns = useMemo((): CampaignRow[] => {
-    const linked = mergeLinkedCampaigns(
-      linkedMeta,
-      metaCampaignsAll.filter((c) => linkedMetaIds.has(c.id))
-    )
+    const linked = mergeLinkedCampaigns(linkedMeta, metaCampaignsFromApi)
     if (!extendedMetrics) return linked
 
     return linked.map((campaign) => {
@@ -157,7 +151,7 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
         totalCpa: extended.totalCpa ?? 0,
       }
     })
-  }, [metaCampaignsAll, linkedMeta, linkedMetaIds, extendedMetrics])
+  }, [metaCampaignsFromApi, linkedMeta, extendedMetrics])
 
   const extendedMetricsLoading =
     hasMeta &&
@@ -168,7 +162,6 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
     tiktokCampaigns,
     metaCampaigns,
     isLoadingCampaigns: isLoadingTikTokCampaigns || isLoadingMetaCampaigns,
-    tiktokAdSetsByCampaignId,
     tiktokCampaignsError: isTikTokCampaignsError
       ? (tiktokCampaignsError as Error)
       : null,

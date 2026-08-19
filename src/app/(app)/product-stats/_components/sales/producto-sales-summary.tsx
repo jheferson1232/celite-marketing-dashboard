@@ -5,10 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   formatCurrency,
   META_DASHBOARD_CURRENCY,
-  TIKTOK_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
 import type { ProductPlatformSalesHistory } from "@/lib/services/product"
+import { PRODUCT_STATS_TIKTOK_CURRENCY } from "../../_lib/producto-stats-currency"
 import { useProductoSalesHistory } from "../../_lib/use-producto-sales-history"
 
 interface ProductoSalesSummaryProps {
@@ -39,7 +39,7 @@ function PlatformSummaryRow({
           value={formatCurrency(history.totals.spend, currency)}
         />
         <SummaryCard
-          label="Compras"
+          label="Pedidos"
           value={String(history.totals.purchases)}
         />
         <SummaryCard
@@ -101,7 +101,7 @@ export function ProductoSalesSummary({
           label="TikTok"
           icon={<RiTiktokFill className="size-3.5" />}
           history={data.tiktok}
-          currency={TIKTOK_DASHBOARD_CURRENCY}
+          currency={PRODUCT_STATS_TIKTOK_CURRENCY}
         />
       ) : null}
       {hasMeta && data.meta ? (

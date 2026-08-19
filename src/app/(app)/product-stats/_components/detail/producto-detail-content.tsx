@@ -51,7 +51,6 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
     tiktokCampaigns,
     metaCampaigns,
     isLoadingCampaigns,
-    tiktokAdSetsByCampaignId,
     tiktokCampaignsError,
     extendedMetricsLoading,
     extendedMetricsError,
@@ -167,7 +166,6 @@ export function ProductoDetailContent({ productId }: ProductoDetailContentProps)
           tiktokCampaigns={tiktokCampaigns}
           metaCampaigns={metaCampaigns}
           isLoading={isLoadingCampaigns}
-          tiktokAdSetsByCampaignId={tiktokAdSetsByCampaignId}
           tiktokCampaignsError={tiktokCampaignsError}
           extendedMetricsLoading={extendedMetricsLoading}
           extendedMetricsError={extendedMetricsError}

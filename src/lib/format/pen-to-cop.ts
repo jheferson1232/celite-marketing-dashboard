@@ -1,4 +1,4 @@
-/** Tasa fija PEN → COP (solo pestaña Resumen). COP por 1 PEN. */
+/** Tasa fija PEN → COP (Resumen y ficha de producto). COP por 1 PEN. */
 const DEFAULT_PEN_TO_COP_RATE = 1050
 
 export function getPenToCopRate(): number {

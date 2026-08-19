@@ -39,6 +39,8 @@ interface GetCampaignColumnsOptions {
   onToggleAdSets: (campaignId: string) => void
   onOpenDetails: (campaign: CampaignRow) => void
   currency?: CurrencyCode
+  /** Gasto y CPA (puede diferir de `currency`, p. ej. PEN presupuesto/CPC y COP gasto). */
+  metricsCurrency?: CurrencyCode
   enableTikTokManage?: boolean
   enableMetaExtendedMetrics?: boolean
   metaLandingUrlsLoading?: boolean
@@ -54,6 +56,7 @@ export function getCampaignColumns({
   onToggleAdSets,
   onOpenDetails,
   currency = META_DASHBOARD_CURRENCY,
+  metricsCurrency = currency,
   enableTikTokManage = false,
   enableMetaExtendedMetrics = false,
   metaLandingUrlsLoading = false,
@@ -128,7 +131,7 @@ export function getCampaignColumns({
       header: (context) => <SortableHeader context={context} label="Gasto" />,
       cell: ({ row }) => (
         <div className="text-right">
-          {formatCurrency(row.original.spend, currency)}
+          {formatCurrency(row.original.spend, metricsCurrency)}
         </div>
       ),
     },
@@ -244,13 +247,13 @@ export function getCampaignColumns({
         const { costPerResult } = row.original
         const highlight = getCostPerResultCellClassName(
           costPerResult,
-          currency
+          metricsCurrency
         )
 
         return (
           <div className={cn("-m-2 p-2 text-right", highlight)}>
             {costPerResult > 0
-              ? formatCurrency(costPerResult, currency)
+              ? formatCurrency(costPerResult, metricsCurrency)
               : "-"}
           </div>
         )
@@ -334,14 +337,17 @@ export function getCampaignColumns({
             ),
             cell: ({ row }) => {
               const cpa7d = row.original.cpa7d ?? 0
-              const highlight = getCostPerResultCellClassName(cpa7d, currency)
+              const highlight = getCostPerResultCellClassName(
+                cpa7d,
+                metricsCurrency
+              )
               return (
                 <div className={cn("-m-2 p-2 text-right", highlight)}>
                   {extendedMetricsLoading &&
                   row.original.cpa7d === undefined ? (
                     <span className="text-muted-foreground">…</span>
                   ) : cpa7d > 0 ? (
-                    formatCurrency(cpa7d, currency)
+                    formatCurrency(cpa7d, metricsCurrency)
                   ) : (
                     "-"
                   )}
@@ -389,7 +395,10 @@ export function getCampaignColumns({
             cell: ({ row }) => (
               <div className="text-right">
                 {(row.original.totalSpend ?? 0) > 0
-                  ? formatCurrency(row.original.totalSpend ?? 0, currency)
+                  ? formatCurrency(
+                      row.original.totalSpend ?? 0,
+                      metricsCurrency
+                    )
                   : "-"}
               </div>
             ),
@@ -410,11 +419,13 @@ export function getCampaignColumns({
               const totalCpa = row.original.totalCpa ?? 0
               const highlight = getCostPerResultCellClassName(
                 totalCpa,
-                currency
+                metricsCurrency
               )
               return (
                 <div className={cn("-m-2 p-2 text-right", highlight)}>
-                  {totalCpa > 0 ? formatCurrency(totalCpa, currency) : "-"}
+                  {totalCpa > 0
+                    ? formatCurrency(totalCpa, metricsCurrency)
+                    : "-"}
                 </div>
               )
             },
