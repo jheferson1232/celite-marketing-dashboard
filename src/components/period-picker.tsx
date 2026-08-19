@@ -2,14 +2,14 @@
 
 import { useState, type ReactNode } from "react"
 import { format, parseISO } from "date-fns"
-import type { DateRange as DateRangeType } from "react-day-picker"
+import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import {
   getDashboardToday,
   getDashboardYesterday,
   getLastNDaysRange,
 } from "@/lib/date"
-import { Calendar } from "@/components/ui/calendar"
+import { DateRangeCalendarPanel } from "@/components/date-range-calendar-panel"
 import {
   Popover,
   PopoverContent,
@@ -58,9 +58,9 @@ function matchPeriod(from: string, to: string): PeriodId | null {
 
 function customLabel(from: string, to: string): string {
   if (from === to) {
-    return format(parseISO(from), "d MMM")
+    return format(parseISO(from), "d MMM", { locale: es })
   }
-  return `${format(parseISO(from), "d MMM")} – ${format(parseISO(to), "d MMM")}`
+  return `${format(parseISO(from), "d MMM", { locale: es })} – ${format(parseISO(to), "d MMM", { locale: es })}`
 }
 
 interface PeriodPickerProps {
@@ -82,21 +82,6 @@ export function PeriodPicker({
   const [customOpen, setCustomOpen] = useState(false)
   const activePeriod = matchPeriod(from, to)
   const isCustom = activePeriod === null
-
-  const date: DateRangeType = {
-    from: parseISO(from),
-    to: parseISO(to),
-  }
-
-  const handleSelect = (range: DateRangeType | undefined) => {
-    if (range?.from && range?.to) {
-      onRangeChange({
-        from: format(range.from, "yyyy-MM-dd"),
-        to: format(range.to, "yyyy-MM-dd"),
-      })
-      setCustomOpen(false)
-    }
-  }
 
   return (
     <div
@@ -148,15 +133,26 @@ export function PeriodPicker({
             {isCustom ? customLabel(from, to) : "Personalizado"}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="range"
-            defaultMonth={date.from}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-            className="p-2"
-          />
+        <PopoverContent
+          className="w-auto gap-0 p-0"
+          align="start"
+          onInteractOutside={(event) => {
+            const target = event.target as HTMLElement | null
+            if (target?.closest("[data-slot=dropdown-menu-content]")) {
+              event.preventDefault()
+            }
+          }}
+        >
+          {customOpen ? (
+            <DateRangeCalendarPanel
+              from={from}
+              to={to}
+              onApply={(range) => {
+                onRangeChange(range)
+                setCustomOpen(false)
+              }}
+            />
+          ) : null}
         </PopoverContent>
       </Popover>
 

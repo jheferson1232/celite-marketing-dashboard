@@ -10,12 +10,14 @@ import {
   RiStarLine,
   RiShoppingBag2Line,
   RiMegaphoneLine,
+  RiMenuLine,
   RiMetaLine,
   RiLinksLine,
   RiBookOpenLine,
   RiTiktokLine,
   RiRobotLine,
 } from "@remixicon/react"
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +29,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const navItems = [
@@ -110,13 +114,13 @@ const navItems = [
   },
 ] as const
 
-export function AppSidebar() {
-  const pathname = usePathname()
+function AppSidebarHeader() {
+  const { toggleSidebar } = useSidebar()
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <SidebarMenu>
+    <SidebarHeader>
+      <div className="flex items-center gap-1">
+        <SidebarMenu className="min-w-0 flex-1">
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
@@ -133,7 +137,41 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarHeader>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          onClick={toggleSidebar}
+          aria-label="Ocultar menú"
+        >
+          <RiMenuLine />
+        </Button>
+      </div>
+    </SidebarHeader>
+  )
+}
+
+export function AppSidebarPeekHeader() {
+  const { open, isMobile } = useSidebar()
+
+  if (!isMobile && open) {
+    return null
+  }
+
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+      <SidebarTrigger aria-label="Mostrar menú" />
+      <span className="truncate text-sm font-semibold">Celite</span>
+    </header>
+  )
+}
+
+export function AppSidebar() {
+  const pathname = usePathname()
+
+  return (
+    <Sidebar collapsible="offcanvas">
+      <AppSidebarHeader />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navegación</SidebarGroupLabel>

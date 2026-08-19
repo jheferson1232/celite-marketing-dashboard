@@ -37,6 +37,15 @@ export function getLastNDaysRange(days: number): { from: string; to: string } {
   return { from: addDaysToDateString(to, -(days - 1)), to }
 }
 
+/** Mes calendario (1–12). Si es el mes actual, `to` no pasa de hoy. */
+export function getMonthRange(year: number, month: number): { from: string; to: string } {
+  const from = `${year}-${String(month).padStart(2, "0")}-01`
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  const today = getDashboardToday()
+  return { from, to: monthEnd > today ? today : monthEnd }
+}
+
 export function buildDateKeys(from: string, to: string): string[] {
   const keys: string[] = []
   let cursor = from
