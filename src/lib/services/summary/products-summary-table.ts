@@ -1,4 +1,4 @@
-import { convertPenToCop } from "@/lib/format/pen-to-cop"
+import { convertToCopIfPen } from "@/lib/format/pen-to-cop"
 import {
   campaignInsightsToMap,
   fetchAllCampaignInsights,
@@ -22,8 +22,10 @@ import { computeBlendedCpaCop, safeNum } from "./safe-number"
 const SUMMARY_PRODUCTS_TTL_MS = 2 * 60 * 1000
 
 export type SummaryProductPlatformMetrics = {
+  /** Gasto en COP. TikTok: COP nativo o PEN convertido. */
   spend: number
   purchases: number
+  /** CPA en COP. */
   cpa: number
 }
 
@@ -87,7 +89,7 @@ function buildRow(
   const tiktok = aggregatePlatformMetrics(tiktokIds, tiktokByCampaign)
 
   const metaSpendCop = safeNum(meta?.spend)
-  const tiktokSpendCop = convertPenToCop(safeNum(tiktok?.spend))
+  const tiktokSpendCop = safeNum(tiktok?.spend)
   const totalSpendCop = metaSpendCop + tiktokSpendCop
   const totalPurchases = safeNum(meta?.purchases) + safeNum(tiktok?.purchases)
 
@@ -108,13 +110,19 @@ function buildRow(
 }
 
 function metricsFromTikTokReport(
-  raw: Map<string, Record<string, string>>
+  raw: Map<string, Record<string, string>>,
+  currency: string | null | undefined
 ): Map<string, SummaryProductPlatformMetrics> {
   const metrics = new Map<string, SummaryProductPlatformMetrics>()
   for (const [campaignId, row] of raw) {
-    const { spend, purchases, cpa } = getPurchaseSpendAndCpa(row)
+    const { spend, purchases } = getPurchaseSpendAndCpa(row)
     if (spend <= 0 && purchases <= 0) continue
-    metrics.set(campaignId, { spend, purchases, cpa })
+    const spendCop = convertToCopIfPen(spend, currency)
+    metrics.set(campaignId, {
+      spend: spendCop,
+      purchases,
+      cpa: purchases > 0 ? spendCop / purchases : 0,
+    })
   }
   return metrics
 }
@@ -150,7 +158,8 @@ async function loadTikTokCampaignMetricsAllAccounts(
 
   if (accounts.length === 0) {
     return metricsFromTikTokReport(
-      await fetchCachedCampaignMetricsByDateRange(dateRange)
+      await fetchCachedCampaignMetricsByDateRange(dateRange),
+      "PEN"
     )
   }
 
@@ -164,7 +173,8 @@ async function loadTikTokCampaignMetricsAllAccounts(
         try {
           return await withTikTokDashboardAccount(account.id, async () =>
             metricsFromTikTokReport(
-              await fetchCachedCampaignMetricsByDateRange(dateRange)
+              await fetchCachedCampaignMetricsByDateRange(dateRange),
+              account.currency
             )
           )
         } catch (error) {
@@ -232,7 +242,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v5:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v6:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )

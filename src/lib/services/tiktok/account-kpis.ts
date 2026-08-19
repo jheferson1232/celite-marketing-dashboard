@@ -1,6 +1,7 @@
 import { convertPenToCop } from "@/lib/format/pen-to-cop"
 import type { AccountKpis, DateRange } from "@/lib/services/meta/types"
 import { listTikTokAdAccounts } from "./ad-accounts"
+import { resolveTikTokAccountCurrency } from "./account-currency"
 import {
   ACCOUNT_METRICS,
   aggregateReportMetrics,
@@ -27,8 +28,12 @@ export type TikTokAggregatedAccountKpis = {
   /** Total en COP: nativo COP + PEN convertido. */
   spendCop: number
   purchases: number
-  /** CPA en PEN sobre el gasto PEN (tarjeta Resumen TikTok). */
+  /** Compras en cuentas PEN (para CPA orig.). */
+  purchasesPen: number
+  /** CPA en PEN sobre gasto y compras PEN. */
   cpaPen: number
+  /** CPA en COP: gasto COP (convertido + nativo) ÷ compras totales. */
+  cpaCop: number
   impressions: number
   clicks: number
   ctr: number
@@ -53,7 +58,7 @@ export async function getTikTokAccountKpis(
 export async function getTikTokAllAccountsKpis(
   dateRange: DateRange
 ): Promise<TikTokAggregatedAccountKpis> {
-  const cacheKey = `tiktok:all-accounts:account-kpis:v2:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `tiktok:all-accounts:account-kpis:v3:${dateRange.from}:${dateRange.to}`
   return withTikTokCache(cacheKey, ACCOUNT_KPIS_TTL_MS, () =>
     fetchTikTokAllAccountsKpis(dateRange)
   )
@@ -74,7 +79,9 @@ function emptyAggregated(): TikTokAggregatedAccountKpis {
     spendCopNative: 0,
     spendCop: 0,
     purchases: 0,
+    purchasesPen: 0,
     cpaPen: 0,
+    cpaCop: 0,
     impressions: 0,
     clicks: 0,
     ctr: 0,
@@ -86,7 +93,7 @@ function emptyAggregated(): TikTokAggregatedAccountKpis {
 }
 
 function isPenCurrency(currency: string | null | undefined): boolean {
-  return (currency ?? "PEN").trim().toUpperCase() === "PEN"
+  return resolveTikTokAccountCurrency(currency) === "PEN"
 }
 
 async function mapPool<T, R>(
@@ -149,12 +156,16 @@ async function fetchTikTokAllAccountsKpis(
   if (accounts.length === 0) {
     const single = await getTikTokAccountKpis(dateRange)
     const spendPen = single.totalSpend
+    const spendCop = convertPenToCop(spendPen)
+    const purchases = single.purchases
     return {
       spendPen,
       spendCopNative: 0,
-      spendCop: convertPenToCop(spendPen),
-      purchases: single.purchases,
+      spendCop,
+      purchases,
+      purchasesPen: purchases,
       cpaPen: single.cpa,
+      cpaCop: purchases > 0 ? spendCop / purchases : 0,
       impressions: single.impressions,
       clicks: single.clicks,
       ctr: single.ctr,
@@ -199,6 +210,7 @@ async function fetchTikTokAllAccountsKpis(
 
     if (isPenCurrency(account.currency)) {
       aggregated.spendPen += kpis.totalSpend
+      aggregated.purchasesPen += kpis.purchases
       purchaseValuePen += kpis.roas * kpis.totalSpend
     } else {
       aggregated.spendCopNative += kpis.totalSpend
@@ -212,9 +224,11 @@ async function fetchTikTokAllAccountsKpis(
   aggregated.spendCop =
     aggregated.spendCopNative + convertPenToCop(aggregated.spendPen)
   aggregated.cpaPen =
-    aggregated.purchases > 0 && aggregated.spendPen > 0
-      ? aggregated.spendPen / aggregated.purchases
+    aggregated.purchasesPen > 0 && aggregated.spendPen > 0
+      ? aggregated.spendPen / aggregated.purchasesPen
       : 0
+  aggregated.cpaCop =
+    aggregated.purchases > 0 ? aggregated.spendCop / aggregated.purchases : 0
   aggregated.ctr =
     aggregated.impressions > 0
       ? (aggregated.clicks / aggregated.impressions) * 100

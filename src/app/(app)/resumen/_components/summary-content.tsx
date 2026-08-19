@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { runServerAction } from "@/lib/server-action"
+import { formatCurrency } from "@/lib/format"
 import { useDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import { getSummaryKpisAction } from "../_actions/summary-kpis"
 import { clearSummaryCacheAction } from "../_actions/clear-summary-cache"
@@ -207,9 +208,13 @@ export function SummaryContent() {
             <SummaryPinCard
               title="TikTok Ads"
               icon={<RiTiktokLine className="size-4 sm:size-5" />}
-              value={formatSummaryCpa(data.tiktok.cpa, "PEN")}
+              value={formatSummaryCpa(data.tiktok.cpa, "COP")}
               changePct={data.tiktok.cpaChangePct}
-              subtitle="Costo por compra · PEN (S/)"
+              subtitle={
+                data.tiktok.cpaPen > 0
+                  ? `${formatCurrency(data.tiktok.cpaPen, "PEN")} orig.`
+                  : "Costo por compra · COP"
+              }
             />
             <SummaryPinCard
               title="CPA total"

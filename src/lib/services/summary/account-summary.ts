@@ -15,7 +15,7 @@ export interface SummaryPlatformBlock {
   spendCop: number
   purchases: number
   purchasesChangePct: number | null
-  /** CPA en moneda nativa: Meta = COP, TikTok = PEN. */
+  /** CPA en COP. TikTok: COP nativo o PEN convertido. */
   cpa: number
   spendChangePct: number | null
   cpaChangePct: number | null
@@ -25,7 +25,7 @@ export interface SummaryKpis {
   dateRange: DateRange
   penToCopRate: number
   meta: SummaryPlatformBlock
-  tiktok: SummaryPlatformBlock & { spendPen: number }
+  tiktok: SummaryPlatformBlock & { spendPen: number; cpaPen: number }
   total: {
     spendCop: number
     spendChangePct: number | null
@@ -89,11 +89,12 @@ async function fetchSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
       spendCop: tiktokSpendCop,
       purchases: tiktokPurchases,
       purchasesChangePct: percentChange(tiktokPurchases, prevTiktokPurchases),
-      cpa: safeNum(tiktokCurrent.cpaPen),
+      cpa: safeNum(tiktokCurrent.cpaCop),
+      cpaPen: safeNum(tiktokCurrent.cpaPen),
       spendChangePct: percentChange(tiktokSpendCop, prevTiktokSpendCop),
       cpaChangePct: percentChange(
-        safeNum(tiktokCurrent.cpaPen),
-        safeNum(tiktokPrevious.cpaPen)
+        safeNum(tiktokCurrent.cpaCop),
+        safeNum(tiktokPrevious.cpaCop)
       ),
     },
     total: {
@@ -108,6 +109,6 @@ async function fetchSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
 }
 
 export async function getSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
-  const cacheKey = `summary-kpis:v4:${dateRange.from}:${dateRange.to}:${getPenToCopRate()}`
+  const cacheKey = `summary-kpis:v5:${dateRange.from}:${dateRange.to}:${getPenToCopRate()}`
   return withMetaCache(cacheKey, SUMMARY_TTL_MS, () => fetchSummaryKpis(dateRange))
 }

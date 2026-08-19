@@ -18,3 +18,13 @@ export function convertPenToCop(pen: number): number {
   const cop = safePen * rate
   return Number.isFinite(cop) ? cop : 0
 }
+
+/** COP se deja igual; PEN se convierte a COP. */
+export function convertToCopIfPen(
+  amount: number,
+  currency: string | null | undefined
+): number {
+  const code = (currency ?? "PEN").trim().toUpperCase()
+  if (code === "PEN") return convertPenToCop(amount)
+  return Number.isFinite(amount) ? amount : 0
+}

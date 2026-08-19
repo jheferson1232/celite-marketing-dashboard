@@ -178,7 +178,7 @@ function ProductRow({
         </div>
       </TableCell>
       <MetricCells metrics={row.meta} currency="COP" />
-      <MetricCells metrics={row.tiktok} currency="PEN" />
+      <MetricCells metrics={row.tiktok} currency="COP" />
       <TableCell
         className={cn(
           "text-right text-xs font-semibold tabular-nums sm:text-sm",
@@ -352,7 +352,7 @@ export function SummaryProductsTableSection({
                       />
                       <MetricCells
                         metrics={footerTiktok}
-                        currency="PEN"
+                        currency="COP"
                         emphasized
                       />
                       <TableCell className="py-3 text-right text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
