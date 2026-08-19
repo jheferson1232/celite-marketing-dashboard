@@ -68,6 +68,11 @@ function isUpgradedSmartPlusAdGroup(adGroup: TikTokAdGroup): boolean {
 async function fetchAdGroupById(adgroupId: string): Promise<TikTokAdGroup | null> {
   const groups = await fetchAllPages<TikTokAdGroup>("/adgroup/get/", {
     filtering: JSON.stringify({ adgroup_ids: [adgroupId] }),
+    fields: JSON.stringify([
+      "adgroup_id",
+      "campaign_id",
+      "campaign_automation_type",
+    ]),
   })
   return groups.find((g) => g.adgroup_id === adgroupId) ?? null
 }

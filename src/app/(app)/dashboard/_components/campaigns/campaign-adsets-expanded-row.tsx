@@ -288,6 +288,7 @@ export function CampaignAdSetsExpandedRow({
         data={displayAdSets}
         displayColumns={tiktokDisplayColumns}
         currency={currency}
+        accountId={accountId}
       />
     )
   }

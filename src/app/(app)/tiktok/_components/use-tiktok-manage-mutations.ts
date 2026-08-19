@@ -151,11 +151,19 @@ export function useTikTokManageMutations(accountId?: string) {
   )
 
   const duplicateAdGroup = React.useCallback(
-    (input: { adgroupId: string; campaignId?: string }) => {
+    (input: {
+      adgroupId: string
+      campaignId?: string
+      accountId?: string
+    }) => {
       const key = duplicateKey(input.adgroupId)
       markPending(key)
       duplicateAdGroupMutation.mutate(
-        { adgroupId: input.adgroupId, accountId },
+        {
+          adgroupId: input.adgroupId,
+          accountId: input.accountId ?? accountId,
+          campaignId: input.campaignId,
+        },
         {
           onSuccess: (result) => {
             setEntityInfo(
@@ -243,6 +251,7 @@ export function useTikTokManageMutations(accountId?: string) {
           adgroupId: entity.id,
           operationStatus,
           accountId: entity.accountId ?? accountId,
+          campaignId: entity.campaignId,
         },
         {
           onSuccess: () => {
@@ -290,7 +299,12 @@ export function useTikTokManageMutations(accountId?: string) {
       }
 
       adGroupBudgetMutation.mutate(
-        { adgroupId: entity.id, budget, accountId: entity.accountId ?? accountId },
+        {
+          adgroupId: entity.id,
+          budget,
+          accountId: entity.accountId ?? accountId,
+          campaignId: entity.campaignId,
+        },
         {
           onSuccess: () => {
             invalidateAfterManageChange({

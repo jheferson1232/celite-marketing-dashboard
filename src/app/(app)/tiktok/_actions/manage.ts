@@ -9,8 +9,21 @@ import {
   updateTikTokCampaignBudget,
   type TikTokOperationStatus,
 } from "@/lib/services/tiktok/manage"
-import { withTikTokAccountForCampaign } from "@/lib/services/tiktok/resolve-campaign-account"
+import { withTikTokAccountForAdGroup, withTikTokAccountForCampaign } from "@/lib/services/tiktok/resolve-campaign-account"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
+
+function withTikTokAccountForAdGroupAction<T>(
+  input: { accountId?: string; campaignId?: string; adgroupId: string },
+  fn: () => Promise<T>
+): Promise<T> {
+  if (input.accountId?.trim()) {
+    return withTikTokDashboardAccount(input.accountId, fn)
+  }
+  if (input.campaignId?.trim()) {
+    return withTikTokAccountForCampaign(input.campaignId, fn)
+  }
+  return withTikTokAccountForAdGroup(input.adgroupId, fn)
+}
 
 export const setTikTokCampaignStatusAction = createServerAction(
   async (input: {
@@ -39,8 +52,9 @@ export const setTikTokAdGroupStatusAction = createServerAction(
     adgroupId: string
     operationStatus: TikTokOperationStatus
     accountId?: string
+    campaignId?: string
   }): Promise<void> =>
-    withTikTokDashboardAccount(input.accountId, () =>
+    withTikTokAccountForAdGroupAction(input, () =>
       updateTikTokAdGroupStatus([input.adgroupId], input.operationStatus)
     )
 )
@@ -50,10 +64,13 @@ export const setTikTokCampaignBudgetAction = createServerAction(
     campaignId: string
     budget: number
     accountId?: string
-  }): Promise<void> =>
-    withTikTokDashboardAccount(input.accountId, () =>
-      updateTikTokCampaignBudget(input.campaignId, input.budget)
-    )
+  }): Promise<void> => {
+    const run = () => updateTikTokCampaignBudget(input.campaignId, input.budget)
+    if (input.accountId?.trim()) {
+      return withTikTokDashboardAccount(input.accountId, run)
+    }
+    return withTikTokAccountForCampaign(input.campaignId, run)
+  }
 )
 
 export const setTikTokAdGroupBudgetAction = createServerAction(
@@ -61,15 +78,20 @@ export const setTikTokAdGroupBudgetAction = createServerAction(
     adgroupId: string
     budget: number
     accountId?: string
+    campaignId?: string
   }): Promise<void> =>
-    withTikTokDashboardAccount(input.accountId, () =>
+    withTikTokAccountForAdGroupAction(input, () =>
       updateTikTokAdGroupBudget(input.adgroupId, input.budget)
     )
 )
 
 export const duplicateTikTokAdGroupAction = createServerAction(
-  async (input: { adgroupId: string; accountId?: string }) =>
-    withTikTokDashboardAccount(input.accountId, () =>
+  async (input: {
+    adgroupId: string
+    accountId?: string
+    campaignId?: string
+  }) =>
+    withTikTokAccountForAdGroupAction(input, () =>
       duplicateTikTokAdGroup(input.adgroupId)
     )
 )

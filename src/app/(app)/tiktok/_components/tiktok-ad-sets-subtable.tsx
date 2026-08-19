@@ -115,7 +115,8 @@ function getSubtableCellClassName(
 
 function renderManageCell(
   columnId: TikTokAdSetManageColumnId,
-  adSet: CampaignAdSetRow
+  adSet: CampaignAdSetRow,
+  accountId?: string
 ) {
   const entity = {
     type: "adgroup" as const,
@@ -125,6 +126,7 @@ function renderManageCell(
     campaignId: adSet.campaignId,
     dailyBudget: adSet.dailyBudget,
     budgetMode: adSet.budgetMode,
+    accountId,
   }
 
   if (columnId === "active") {
@@ -137,6 +139,7 @@ function renderManageCell(
         adgroupId={adSet.id}
         adgroupName={adSet.name}
         campaignId={adSet.campaignId}
+        accountId={accountId}
       />
     )
   }
@@ -162,7 +165,8 @@ function metricAccessor(
 
 function buildColumnDef(
   columnId: TikTokAdSetDisplayColumnId,
-  currency: CurrencyCode
+  currency: CurrencyCode,
+  accountId?: string
 ): ColumnDef<CampaignAdSetRow> {
   const meta = getTikTokAdSetColumnMeta(columnId, currency)
   const align = meta.align === "left" ? "left" : "right"
@@ -189,7 +193,7 @@ function buildColumnDef(
                 {meta.label || "Dup."}
               </span>
             ),
-      cell: ({ row }) => renderManageCell(columnId, row.original),
+      cell: ({ row }) => renderManageCell(columnId, row.original, accountId),
     }
   }
 
@@ -235,20 +239,25 @@ interface TikTokAdSetsSubtableProps {
   data: CampaignAdSetRow[]
   displayColumns: TikTokAdSetDisplayColumnId[]
   currency: CurrencyCode
+  accountId?: string
 }
 
 export function TikTokAdSetsSubtable({
   data,
   displayColumns,
   currency,
+  accountId,
 }: TikTokAdSetsSubtableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "spend", desc: true },
   ])
 
   const columns = React.useMemo(
-    () => displayColumns.map((columnId) => buildColumnDef(columnId, currency)),
-    [currency, displayColumns]
+    () =>
+      displayColumns.map((columnId) =>
+        buildColumnDef(columnId, currency, accountId)
+      ),
+    [accountId, currency, displayColumns]
   )
 
   const table = useReactTable({

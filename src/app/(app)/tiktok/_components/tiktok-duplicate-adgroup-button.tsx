@@ -14,6 +14,7 @@ interface TikTokDuplicateAdGroupButtonProps {
   adgroupId: string
   adgroupName: string
   campaignId?: string
+  accountId?: string
   className?: string
 }
 
@@ -21,6 +22,7 @@ export function TikTokDuplicateAdGroupButton({
   adgroupId,
   adgroupName,
   campaignId,
+  accountId,
   className,
 }: TikTokDuplicateAdGroupButtonProps) {
   const {
@@ -52,7 +54,7 @@ export function TikTokDuplicateAdGroupButton({
                 `¿Duplicar el conjunto «${adgroupName}»?\n\nSe creará una copia apagada en la misma campaña, con sus anuncios.`
               )
               if (!ok) return
-              duplicateAdGroup({ adgroupId, campaignId })
+              duplicateAdGroup({ adgroupId, campaignId, accountId })
             }}
           >
             <RiFileCopyLine
