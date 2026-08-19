@@ -192,6 +192,7 @@ export function TikTokCampaignDetailsContent({
                     title={item.name}
                     loading="lazy"
                     decoding="async"
+                    referrerPolicy="no-referrer"
                     className="aspect-[9/16] w-full object-cover"
                   />
                 </div>
