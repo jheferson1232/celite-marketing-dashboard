@@ -13,6 +13,7 @@ export const getCampaignAdSets = createServerAction(
     campaignId: string
     dateRange: DateRange
     objective: string
+    accountId?: string
   }): Promise<CampaignAdSetRow[]> =>
     getCampaignAdSetsByCampaignId(campaignId, dateRange, objective)
 )

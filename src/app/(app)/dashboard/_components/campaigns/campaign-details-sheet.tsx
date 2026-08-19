@@ -46,6 +46,7 @@ export function CampaignDetailsSheet({
         {platform === "tiktok" && campaign?.id ? (
           <TikTokCampaignDetailsContent
             campaignId={campaign.id}
+            accountId={campaign.tiktokAccountId}
             currency={currency}
           />
         ) : platform === "meta" && campaign?.id ? (

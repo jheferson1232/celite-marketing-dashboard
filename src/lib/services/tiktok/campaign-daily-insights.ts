@@ -19,6 +19,7 @@ import { convertToCopIfPen } from "@/lib/format/pen-to-cop"
 import { listTikTokAdAccounts } from "./ad-accounts"
 import { withTikTokCache } from "./tiktok-cache"
 import { buildTikTokCacheKey } from "./tiktok-api.server"
+import { withTikTokAccountForCampaign } from "./resolve-campaign-account"
 import { withTikTokDashboardAccount } from "./tiktok-dashboard-account.server"
 import { pacedTikTokRequest } from "./tiktok-request-pacing"
 
@@ -139,14 +140,25 @@ function convertSummaryToCop(
 
 export async function getTikTokCampaignDailyInsights(
   campaignId: string,
-  dateRange: DateRange
+  dateRange: DateRange,
+  accountId?: string
 ): Promise<TikTokCampaignDailyInsightsSummary> {
-  const cacheKey = await buildTikTokCacheKey(
-    `campaign-daily:${campaignId}:${dateRange.from}:${dateRange.to}`
-  )
-  return withTikTokCache(cacheKey, DAILY_INSIGHTS_TTL_MS, () =>
-    pacedTikTokRequest(() => fetchTikTokCampaignDailyInsights(campaignId, dateRange))
-  )
+  const run = async () => {
+    const cacheKey = await buildTikTokCacheKey(
+      `campaign-daily:${campaignId}:${dateRange.from}:${dateRange.to}`
+    )
+    return withTikTokCache(cacheKey, DAILY_INSIGHTS_TTL_MS, () =>
+      pacedTikTokRequest(() =>
+        fetchTikTokCampaignDailyInsights(campaignId, dateRange)
+      )
+    )
+  }
+
+  if (accountId?.trim()) {
+    return withTikTokDashboardAccount(accountId, run)
+  }
+
+  return withTikTokAccountForCampaign(campaignId, run)
 }
 
 async function fetchTikTokCampaignDailyInsights(

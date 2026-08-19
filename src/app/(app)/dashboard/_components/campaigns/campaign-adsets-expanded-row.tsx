@@ -51,6 +51,7 @@ type DisplayColumnId = AdSetSubtableColumnId | TikTokAdSetManageColumnId
 interface CampaignAdSetsExpandedRowProps {
   campaignId: string
   campaignObjective: string
+  accountId?: string
   columnVisibility: VisibilityState
   visibleColumnOrder: string[]
   queryKeyPrefix?: string
@@ -95,6 +96,7 @@ function getSubtableCellClassName(
 export function CampaignAdSetsExpandedRow({
   campaignId,
   campaignObjective,
+  accountId,
   columnVisibility,
   visibleColumnOrder,
   queryKeyPrefix = "campaign-adsets",
@@ -121,10 +123,21 @@ export function CampaignAdSetsExpandedRow({
   const usePrefetched = prefetchedAdSets !== undefined
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: [queryKeyPrefix, campaignId, dateRange, campaignObjective],
+    queryKey: [
+      queryKeyPrefix,
+      campaignId,
+      accountId,
+      dateRange,
+      campaignObjective,
+    ],
     queryFn: () =>
       runServerAction(
-        fetchAdSets({ campaignId, dateRange, objective: campaignObjective })
+        fetchAdSets({
+          campaignId,
+          dateRange,
+          objective: campaignObjective,
+          accountId,
+        })
       ),
     enabled: Boolean(campaignId) && !usePrefetched,
   })

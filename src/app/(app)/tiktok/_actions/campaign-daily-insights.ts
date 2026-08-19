@@ -11,6 +11,11 @@ export const getTikTokCampaignDailyInsightsAction = createServerAction(
   async (input: {
     campaignId: string
     dateRange: DateRange
+    accountId?: string
   }): Promise<TikTokCampaignDailyInsightsSummary> =>
-    getTikTokCampaignDailyInsights(input.campaignId, input.dateRange)
+    getTikTokCampaignDailyInsights(
+      input.campaignId,
+      input.dateRange,
+      input.accountId
+    )
 )

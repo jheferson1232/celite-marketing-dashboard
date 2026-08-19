@@ -625,6 +625,7 @@ export function CampaignsTable({
                           <CampaignAdSetsExpandedRow
                             campaignId={row.original.id}
                             campaignObjective={row.original.objective}
+                            accountId={row.original.tiktokAccountId}
                             columnVisibility={columnVisibility}
                             visibleColumnOrder={visibleColumnOrder}
                             queryKeyPrefix={adSetsQueryKeyPrefix}

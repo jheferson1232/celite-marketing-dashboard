@@ -4,7 +4,9 @@ import {
   buildTikTokCacheKey,
   getTikTokRequestContext,
 } from "./tiktok-api.server"
+import { withTikTokAccountForCampaign } from "./resolve-campaign-account"
 import { withTikTokCache } from "./tiktok-cache"
+import { withTikTokDashboardAccount } from "./tiktok-dashboard-account.server"
 import type {
   TikTokAd,
   TikTokAdVideo,
@@ -229,15 +231,24 @@ async function fetchCampaignVideoThumbnailsUncached(
 
 /** Miniaturas (solo imágenes cover) de creativos de una campaña TikTok. */
 export async function getTikTokCampaignVideoThumbnails(
-  campaignId: string
+  campaignId: string,
+  accountId?: string
 ): Promise<TikTokCampaignVideoThumbnail[]> {
   const id = campaignId.trim()
   if (!id) return []
 
-  const cacheKey = await buildTikTokCacheKey(
-    `campaign-video-thumbs:v1:${id}`
-  )
-  return withTikTokCache(cacheKey, THUMBNAILS_TTL_MS, () =>
-    fetchCampaignVideoThumbnailsUncached(id)
-  )
+  const run = async () => {
+    const cacheKey = await buildTikTokCacheKey(
+      `campaign-video-thumbs:v1:${id}`
+    )
+    return withTikTokCache(cacheKey, THUMBNAILS_TTL_MS, () =>
+      fetchCampaignVideoThumbnailsUncached(id)
+    )
+  }
+
+  if (accountId?.trim()) {
+    return withTikTokDashboardAccount(accountId, run)
+  }
+
+  return withTikTokAccountForCampaign(id, run)
 }

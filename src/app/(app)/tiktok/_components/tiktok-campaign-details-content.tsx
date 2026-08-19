@@ -25,28 +25,41 @@ import { TikTokCampaignDetailsChart } from "./tiktok-campaign-details-chart"
 
 interface TikTokCampaignDetailsContentProps {
   campaignId: string
+  accountId?: string
   currency?: CurrencyCode
 }
 
 export function TikTokCampaignDetailsContent({
   campaignId,
+  accountId,
   currency = TIKTOK_DASHBOARD_CURRENCY,
 }: TikTokCampaignDetailsContentProps) {
   const dateRange = getLastSevenDaysRange()
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["tiktok-campaign-daily-insights", campaignId, dateRange],
+    queryKey: [
+      "tiktok-campaign-daily-insights",
+      campaignId,
+      accountId,
+      dateRange,
+    ],
     queryFn: () =>
       runServerAction(
-        getTikTokCampaignDailyInsightsAction({ campaignId, dateRange })
+        getTikTokCampaignDailyInsightsAction({
+          campaignId,
+          dateRange,
+          accountId,
+        })
       ),
     enabled: Boolean(campaignId),
   })
 
   const thumbnailsQuery = useQuery({
-    queryKey: ["tiktok-campaign-video-thumbnails", campaignId],
+    queryKey: ["tiktok-campaign-video-thumbnails", campaignId, accountId],
     queryFn: () =>
-      runServerAction(getTikTokCampaignVideoThumbnailsAction(campaignId)),
+      runServerAction(
+        getTikTokCampaignVideoThumbnailsAction({ campaignId, accountId })
+      ),
     enabled: Boolean(campaignId),
     staleTime: 5 * 60 * 1000,
   })
