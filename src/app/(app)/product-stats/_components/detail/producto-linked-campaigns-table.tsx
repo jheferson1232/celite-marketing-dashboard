@@ -17,6 +17,7 @@ import {
 } from "@/lib/format"
 import { PRODUCT_STATS_TIKTOK_CURRENCY } from "../../_lib/producto-stats-currency"
 import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
+import { useProductoDateRange } from "../../_lib/use-producto-date-range"
 import { useProductoPlatformFilter } from "../../_lib/use-producto-platform-filter"
 
 interface ProductoLinkedCampaignsTableProps {
@@ -40,6 +41,7 @@ export function ProductoLinkedCampaignsTable({
   extendedMetricsLoading = false,
   extendedMetricsError = null,
 }: ProductoLinkedCampaignsTableProps) {
+  const { dateRange } = useProductoDateRange()
   const { platformFilter } = useProductoPlatformFilter()
 
   if (campaignCount === 0) {
@@ -89,6 +91,7 @@ export function ProductoLinkedCampaignsTable({
                 enableTikTokManage
                 tikTokAdSetsByCampaignId={tiktokAdSetsByCampaignId}
                 originPlatform="tiktok"
+                metricsDateRange={dateRange}
                 columnVisibilityStorageKey={
                   TIKTOK_CAMPAIGNS_COLUMN_VISIBILITY_KEY
                 }
@@ -129,6 +132,7 @@ export function ProductoLinkedCampaignsTable({
               extendedMetricsLoading={extendedMetricsLoading}
               extendedMetricsError={extendedMetricsError}
               originPlatform="meta"
+              metricsDateRange={dateRange}
               columnVisibilityStorageKey={META_CAMPAIGNS_COLUMN_VISIBILITY_KEY}
               defaultColumnVisibility={META_CAMPAIGNS_DEFAULT_COLUMN_VISIBILITY}
             />

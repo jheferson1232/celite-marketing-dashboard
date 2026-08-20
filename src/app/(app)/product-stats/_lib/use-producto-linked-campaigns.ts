@@ -2,7 +2,6 @@
 
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { getTodayDateRange } from "@/app/(app)/dashboard/_lib/use-date-range"
 import {
   getMetaLinkedCampaignsAction,
   getMetaLinkedExtendedMetricsAction,
@@ -10,6 +9,7 @@ import {
 } from "../_actions/linked-campaigns"
 import type { CampaignRow } from "@/lib/services/meta/types"
 import { runServerAction } from "@/lib/server-action"
+import { useProductoDateRange } from "./use-producto-date-range"
 
 const dashboardQueryOptions = {
   staleTime: 2 * 60 * 1000,
@@ -64,8 +64,9 @@ function sortedIds(links: LinkedCampaign[]): string[] {
   return links.map((c) => c.campaignId).toSorted()
 }
 
-/** Métricas de periodo (Gasto, Compras, CPA) = hoy, como en el dashboard. */
+/** Métricas de periodo (Gasto, Compras, CPA) siguen el calendario del producto. */
 export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
+  const { dateRange } = useProductoDateRange()
   const linkedTikTok = useMemo(
     () => productCampaigns.filter((c) => c.platform !== "meta"),
     [productCampaigns]
@@ -80,7 +81,6 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
 
   const hasTikTok = tiktokIds.length > 0
   const hasMeta = metaIds.length > 0
-  const todayRange = getTodayDateRange()
 
   const {
     data: tiktokCampaignsFromApi = [],
@@ -88,12 +88,12 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
     isError: isTikTokCampaignsError,
     error: tiktokCampaignsError,
   } = useQuery({
-    queryKey: ["product-linked-tiktok-campaigns", tiktokIds, todayRange],
+    queryKey: ["product-linked-tiktok-campaigns", tiktokIds, dateRange],
     queryFn: () =>
       runServerAction(
         getTikTokLinkedCampaignsAction({
           campaignIds: tiktokIds,
-          dateRange: todayRange,
+          dateRange,
         })
       ),
     enabled: hasTikTok,
@@ -102,12 +102,12 @@ export function useProductoLinkedCampaigns(productCampaigns: LinkedCampaign[]) {
 
   const { data: metaCampaignsFromApi = [], isLoading: isLoadingMetaCampaigns } =
     useQuery({
-      queryKey: ["product-linked-meta-campaigns", metaIds, todayRange],
+      queryKey: ["product-linked-meta-campaigns", metaIds, dateRange],
       queryFn: () =>
         runServerAction(
           getMetaLinkedCampaignsAction({
             campaignIds: metaIds,
-            dateRange: todayRange,
+            dateRange,
           })
         ),
       enabled: hasMeta,

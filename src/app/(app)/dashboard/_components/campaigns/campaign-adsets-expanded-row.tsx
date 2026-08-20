@@ -20,6 +20,7 @@ import {
 } from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
 import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
+import type { DateRange } from "@/lib/services/meta/types"
 import { cn } from "@/lib/utils"
 import { useDateRange } from "../../_lib/use-date-range"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
@@ -61,6 +62,8 @@ interface CampaignAdSetsExpandedRowProps {
   enableMetaExtendedMetrics?: boolean
   prefetchedAdSets?: CampaignAdSetRow[]
   adSetPerformanceFilter?: CampaignPerformanceFilter
+  /** Si se pasa, ignora el rango `from`/`to` del dashboard. */
+  metricsDateRange?: DateRange
 }
 
 const SKELETON_ROWS = 3
@@ -106,9 +109,11 @@ export function CampaignAdSetsExpandedRow({
   enableMetaExtendedMetrics = false,
   prefetchedAdSets,
   adSetPerformanceFilter,
+  metricsDateRange,
 }: CampaignAdSetsExpandedRowProps) {
   const usePurchaseLabels = enableTikTokManage || enableMetaExtendedMetrics
-  const { dateRange } = useDateRange()
+  const { dateRange: dashboardDateRange } = useDateRange()
+  const dateRange = metricsDateRange ?? dashboardDateRange
   const visibleSubtableColumns = getVisibleAdSetSubtableColumns(
     visibleColumnOrder,
     columnVisibility
@@ -120,7 +125,8 @@ export function CampaignAdSetsExpandedRow({
     tiktokDisplayColumns ??
     getAdSetSubtableColumnsWithTikTokManage(visibleSubtableColumns, false)
 
-  const usePrefetched = prefetchedAdSets !== undefined
+  const usePrefetched =
+    prefetchedAdSets !== undefined && metricsDateRange === undefined
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: [

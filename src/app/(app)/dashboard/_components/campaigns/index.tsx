@@ -21,7 +21,11 @@ import {
   META_DASHBOARD_CURRENCY,
   type CurrencyCode,
 } from "@/lib/format"
-import type { CampaignAdSetRow, CampaignRow } from "@/lib/services/meta/types"
+import type {
+  CampaignAdSetRow,
+  CampaignRow,
+  DateRange,
+} from "@/lib/services/meta/types"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
 import { CampaignAdSetsExpandedRow } from "./campaign-adsets-expanded-row"
 import { CampaignDetailsSheet } from "./campaign-details-sheet"
@@ -97,6 +101,8 @@ interface CampaignsTableProps {
   toolbarExtra?: React.ReactNode
   /** Etiqueta + filtro IA / Reutilizado (Meta o TikTok). */
   originPlatform?: CampaignOriginPlatform
+  /** Rango de métricas del periodo (Gasto, Compras, CPA). Por defecto el del dashboard. */
+  metricsDateRange?: DateRange
 }
 
 const EMPTY_DATA: CampaignRow[] = []
@@ -132,6 +138,7 @@ export function CampaignsTable({
   onArchiveCampaign,
   toolbarExtra,
   originPlatform,
+  metricsDateRange,
 }: CampaignsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [selectedPerformanceFilter, setSelectedPerformanceFilter] =
@@ -641,6 +648,7 @@ export function CampaignsTable({
                                 ? selectedPerformanceFilter
                                 : undefined
                             }
+                            metricsDateRange={metricsDateRange}
                           />
                         </TableCell>
                       </TableRow>
