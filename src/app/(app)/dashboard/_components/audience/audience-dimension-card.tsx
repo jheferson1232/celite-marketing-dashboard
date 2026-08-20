@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import type { AudienceDimension } from "@/lib/services/meta/audience-breakdowns"
 import {
   formatAudienceSpend,
-  isGoodAudienceCoverage,
+  getAudienceCoverageState,
 } from "@/lib/services/meta/audience-breakdowns"
 import { AudienceBarsView } from "./audience-bars-view"
 import { AudienceDonutView } from "./audience-donut-view"
@@ -25,8 +25,9 @@ export function AudienceDimensionCard({
 }) {
   const classified = dimension.classifiedPurchases ?? 0
   const total = dimension.totalPurchases
-  const goodCoverage =
-    dimension.showCoverage && isGoodAudienceCoverage(classified, total)
+  const coverage = dimension.showCoverage
+    ? getAudienceCoverageState(classified, total)
+    : null
 
   return (
     <section className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -36,7 +37,7 @@ export function AudienceDimensionCard({
           <h3 className="text-sm font-semibold">{dimension.title}</h3>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          {dimension.showCoverage ? (
+          {coverage ? (
             <>
               <span className="text-xs tabular-nums text-muted-foreground">
                 {classified}/{total} clasif.
@@ -45,12 +46,17 @@ export function AudienceDimensionCard({
                 variant="secondary"
                 className={cn(
                   "text-[10px]",
-                  goodCoverage
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                    : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                  coverage === "good" &&
+                    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                  coverage === "low" &&
+                    "bg-amber-500/15 text-amber-700 dark:text-amber-400"
                 )}
               >
-                {goodCoverage ? "Buena cobertura" : "Cobertura baja"}
+                {coverage === "good"
+                  ? "Buena cobertura"
+                  : coverage === "low"
+                    ? "Cobertura baja"
+                    : "Sin compras"}
               </Badge>
             </>
           ) : (

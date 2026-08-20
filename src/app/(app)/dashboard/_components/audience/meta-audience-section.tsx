@@ -84,8 +84,7 @@ export function MetaAudienceSection() {
             </h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Distribución Meta Insights · últimos {periodDays} días · solo
-            activas
+            Distribución Meta Insights · últimos {periodDays} días
           </p>
         </div>
       </button>

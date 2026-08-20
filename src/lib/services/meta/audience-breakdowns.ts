@@ -53,14 +53,6 @@ type BreakdownRow = {
   region?: string
 }
 
-const ACTIVE_CAMPAIGN_FILTER = JSON.stringify([
-  {
-    field: "campaign.effective_status",
-    operator: "IN",
-    value: ["ACTIVE"],
-  },
-])
-
 const GENDER_LABELS: Record<string, string> = {
   male: "Hombres",
   female: "Mujeres",
@@ -149,7 +141,6 @@ async function fetchBreakdownRows(
       level: "account",
       fields: "spend,actions,cost_per_action_type",
       breakdowns,
-      filtering: ACTIVE_CAMPAIGN_FILTER,
       time_range: timeRange,
       limit: "500",
     },
@@ -418,7 +409,7 @@ async function fetchAudienceBreakdowns(
 export async function getMetaAudienceBreakdowns(
   dateRange: DateRange
 ): Promise<AudienceBreakdowns> {
-  const cacheKey = `meta-audience:v1:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `meta-audience:v2:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, AUDIENCE_TTL_MS, () =>
     fetchAudienceBreakdowns(dateRange)
   )
@@ -445,4 +436,12 @@ export function isGoodAudienceCoverage(
 ): boolean {
   if (total <= 0) return false
   return classified / total >= 0.9
+}
+
+export function getAudienceCoverageState(
+  classified: number,
+  total: number
+): "good" | "low" | "empty" {
+  if (total <= 0) return "empty"
+  return isGoodAudienceCoverage(classified, total) ? "good" : "low"
 }
