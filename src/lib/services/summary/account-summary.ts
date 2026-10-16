@@ -1,5 +1,5 @@
 import { getPenToCopRate } from "@/lib/format/pen-to-cop"
-import { getAccountKpis } from "@/lib/services/meta/account-kpis"
+import { getAllMetaAccountKpis } from "@/lib/services/meta/account-kpis"
 import { withMetaCache } from "@/lib/services/meta/meta-cache"
 import type { DateRange } from "@/lib/services/meta/types"
 import { getTikTokAllAccountsKpis } from "@/lib/services/tiktok/account-kpis"
@@ -43,8 +43,8 @@ async function fetchSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
 
   const [metaCurrent, metaPrevious, tiktokCurrent, tiktokPrevious] =
     await Promise.all([
-      getAccountKpis(dateRange),
-      getAccountKpis(previousRange),
+      getAllMetaAccountKpis(dateRange),
+      getAllMetaAccountKpis(previousRange),
       getTikTokAllAccountsKpis(dateRange),
       getTikTokAllAccountsKpis(previousRange),
     ])
@@ -109,6 +109,6 @@ async function fetchSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
 }
 
 export async function getSummaryKpis(dateRange: DateRange): Promise<SummaryKpis> {
-  const cacheKey = `summary-kpis:v5:${dateRange.from}:${dateRange.to}:${getPenToCopRate()}`
+  const cacheKey = `summary-kpis:v6:${dateRange.from}:${dateRange.to}:${getPenToCopRate()}`
   return withMetaCache(cacheKey, SUMMARY_TTL_MS, () => fetchSummaryKpis(dateRange))
 }

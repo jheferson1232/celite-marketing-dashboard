@@ -1,6 +1,8 @@
 import { buildDateKeys } from "@/lib/date"
 import { getAddToCartFromActions } from "./add-to-cart"
+import { listMetaAdAccounts } from "./meta-ad-accounts"
 import { getMetaClient } from "./meta"
+import { withMetaDashboardAccount } from "./meta-dashboard-account.server"
 import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 import {
@@ -127,4 +129,108 @@ async function fetchAccountKpis(dateRange: DateRange): Promise<AccountKpis> {
     roas: 0,
     addToCart,
   }
+}
+
+const ACCOUNT_FETCH_CONCURRENCY = 3
+
+function emptyAccountKpis(): AccountKpis {
+  return {
+    totalSpend: 0,
+    impressions: 0,
+    clicks: 0,
+    ctr: 0,
+    cpa: 0,
+    cpm: 0,
+    purchases: 0,
+    roas: 0,
+    addToCart: 0,
+  }
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return []
+  const results: R[] = new Array(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(items[index])
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  )
+  await Promise.all(workers)
+  return results
+}
+
+function mergeAccountKpis(parts: AccountKpis[]): AccountKpis {
+  const merged = emptyAccountKpis()
+  let addToCart = 0
+
+  for (const part of parts) {
+    merged.totalSpend += part.totalSpend
+    merged.impressions += part.impressions
+    merged.clicks += part.clicks
+    merged.purchases += part.purchases
+    addToCart += part.addToCart ?? 0
+  }
+
+  merged.addToCart = addToCart
+  merged.ctr =
+    merged.impressions > 0 ? (merged.clicks / merged.impressions) * 100 : 0
+  merged.cpm =
+    merged.impressions > 0
+      ? (merged.totalSpend / merged.impressions) * 1000
+      : 0
+  merged.cpa =
+    merged.purchases > 0 ? merged.totalSpend / merged.purchases : 0
+  return merged
+}
+
+async function fetchAllAccountsKpis(dateRange: DateRange): Promise<AccountKpis> {
+  const accounts = await listMetaAdAccounts()
+  if (accounts.length === 0) return fetchAccountKpis(dateRange)
+
+  const results = await mapPool(
+    accounts,
+    ACCOUNT_FETCH_CONCURRENCY,
+    async (account) => {
+      try {
+        return await withMetaDashboardAccount(account.accountId, () =>
+          fetchAccountKpis(dateRange)
+        )
+      } catch (error) {
+        console.warn(
+          `[meta] No se pudieron obtener KPIs de ${account.accountId} (${account.name}):`,
+          error
+        )
+        return null
+      }
+    }
+  )
+
+  const succeeded = results.filter((row): row is AccountKpis => row != null)
+  if (succeeded.length === 0) {
+    throw new Error("No se pudo obtener KPIs de ninguna cuenta Meta")
+  }
+  return mergeAccountKpis(succeeded)
+}
+
+/** Suma gasto y compras de todas las cuentas Meta accesibles con el token. */
+export async function getAllMetaAccountKpis(
+  dateRange: DateRange
+): Promise<AccountKpis> {
+  const cacheKey = `all-account-kpis:v1:${dateRange.from}:${dateRange.to}`
+  return withMetaCache(cacheKey, ACCOUNT_KPIS_TTL_MS, () =>
+    fetchAllAccountsKpis(dateRange)
+  )
 }

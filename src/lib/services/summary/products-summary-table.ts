@@ -3,8 +3,10 @@ import {
   campaignInsightsToMap,
   fetchAllCampaignInsights,
 } from "@/lib/services/meta/campaign-insights-fetch"
+import { listMetaAdAccounts } from "@/lib/services/meta/meta-ad-accounts"
 import { getMetaClient } from "@/lib/services/meta/meta"
 import { withMetaCache } from "@/lib/services/meta/meta-cache"
+import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import { normalizeMetaId } from "@/lib/services/meta/meta-ids"
 import { pacedMetaRequest } from "@/lib/services/meta/meta-request-pacing"
 import { getPurchaseSpendAndCpaFromInsight } from "@/lib/services/meta/purchase-metrics"
@@ -199,18 +201,39 @@ async function loadBatchCampaignMetrics(dateRange: DateRange): Promise<{
 }> {
   const [metaByCampaign, tiktokByCampaign] = await Promise.all([
     pacedMetaRequest(async () => {
-      const api = getMetaClient()
-      const rows = await fetchAllCampaignInsights(api, dateRange)
-      const byInsight = campaignInsightsToMap(rows)
-      const metrics = new Map<string, SummaryProductPlatformMetrics>()
+      const accounts = await listMetaAdAccounts()
+      const accountIds =
+        accounts.length > 0
+          ? accounts.map((account) => account.accountId)
+          : [undefined]
 
-      for (const [campaignId, insight] of byInsight) {
-        const { spend, purchases, cpa } = getPurchaseSpendAndCpaFromInsight(insight)
-        if (spend <= 0 && purchases <= 0) continue
-        metrics.set(campaignId, { spend, purchases, cpa })
-      }
+      const maps = await Promise.all(
+        accountIds.map(async (accountId) =>
+          withMetaDashboardAccount(accountId, async () => {
+            const api = getMetaClient()
+            const rows = await fetchAllCampaignInsights(api, dateRange)
+            const byInsight = campaignInsightsToMap(rows)
+            const metrics = new Map<string, SummaryProductPlatformMetrics>()
 
-      return metrics
+            for (const [campaignId, insight] of byInsight) {
+              const { spend, purchases, cpa } =
+                getPurchaseSpendAndCpaFromInsight(insight)
+              if (spend <= 0 && purchases <= 0) continue
+              metrics.set(campaignId, { spend, purchases, cpa })
+            }
+
+            return metrics
+          }).catch((error) => {
+            console.warn(
+              `[summary-products] No se pudieron obtener campañas Meta de ${accountId ?? "env"}:`,
+              error
+            )
+            return new Map<string, SummaryProductPlatformMetrics>()
+          })
+        )
+      )
+
+      return mergePlatformMetricsMaps(maps)
     }),
     loadTikTokCampaignMetricsAllAccounts(dateRange),
   ])
@@ -242,7 +265,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v6:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v7:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )
