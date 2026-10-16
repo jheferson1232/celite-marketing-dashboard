@@ -54,7 +54,7 @@ type ProfileIdentity = {
 
 function tikTokItemCreateTime(itemId: string): string | null {
   try {
-    const seconds = Number(BigInt(itemId) >> 32n)
+    const seconds = Number(BigInt(itemId) >> BigInt(32))
     if (!Number.isFinite(seconds) || seconds < 1_000_000_000) return null
     return String(seconds)
   } catch {
