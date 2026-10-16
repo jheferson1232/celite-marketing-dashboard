@@ -45,17 +45,38 @@ export function isTikTokPostVideoAsset(
   return /^\d{10,}$/.test(name)
 }
 
+/** Milisegundos de la fecha del video. Sin fecha válida devuelve 0. */
+export function tikTokVideoCreateTimeMs(createTime: string | null): number {
+  if (!createTime?.trim()) return 0
+
+  const raw = createTime.trim()
+  const asUnix = Number(raw)
+  if (Number.isFinite(asUnix) && asUnix > 1_000_000_000) {
+    return asUnix > 1e12 ? asUnix : asUnix * 1000
+  }
+
+  const parsed = Date.parse(raw.includes("T") ? raw : `${raw.replace(" ", "T")}Z`)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+/** Más reciente primero. Sin fecha queda al final. */
+export function compareTikTokVideosByDateDesc(
+  a: Pick<TikTokAdVideoAsset, "createTime" | "name" | "profileName">,
+  b: Pick<TikTokAdVideoAsset, "createTime" | "name" | "profileName">
+): number {
+  const byTime = tikTokVideoCreateTimeMs(b.createTime) - tikTokVideoCreateTimeMs(a.createTime)
+  if (byTime !== 0) return byTime
+  return (a.profileName ?? a.name).localeCompare(b.profileName ?? b.name, "es")
+}
+
 export function formatTikTokVideoCreateTime(
   createTime: string | null
 ): string | null {
   if (!createTime?.trim()) return null
 
-  const raw = createTime.trim()
-  const asUnix = Number(raw)
-  const date =
-    Number.isFinite(asUnix) && asUnix > 1_000_000_000
-      ? new Date(asUnix > 1e12 ? asUnix : asUnix * 1000)
-      : new Date(raw.includes("T") ? raw : raw.replace(" ", "T") + "Z")
+  const millis = tikTokVideoCreateTimeMs(createTime)
+  if (millis <= 0) return null
+  const date = new Date(millis)
 
   if (Number.isNaN(date.getTime())) return null
 

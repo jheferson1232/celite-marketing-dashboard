@@ -1,6 +1,5 @@
 import { Suspense } from "react"
 import { AppSidebar, AppSidebarPeekHeader } from "@/components/app-sidebar"
-import { MetaPaymentAlert } from "@/components/meta-payment-alert"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 export default function AppLayout({
@@ -19,7 +18,6 @@ export default function AppLayout({
           {children}
         </div>
       </SidebarInset>
-      <MetaPaymentAlert />
     </SidebarProvider>
   )
 }

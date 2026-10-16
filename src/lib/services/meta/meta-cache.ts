@@ -1,11 +1,19 @@
+import { getMetaDashboardAccountId } from "./meta-dashboard-account-store"
+
 const cache = new Map<string, { value: unknown; expiresAt: number }>()
+
+function scopeKey(key: string): string {
+  const accountId = getMetaDashboardAccountId()
+  return accountId ? `act:${accountId}:${key}` : key
+}
 
 export async function withMetaCache<T>(
   key: string,
   ttlMs: number,
   fn: () => Promise<T>
 ): Promise<T> {
-  const hit = cache.get(key)
+  const cacheKey = scopeKey(key)
+  const hit = cache.get(cacheKey)
   if (hit && hit.expiresAt > Date.now()) {
     return hit.value as T
   }
@@ -13,7 +21,7 @@ export async function withMetaCache<T>(
   const value = await fn()
 
   if (value !== null && value !== undefined) {
-    cache.set(key, { value, expiresAt: Date.now() + ttlMs })
+    cache.set(cacheKey, { value, expiresAt: Date.now() + ttlMs })
   }
 
   return value

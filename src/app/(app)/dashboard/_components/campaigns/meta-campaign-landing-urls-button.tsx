@@ -14,6 +14,7 @@ import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
 import { getMetaCampaignLandingUrlsAction } from "../../_actions/campaign-landing-urls"
+import { useMetaDashboardAccountId } from "../meta-dashboard-account"
 
 function formatLandingDisplay(url: string): { host: string; path: string } {
   try {
@@ -42,14 +43,20 @@ export function MetaCampaignLandingUrlsButton({
   globalUrlsLoading = false,
 }: MetaCampaignLandingUrlsButtonProps) {
   const [open, setOpen] = React.useState(false)
+  const accountId = useMetaDashboardAccountId()
   const needsFetch =
     urlsFromList.length === 0 && Boolean(campaignId) && !globalUrlsLoading
 
   const { data: fetchedUrls, isLoading, isError, error, refetch, isFetching } =
     useQuery({
-      queryKey: ["meta-campaign-landing-urls", campaignId],
+      queryKey: ["meta-campaign-landing-urls", accountId, campaignId],
       queryFn: () =>
-        runServerAction(getMetaCampaignLandingUrlsAction(campaignId!)),
+        runServerAction(
+          getMetaCampaignLandingUrlsAction({
+            campaignId: campaignId!,
+            accountId: accountId ?? undefined,
+          })
+        ),
       enabled: open && needsFetch,
       staleTime: 30 * 60 * 1000,
       retry: false,

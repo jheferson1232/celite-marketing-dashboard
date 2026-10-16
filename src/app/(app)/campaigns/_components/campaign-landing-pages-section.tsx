@@ -20,6 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import type { CampaignLandingPageRef } from "@/lib/config/tiktok-strategies"
 import { parseLandingPageParts } from "@/lib/url-match"
@@ -27,6 +35,7 @@ import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
 import {
   createCampaignLandingPageAction,
+  deleteCampaignLandingPagesAction,
   listCampaignLandingPagesCatalogAction,
 } from "../_actions/campaign-landing-pages"
 
@@ -53,6 +62,11 @@ interface CatalogModelGroup {
   modelKey: string
   modelLabel: string
   variants: CatalogVariant[]
+}
+
+interface DeleteTarget {
+  label: string
+  pages: CatalogPage[]
 }
 
 function normalizeUrl(raw: string): string {
@@ -121,6 +135,8 @@ export function CampaignLandingPagesSection({
     () => new Set()
   )
   const [copyFeedbackId, setCopyFeedbackId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const selectedLanding =
     landingPages.find((page) => page.id === selectedLandingPageId) ?? null
@@ -200,6 +216,32 @@ export function CampaignLandingPagesSection({
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (pages: CatalogPage[]) => {
+      await runServerAction(
+        deleteCampaignLandingPagesAction(pages.map((page) => page.id))
+      )
+      return pages
+    },
+    onSuccess: async (pages) => {
+      const removedIds = new Set(pages.map((page) => page.id))
+      if (removedIds.has(selectedLandingPageId)) {
+        onLandingPagesChange([])
+        onSelectLandingPage("")
+      }
+      setDeleteTarget(null)
+      setDeleteError(null)
+      await queryClient.invalidateQueries({
+        queryKey: ["campaign-landing-pages-catalog"],
+      })
+    },
+    onError: (error) => {
+      setDeleteError(
+        error instanceof Error ? error.message : "No se pudo eliminar la URL"
+      )
+    },
+  })
+
   const applyLandingSelection = (page: CampaignLandingPageRef) => {
     onLandingPagesChange([page])
     onSelectLandingPage(page.id)
@@ -231,7 +273,12 @@ export function CampaignLandingPagesSection({
     }
   }
 
-  const isBusy = disabled || createMutation.isPending
+  const isBusy = disabled || createMutation.isPending || deleteMutation.isPending
+
+  const askDelete = (label: string, pages: CatalogPage[]) => {
+    setDeleteError(null)
+    setDeleteTarget({ label, pages })
+  }
   const variantCount = filteredGroups.reduce(
     (sum, group) => sum + group.variants.length,
     0
@@ -342,28 +389,47 @@ export function CampaignLandingPagesSection({
                     key={group.modelKey}
                     className="border-b last:border-b-0"
                   >
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => toggleModel(group.modelKey)}
-                      className={cn(
-                        "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition",
-                        "hover:bg-muted/70",
-                        hasSelected && "bg-primary/5"
-                      )}
-                    >
-                      {expanded ? (
-                        <RiArrowDownSLine className="text-muted-foreground size-4 shrink-0" />
-                      ) : (
-                        <RiArrowRightSLine className="text-muted-foreground size-4 shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate font-medium">
-                        {group.modelLabel}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {group.variants.length}
-                      </span>
-                    </button>
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => toggleModel(group.modelKey)}
+                        className={cn(
+                          "flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition",
+                          "hover:bg-muted/70",
+                          hasSelected && "bg-primary/5"
+                        )}
+                      >
+                        {expanded ? (
+                          <RiArrowDownSLine className="text-muted-foreground size-4 shrink-0" />
+                        ) : (
+                          <RiArrowRightSLine className="text-muted-foreground size-4 shrink-0" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {group.modelLabel}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {group.variants.length}
+                        </span>
+                      </button>
+                      <div className="flex shrink-0 items-center pr-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isBusy}
+                          aria-label={`Eliminar URLs de ${group.modelLabel}`}
+                          onClick={() =>
+                            askDelete(
+                              group.modelLabel,
+                              group.variants.map((variant) => variant.page)
+                            )
+                          }
+                        >
+                          <RiDeleteBinLine className="size-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
 
                     {expanded ? (
                       <ul className="border-t bg-muted/10">
@@ -425,6 +491,20 @@ export function CampaignLandingPagesSection({
                                   ) : (
                                     <RiFileCopyLine className="size-3.5" />
                                   )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  disabled={isBusy}
+                                  aria-label={`Eliminar ${variant.page.url}`}
+                                  onClick={() =>
+                                    askDelete(variant.variantLabel, [
+                                      variant.page,
+                                    ])
+                                  }
+                                >
+                                  <RiDeleteBinLine className="size-3.5 text-destructive" />
                                 </Button>
                                 <Button
                                   type="button"
@@ -499,6 +579,62 @@ export function CampaignLandingPagesSection({
           ) : null}
         </div>
       </CardContent>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (open || deleteMutation.isPending) return
+          setDeleteTarget(null)
+          setDeleteError(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar URL?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && deleteTarget.pages.length > 1
+                ? `Se eliminarán ${deleteTarget.pages.length} URLs de ${deleteTarget.label} del catálogo de este servidor.`
+                : "Se eliminará esta URL del catálogo de este servidor."}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget ? (
+            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border bg-muted/20 px-3 py-2">
+              {deleteTarget.pages.map((page) => (
+                <li key={page.id} className="truncate text-xs">
+                  {page.url}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {deleteError ? (
+            <p className="text-destructive text-sm">{deleteError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteError(null)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteMutation.isPending || !deleteTarget}
+              onClick={() => {
+                if (!deleteTarget) return
+                deleteMutation.mutate(deleteTarget.pages)
+              }}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

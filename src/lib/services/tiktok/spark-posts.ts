@@ -8,6 +8,7 @@ import {
 import { withTikTokCache } from "./tiktok-cache"
 import type { TikTokApiResponse, TikTokPageInfo } from "./types"
 import {
+  compareTikTokVideosByDateDesc,
   toSparkVideoSelectionId,
   type TikTokAdVideoAsset,
 } from "./ad-video-asset"
@@ -112,12 +113,7 @@ async function fetchTikTokSparkPosts(): Promise<TikTokAdVideoAsset[]> {
     page += 1
   }
 
-  return [...byId.values()].sort((a, b) => {
-    const aTime = a.createTime ?? ""
-    const bTime = b.createTime ?? ""
-    if (aTime && bTime && aTime !== bTime) return bTime.localeCompare(aTime)
-    return (a.profileName ?? a.name).localeCompare(b.profileName ?? b.name, "es")
-  })
+  return [...byId.values()].sort(compareTikTokVideosByDateDesc)
 }
 
 /** Posts orgánicos autorizados (Spark) — originales con nombre de perfil. */
@@ -133,9 +129,12 @@ export async function getTikTokSparkPostByItemId(
   if (!trimmed) return null
 
   const posts = await listTikTokSparkPosts()
-  return (
+  const spark =
     posts.find((post) => post.id === toSparkVideoSelectionId(trimmed)) ?? null
-  )
+  if (spark) return spark
+
+  const { getTikTokProfileVideoByItemId } = await import("./profile-videos")
+  return getTikTokProfileVideoByItemId(trimmed)
 }
 
 export async function getTikTokSparkPostPreviewUrl(

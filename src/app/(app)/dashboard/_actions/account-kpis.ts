@@ -2,8 +2,12 @@
 
 import { createServerAction } from "@/lib/server-action"
 import { getAccountKpis } from "@/lib/services/meta/account-kpis"
+import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import type { AccountKpis, DateRange } from "@/lib/services/meta/types"
 
 export const getAccountKpisSummary = createServerAction(
-  async (dateRange: DateRange): Promise<AccountKpis> => getAccountKpis(dateRange)
+  async (input: DateRange & { accountId?: string }): Promise<AccountKpis> =>
+    withMetaDashboardAccount(input.accountId, () =>
+      getAccountKpis({ from: input.from, to: input.to })
+    )
 )

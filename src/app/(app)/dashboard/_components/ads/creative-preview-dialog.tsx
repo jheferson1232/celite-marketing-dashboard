@@ -14,6 +14,7 @@ import { runServerAction } from "@/lib/server-action"
 import type { CreativeRow } from "@/lib/services/meta/types"
 import { getAdVideoSource } from "../../_actions/ad-video-source"
 import { getCreativeVideoSource } from "../../_actions/creative-video-source"
+import { useMetaDashboardAccountId } from "../meta-dashboard-account"
 import { getTikTokVideoSourceAction } from "../../_actions/tiktok-video-source"
 import { isTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
 import { CreativePreviewImage } from "./creative-preview-image"
@@ -56,6 +57,7 @@ export function CreativePreviewDialog({
 }: CreativePreviewDialogProps) {
   const adId = creative?.adId
   const videoId = creative?.videoId
+  const metaAccountId = useMetaDashboardAccountId()
   const cachedVideoUrl = creative?.videoUrl?.trim() || ""
   const isVideo = creative?.mediaType === "video"
   const needsFetch = isVideo && !cachedVideoUrl && Boolean(videoId || adId)
@@ -67,7 +69,7 @@ export function CreativePreviewDialog({
     error,
     isFetching,
   } = useQuery({
-    queryKey: ["video-preview", platform, videoId, adId],
+    queryKey: ["video-preview", platform, metaAccountId, videoId, adId],
     queryFn: async () => {
       if (platform === "tiktok" && videoId) {
         const sourceUrl = await runServerAction(getTikTokVideoSourceAction(videoId))
@@ -76,7 +78,10 @@ export function CreativePreviewDialog({
 
       if (videoId) {
         const fromVideoId = await runServerAction(
-          getCreativeVideoSource(videoId)
+          getCreativeVideoSource({
+            videoId,
+            accountId: metaAccountId ?? undefined,
+          })
         )
         if (fromVideoId) {
           return { sourceUrl: fromVideoId, embedUrl: null as string | null }
@@ -84,7 +89,9 @@ export function CreativePreviewDialog({
       }
 
       if (adId) {
-        return runServerAction(getAdVideoSource(adId))
+        return runServerAction(
+          getAdVideoSource({ adId, accountId: metaAccountId ?? undefined })
+        )
       }
 
       return { sourceUrl: null, embedUrl: null }

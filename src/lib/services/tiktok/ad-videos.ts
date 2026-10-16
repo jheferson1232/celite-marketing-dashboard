@@ -4,7 +4,10 @@ import { buildTikTokCacheKey, getTikTokRequestContext } from "./tiktok-api.serve
 import { withTikTokCache } from "./tiktok-cache"
 import { normalizeTikTokMediaUrl } from "@/lib/services/sociavault/tiktok-media-hosts"
 import type { TikTokApiResponse, TikTokPageInfo } from "./types"
-import type { TikTokAdVideoAsset } from "./ad-video-asset"
+import {
+  compareTikTokVideosByDateDesc,
+  type TikTokAdVideoAsset,
+} from "./ad-video-asset"
 
 export type { TikTokAdVideoAsset } from "./ad-video-asset"
 
@@ -110,15 +113,16 @@ async function fetchTikTokAdVideos(): Promise<TikTokAdVideoAsset[]> {
     page += 1
   }
 
-  return [...byId.values()].sort((a, b) => {
-    const aTime = a.createTime ?? ""
-    const bTime = b.createTime ?? ""
-    if (aTime && bTime && aTime !== bTime) return bTime.localeCompare(aTime)
-    return a.name.localeCompare(b.name, "es")
-  })
+  return [...byId.values()].sort(compareTikTokVideosByDateDesc)
 }
 
 export async function listTikTokAdVideos(): Promise<TikTokAdVideoAsset[]> {
   const cacheKey = await buildTikTokCacheKey("ad-videos")
   return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchTikTokAdVideos)
+}
+
+/** Videos de @mokado.co autorizados para anuncios. Sin biblioteca de archivos. */
+export async function listTikTokCampaignVideos(): Promise<TikTokAdVideoAsset[]> {
+  const { listTikTokProfileVideos } = await import("./profile-videos")
+  return listTikTokProfileVideos()
 }

@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getTikTokVideoSourceAction } from "@/app/(app)/dashboard/_actions/tiktok-video-source"
 import { isTikTokMediaHostname } from "@/lib/services/sociavault/tiktok-media-hosts"
 import {
+  compareTikTokVideosByDateDesc,
   formatTikTokVideoCreateTime,
   isTikTokPostVideoAsset,
   toSparkVideoSelectionId,
@@ -37,12 +38,6 @@ import {
   CAMPAIGN_STATUS_LABELS,
 } from "../_lib/status-labels"
 
-type TikTokPixelOption = {
-  id: string
-  name: string
-  code: string | null
-}
-
 interface CampaignGeneralSectionProps {
   name: string
   status: CampaignStatus
@@ -56,23 +51,6 @@ interface CampaignGeneralSectionProps {
   onPixelIdChange: (pixelId: string) => void
   onAuthCodeChange: (authCode: string) => void
   onSelectedTikTokVideoIdsChange: (videoIds: string[]) => void
-}
-
-function buildPixelOptions(
-  pixels: TikTokPixelOption[],
-  selectedPixelId: string
-): TikTokPixelOption[] {
-  const byId = new Map(pixels.map((pixel) => [pixel.id, pixel]))
-
-  if (selectedPixelId && !byId.has(selectedPixelId)) {
-    byId.set(selectedPixelId, {
-      id: selectedPixelId,
-      name: `Pixel guardado (${selectedPixelId.slice(-6)})`,
-      code: null,
-    })
-  }
-
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "es"))
 }
 
 function proxyTikTokMedia(url: string): string {
@@ -259,7 +237,7 @@ export function CampaignGeneralSection({
     isError: videosError,
     error: videosErrorDetail,
   } = useQuery({
-    queryKey: ["tiktok-spark-posts"],
+    queryKey: ["tiktok-profile-videos", "mokado.co"],
     queryFn: () => runServerAction(listTikTokAdVideosAction()),
     staleTime: 2 * 60 * 1000,
   })
@@ -296,8 +274,7 @@ export function CampaignGeneralSection({
   ])
 
   const tikTokPostVideos = useMemo(() => {
-    const posts = tikTokVideos.filter(isTikTokPostVideoAsset)
-    const byId = new Map(posts.map((video) => [video.id, video]))
+    const byId = new Map(tikTokVideos.map((video) => [video.id, video]))
     const sparkPreview = sparkPreviewQuery.data
 
     for (const id of selectedTikTokVideoIds) {
@@ -331,15 +308,7 @@ export function CampaignGeneralSection({
       })
     }
 
-    return [...byId.values()].sort((a, b) => {
-      const aTime = a.createTime ?? ""
-      const bTime = b.createTime ?? ""
-      if (aTime && bTime && aTime !== bTime) return bTime.localeCompare(aTime)
-      return (a.profileName ?? a.name).localeCompare(
-        b.profileName ?? b.name,
-        "es"
-      )
-    })
+    return [...byId.values()].sort(compareTikTokVideosByDateDesc)
   }, [selectedTikTokVideoIds, sparkPreviewQuery.data, tikTokVideos])
 
   function toggleTikTokVideo(videoId: string, checked: boolean) {
@@ -357,15 +326,13 @@ export function CampaignGeneralSection({
     )
   }
 
-  const pixelOptions = useMemo(
-    () => buildPixelOptions(pixels, pixelId),
-    [pixelId, pixels]
-  )
+  const pixelOptions = pixels
 
   useEffect(() => {
-    if (pixelId || pixelOptions.length === 0) return
+    if (pixelsLoading || pixelOptions.length === 0) return
+    if (pixelOptions.some((pixel) => pixel.id === pixelId)) return
     onPixelIdChange(pixelOptions[0]!.id)
-  }, [onPixelIdChange, pixelId, pixelOptions])
+  }, [onPixelIdChange, pixelId, pixelOptions, pixelsLoading])
 
   const selectedPixel = pixelOptions.find((pixel) => pixel.id === pixelId)
   const coverUrl = sparkPreviewQuery.data?.coverUrl?.trim() || null
@@ -489,10 +456,10 @@ export function CampaignGeneralSection({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <label className="text-sm font-medium">
-              Posts de TikTok
+              Videos de @mokado.co
             </label>
             <p className="text-xs text-muted-foreground">
-              Solo posts orgánicos autorizados (originales). Cada uno seleccionado
+              Videos publicados en esa cuenta de TikTok. Cada uno seleccionado
               crea un conjunto al lanzar.
             </p>
           </div>
@@ -505,17 +472,18 @@ export function CampaignGeneralSection({
         </div>
 
         {videosLoading ? (
-          <p className="text-muted-foreground text-sm">Cargando posts de TikTok…</p>
+          <p className="text-muted-foreground text-sm">
+            Cargando videos de @mokado.co…
+          </p>
         ) : videosError ? (
           <p className="text-sm text-destructive">
             {videosErrorDetail instanceof Error
               ? videosErrorDetail.message
-              : "No se pudieron cargar los posts de TikTok"}
+              : "No se pudieron cargar los videos de @mokado.co"}
           </p>
         ) : tikTokPostVideos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No hay posts orgánicos autorizados en la cuenta. Autorizá un post
-            Spark desde TikTok Ads.
+            No hay videos de @mokado.co en esta cuenta de TikTok Ads.
           </p>
         ) : (
           <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3">
@@ -523,8 +491,15 @@ export function CampaignGeneralSection({
               const checked = selectedTikTokSet.has(video.id)
               const durationLabel = formatVideoDuration(video.durationMs)
               const dateLabel = formatTikTokVideoCreateTime(video.createTime)
-              const profileLabel =
-                video.profileName?.trim() || video.name || "TikTok Post"
+              const profileName = video.profileName?.trim()
+              const caption = video.name?.trim()
+              const profileLabel = profileName
+                ? `@${profileName.replace(/^@/, "")}`
+                : caption || "Video TikTok"
+              const titleLabel =
+                caption && caption !== profileName && caption !== profileLabel
+                  ? caption
+                  : profileLabel
               return (
                 <div
                   key={video.id}
@@ -585,7 +560,7 @@ export function CampaignGeneralSection({
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="truncate text-xs font-medium leading-snug">
-                      @{profileLabel.replace(/^@/, "")}
+                      {titleLabel}
                     </span>
                     {dateLabel ? (
                       <span className="text-muted-foreground text-[11px] tabular-nums">

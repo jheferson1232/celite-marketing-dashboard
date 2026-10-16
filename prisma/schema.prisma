@@ -391,6 +391,23 @@ model MetaDashboardSettings {
   @@map("MetaDashboardSettings")
 }
 
+/** Cuentas publicitarias de Meta accesibles con el token del entorno. */
+model MetaAdAccount {
+  id            String   @id @default(cuid())
+  accountId     String   @unique
+  name          String
+  currency      String?
+  timezone      String?
+  accountStatus Int?
+  status        String   @default("active")
+  isDefault     Boolean  @default(false)
+  syncedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, isDefault])
+  @@map("MetaAdAccount")
+}
+
 /** Preferencias del resumen /resumen (singleton id=default). */
 model SummaryDashboardSettings {
   id String @id @default("default")

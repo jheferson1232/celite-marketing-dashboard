@@ -24,6 +24,7 @@ import type { DateRange } from "@/lib/services/meta/types"
 import { cn } from "@/lib/utils"
 import { useDateRange } from "../../_lib/use-date-range"
 import { getCampaignAdSets } from "../../_actions/campaign-adsets"
+import { useMetaDashboardAccountId } from "../meta-dashboard-account"
 import {
   getAdSetSubtableColumnMeta,
   getAdSetSubtableColumnsWithTikTokManage,
@@ -112,6 +113,8 @@ export function CampaignAdSetsExpandedRow({
   metricsDateRange,
 }: CampaignAdSetsExpandedRowProps) {
   const usePurchaseLabels = enableTikTokManage || enableMetaExtendedMetrics
+  const metaAccountId = useMetaDashboardAccountId()
+  const resolvedAccountId = accountId ?? metaAccountId ?? undefined
   const { dateRange: dashboardDateRange } = useDateRange()
   const dateRange = metricsDateRange ?? dashboardDateRange
   const visibleSubtableColumns = getVisibleAdSetSubtableColumns(
@@ -132,7 +135,7 @@ export function CampaignAdSetsExpandedRow({
     queryKey: [
       queryKeyPrefix,
       campaignId,
-      accountId,
+      resolvedAccountId,
       dateRange,
       campaignObjective,
     ],
@@ -142,7 +145,7 @@ export function CampaignAdSetsExpandedRow({
           campaignId,
           dateRange,
           objective: campaignObjective,
-          accountId,
+          accountId: resolvedAccountId,
         })
       ),
     enabled: Boolean(campaignId) && !usePrefetched,

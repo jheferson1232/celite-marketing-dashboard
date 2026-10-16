@@ -5,6 +5,7 @@ import {
   getMetaCampaignDailyInsights,
   type MetaCampaignDailyInsightsSummary,
 } from "@/lib/services/meta/campaign-daily-insights"
+import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import type { DateRange } from "@/lib/services/meta/types"
 
 export const getMetaCampaignDailyInsightsAction = createServerAction(
@@ -12,10 +13,13 @@ export const getMetaCampaignDailyInsightsAction = createServerAction(
     campaignId: string
     dateRange: DateRange
     objective: string
+    accountId?: string
   }): Promise<MetaCampaignDailyInsightsSummary> =>
-    getMetaCampaignDailyInsights(
-      input.campaignId,
-      input.dateRange,
-      input.objective
+    withMetaDashboardAccount(input.accountId, () =>
+      getMetaCampaignDailyInsights(
+        input.campaignId,
+        input.dateRange,
+        input.objective
+      )
     )
 )

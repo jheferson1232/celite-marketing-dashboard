@@ -22,6 +22,11 @@ import { MetaAudienceSection } from "./audience/meta-audience-section"
 import { PeriodPicker } from "@/components/period-picker"
 import { ThemeToggleButton } from "./theme-toggle-button"
 import { MetaApiStatusIndicator } from "./meta-api-status-indicator"
+import {
+  MetaAccountSelect,
+  MetaDashboardAccountProvider,
+  useMetaDashboardAccount,
+} from "./meta-dashboard-account"
 import { useMetaArchivedCampaigns } from "./campaigns/use-meta-archived-campaigns"
 import {
   RiAdvertisementLine,
@@ -31,6 +36,12 @@ import {
 
 export function DashboardContent() {
   const queryClient = useQueryClient()
+  const {
+    accounts,
+    accountId,
+    setAccountId,
+    isLoading: isLoadingAccounts,
+  } = useMetaDashboardAccount()
   const [isReloading, setIsReloading] = useState(false)
   const [activeTab, setActiveTab] = useState("campaigns")
   const { dateRange, setDateRange } = useDateRange()
@@ -70,14 +81,18 @@ export function DashboardContent() {
   }
 
   const kpisQuery = useQuery({
-    queryKey: ["account-kpis", dateRange],
-    queryFn: () => runServerAction(getAccountKpisSummary(dateRange)),
+    queryKey: ["account-kpis", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(getAccountKpisSummary({ ...dateRange, accountId: accountId! })),
+    enabled: Boolean(accountId),
     ...dashboardQueryOptions,
   })
 
   const campaignsQuery = useQuery({
-    queryKey: ["campaigns", dateRange],
-    queryFn: () => runServerAction(getCampaignsList(dateRange)),
+    queryKey: ["campaigns", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(getCampaignsList({ ...dateRange, accountId: accountId! })),
+    enabled: Boolean(accountId),
     ...dashboardQueryOptions,
   })
 
@@ -124,9 +139,12 @@ export function DashboardContent() {
   }, [campaigns?.length, dateRange.from, dateRange.to])
 
   useQuery({
-    queryKey: ["meta-adset-insights-warm", dateRange],
-    queryFn: () => runServerAction(warmMetaAdsetInsightsAction(dateRange)),
-    enabled: adsetInsightsWarmEnabled,
+    queryKey: ["meta-adset-insights-warm", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(
+        warmMetaAdsetInsightsAction({ ...dateRange, accountId: accountId! })
+      ),
+    enabled: adsetInsightsWarmEnabled && Boolean(accountId),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
@@ -136,9 +154,10 @@ export function DashboardContent() {
     isFetching: isLandingUrlsMapFetching,
     isPending: isLandingUrlsMapPending,
   } = useQuery({
-    queryKey: ["meta-landing-urls-map"],
-    queryFn: () => runServerAction(getMetaLandingUrlsMapAction()),
-    enabled: landingMapEnabled,
+    queryKey: ["meta-landing-urls-map", accountId],
+    queryFn: () =>
+      runServerAction(getMetaLandingUrlsMapAction({ accountId: accountId! })),
+    enabled: landingMapEnabled && Boolean(accountId),
     staleTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
@@ -153,9 +172,10 @@ export function DashboardContent() {
     isError: isExtendedMetricsError,
     error: extendedMetricsError,
   } = useQuery({
-    queryKey: ["campaigns-extended-metrics"],
-    queryFn: () => runServerAction(getCampaignsExtendedMetrics()),
-    enabled: extendedMetricsEnabled,
+    queryKey: ["campaigns-extended-metrics", accountId],
+    queryFn: () =>
+      runServerAction(getCampaignsExtendedMetrics({ accountId: accountId! })),
+    enabled: extendedMetricsEnabled && Boolean(accountId),
     ...extendedQueryOptions,
   })
 
@@ -191,13 +211,15 @@ export function DashboardContent() {
   }, [campaigns, extendedMetrics, landingUrlsMap, archivedIds])
 
   const { data: adInsights, isLoading: isLoadingAdInsights } = useQuery({
-    queryKey: ["ad-insights", dateRange],
-    queryFn: () => runServerAction(getAdInsightsList(dateRange)),
-    enabled: activeTab === "ads",
+    queryKey: ["ad-insights", accountId, dateRange],
+    queryFn: () =>
+      runServerAction(getAdInsightsList({ ...dateRange, accountId: accountId! })),
+    enabled: activeTab === "ads" && Boolean(accountId),
     ...dashboardQueryOptions,
   })
 
   return (
+    <MetaDashboardAccountProvider accountId={accountId}>
     <div className="flex w-full min-w-0 flex-col gap-6 p-4 sm:gap-8 sm:p-6 lg:p-8">
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
@@ -206,6 +228,12 @@ export function DashboardContent() {
               Meta
             </h1>
           </div>
+          <MetaAccountSelect
+            accounts={accounts}
+            value={accountId}
+            onChange={setAccountId}
+            disabled={isLoadingAccounts}
+          />
           <MetaApiStatusIndicator status={metaApiStatus} />
         </div>
         <PeriodPicker
@@ -235,7 +263,7 @@ export function DashboardContent() {
 
       <KpiCards
         data={kpis}
-        isLoading={isLoadingKpis}
+        isLoading={isLoadingKpis || !accountId}
         lastMetric="addToCart"
       />
 
@@ -270,7 +298,7 @@ export function DashboardContent() {
           ) : null}
           <CampaignsTable
             data={campaignsEnriched}
-            isLoading={isLoadingCampaigns}
+            isLoading={isLoadingCampaigns || !accountId}
             error={campaignsError}
             enableMetaExtendedMetrics
             showAllCampaignsFilter
@@ -292,5 +320,6 @@ export function DashboardContent() {
         </TabsContent>
       </Tabs>
     </div>
+    </MetaDashboardAccountProvider>
   )
 }

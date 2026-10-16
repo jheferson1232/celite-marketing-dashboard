@@ -88,7 +88,12 @@ async function fetchTikTokCreativeVideoSource(
   videoId: string
 ): Promise<string | null> {
   if (videoId.startsWith("spark:")) {
-    return fetchSparkItemVideoSource(videoId.slice("spark:".length))
+    const itemId = videoId.slice("spark:".length)
+    const sparkUrl = await fetchSparkItemVideoSource(itemId)
+    if (sparkUrl) return sparkUrl
+    const { getTikTokProfileVideoByItemId } = await import("./profile-videos")
+    const profileVideo = await getTikTokProfileVideoByItemId(itemId)
+    return profileVideo?.previewUrl ?? null
   }
   return fetchLibraryVideoSource(videoId)
 }

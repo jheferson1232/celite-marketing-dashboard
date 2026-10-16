@@ -5,8 +5,11 @@ import {
   getCampaignsExtendedMetrics as getCampaignsExtendedMetricsService,
   type CampaignExtendedMetricsById,
 } from "@/lib/services/meta/campaigns-extended-metrics"
+import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 
 export const getCampaignsExtendedMetrics = createServerAction(
-  async (): Promise<CampaignExtendedMetricsById> =>
-    getCampaignsExtendedMetricsService()
+  async (input?: { accountId?: string }): Promise<CampaignExtendedMetricsById> =>
+    withMetaDashboardAccount(input?.accountId, () =>
+      getCampaignsExtendedMetricsService()
+    )
 )

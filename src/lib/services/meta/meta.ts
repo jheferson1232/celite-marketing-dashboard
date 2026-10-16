@@ -1,4 +1,5 @@
 import { assertMetaEnvConfigured } from "./meta-env"
+import { getMetaDashboardAccountId } from "./meta-dashboard-account-store"
 import { metaGraphFetchJson } from "./meta-graph-fetch"
 
 export type MetaApiClient = {
@@ -27,12 +28,17 @@ function buildMetaAccountUrl(
   return url.toString()
 }
 
+function resolveMetaAdAccountId(): string {
+  const fromRequest = getMetaDashboardAccountId()?.replace(/^act_/i, "").trim()
+  if (fromRequest) return fromRequest
+  return process.env.META_AD_ACCOUNT_ID!.replace(/^act_/i, "").trim()
+}
+
 export function getMetaClient(): MetaApiClient {
   if (!metaClient) {
     assertMetaEnvConfigured()
 
     const token = process.env.META_ACCESS_TOKEN!
-    const accountId = process.env.META_AD_ACCOUNT_ID!
 
     metaClient = {
       async get<T>(
@@ -40,7 +46,7 @@ export function getMetaClient(): MetaApiClient {
         options?: { params?: Record<string, string> }
       ): Promise<{ data: T }> {
         const url = buildMetaAccountUrl(
-          accountId,
+          resolveMetaAdAccountId(),
           path,
           options?.params ?? {},
           token

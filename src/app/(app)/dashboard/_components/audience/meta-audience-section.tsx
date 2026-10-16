@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { getLastNDaysRange } from "@/lib/date"
 import { runServerAction } from "@/lib/server-action"
 import { getAudienceBreakdownsAction } from "../../_actions/audience-breakdowns"
+import { useMetaDashboardAccountId } from "../meta-dashboard-account"
 import { AudienceDimensionCard } from "./audience-dimension-card"
 
 type ViewMode = "bars" | "table" | "donut"
@@ -52,11 +53,15 @@ export function MetaAudienceSection() {
   const [periodDays, setPeriodDays] = useState<PeriodDays>(7)
 
   const dateRange = getLastNDaysRange(periodDays)
+  const accountId = useMetaDashboardAccountId()
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["meta-audience-breakdowns", periodDays],
-    queryFn: () => runServerAction(getAudienceBreakdownsAction(dateRange)),
-    enabled: open,
+    queryKey: ["meta-audience-breakdowns", accountId, periodDays],
+    queryFn: () =>
+      runServerAction(
+        getAudienceBreakdownsAction({ ...dateRange, accountId: accountId! })
+      ),
+    enabled: open && Boolean(accountId),
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   })

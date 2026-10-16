@@ -241,3 +241,19 @@ export async function deleteLandingPage(id: string): Promise<void> {
 
   await prisma.landingPage.delete({ where: { id } })
 }
+
+/** Quita URLs del catálogo local. No toca TikTok ni las campañas ya guardadas. */
+export async function deleteLandingPages(ids: string[]): Promise<void> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))]
+  if (unique.length === 0) throw new Error("No hay URLs para eliminar")
+
+  await prisma.$transaction(async (tx) => {
+    for (const id of unique) {
+      await tx.landingPage.update({
+        where: { id },
+        data: { products: { set: [] } },
+      })
+    }
+    await tx.landingPage.deleteMany({ where: { id: { in: unique } } })
+  })
+}

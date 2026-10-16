@@ -18,6 +18,7 @@ import { getLastSevenDaysRange } from "@/lib/services/meta/campaign-daily-insigh
 import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
 import { getMetaCampaignDailyInsightsAction } from "../../_actions/campaign-daily-insights"
 import { getMetaCampaignVideoThumbnailsAction } from "../../_actions/campaign-video-thumbnails"
+import { useMetaDashboardAccountId } from "../meta-dashboard-account"
 import { TikTokCampaignDetailsChart } from "@/app/(app)/tiktok/_components/tiktok-campaign-details-chart"
 
 interface MetaCampaignDetailsContentProps {
@@ -30,10 +31,12 @@ export function MetaCampaignDetailsContent({
   objective,
 }: MetaCampaignDetailsContentProps) {
   const dateRange = getLastSevenDaysRange()
+  const accountId = useMetaDashboardAccountId()
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [
       "meta-campaign-daily-insights",
+      accountId,
       campaignId,
       dateRange,
       objective,
@@ -44,6 +47,7 @@ export function MetaCampaignDetailsContent({
           campaignId,
           dateRange,
           objective,
+          accountId: accountId ?? undefined,
         })
       ),
     enabled: Boolean(campaignId),
@@ -51,9 +55,14 @@ export function MetaCampaignDetailsContent({
 
   // Diferir miniaturas hasta que los insights terminen: evita pico de QPS con Meta.
   const thumbnailsQuery = useQuery({
-    queryKey: ["meta-campaign-video-thumbnails", campaignId],
+    queryKey: ["meta-campaign-video-thumbnails", accountId, campaignId],
     queryFn: () =>
-      runServerAction(getMetaCampaignVideoThumbnailsAction(campaignId)),
+      runServerAction(
+        getMetaCampaignVideoThumbnailsAction({
+          campaignId,
+          accountId: accountId ?? undefined,
+        })
+      ),
     enabled: Boolean(campaignId) && Boolean(data),
     staleTime: 30 * 60 * 1000,
     retry: (failureCount, error) =>
