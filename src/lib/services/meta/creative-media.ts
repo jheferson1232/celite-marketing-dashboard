@@ -1,5 +1,10 @@
+import { buildMetaGraphUrl } from "./meta-graph-fetch"
+import { metaGraphGet } from "./meta-graph-retry"
 import { getMetaClient } from "./meta"
 import type { MetaAdCreative } from "./types"
+
+const SHARP_THUMB_WIDTH = "1080"
+const SHARP_THUMB_HEIGHT = "1920"
 
 interface MetaAdImage {
   hash: string
@@ -68,50 +73,48 @@ export async function fetchAdImageUrlsByHash(
   return urlMap
 }
 
-interface MetaAdVideo {
-  id: string
-  picture?: string
-}
-
-interface MetaAdVideosResponse {
-  data: MetaAdVideo[]
-}
-
-export async function fetchAdVideoPicturesById(
-  videoIds: string[]
+/**
+ * `thumbnail_url` on an ad creative defaults to 64×64.
+ * `thumbnail_width` / `thumbnail_height` return a frame sharp enough for the cards.
+ */
+export async function fetchSharpCreativeThumbnails(
+  creativeIds: string[]
 ): Promise<Map<string, string>> {
-  const uniqueIds = [...new Set(videoIds.filter(Boolean))]
-  const pictureMap = new Map<string, string>()
+  const uniqueIds = [...new Set(creativeIds.filter(Boolean))]
+  const thumbMap = new Map<string, string>()
 
   if (uniqueIds.length === 0) {
-    return pictureMap
+    return thumbMap
   }
 
-  const api = getMetaClient()
-  const BATCH_SIZE = 50
+  const BATCH_SIZE = 25
 
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
     const chunk = uniqueIds.slice(i, i + BATCH_SIZE)
 
     try {
-      const response = await api.get<MetaAdVideosResponse>("/advideos", {
-        params: {
-          video_ids: JSON.stringify(chunk),
-          fields: "id,picture",
-        },
-      })
+      const data = await metaGraphGet<
+        Record<string, { thumbnail_url?: string }>
+      >(
+        buildMetaGraphUrl("", {
+          ids: chunk.join(","),
+          fields: "thumbnail_url",
+          thumbnail_width: SHARP_THUMB_WIDTH,
+          thumbnail_height: SHARP_THUMB_HEIGHT,
+        })
+      )
 
-      for (const video of response.data.data ?? []) {
-        if (video.picture) {
-          pictureMap.set(video.id, video.picture)
+      for (const [id, creative] of Object.entries(data)) {
+        if (creative?.thumbnail_url) {
+          thumbMap.set(id, creative.thumbnail_url)
         }
       }
     } catch (error) {
-      console.error("Error fetching ad video pictures batch:", error)
+      console.error("Error fetching sharp creative thumbnails:", error)
     }
   }
 
-  return pictureMap
+  return thumbMap
 }
 
 export function resolveCreativeMediaUrls(

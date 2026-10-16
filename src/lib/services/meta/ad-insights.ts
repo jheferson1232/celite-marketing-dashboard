@@ -1,6 +1,6 @@
 import {
   fetchAdImageUrlsByHash,
-  fetchAdVideoPicturesById,
+  fetchSharpCreativeThumbnails,
   pickDisplayImageUrl,
   resolveCreativeMediaUrls,
 } from "./creative-media"
@@ -25,7 +25,7 @@ const AD_INSIGHTS_TTL_MS = 2 * 60 * 1000
 export async function getAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
-  const cacheKey = `ad-insights:v2:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `ad-insights:v4:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, AD_INSIGHTS_TTL_MS, () =>
     fetchAdInsights(dateRange)
   )
@@ -145,20 +145,21 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
   })
 
   const videoIds = [...new Set(videoIdMap.values())]
+  const creativeIds = [...creativeMap.values()].map((creative) => creative.id)
   let videoUrlMap = new Map<string, string>()
   let imageHashMap = new Map<string, string>()
-  let videoPictureMap = new Map<string, string>()
+  let sharpThumbMap = new Map<string, string>()
 
   try {
-    const [hashUrls, pictures, sources] = await Promise.all([
+    const [hashUrls, sharpThumbs, sources] = await Promise.all([
       fetchAdImageUrlsByHash(imageHashes),
-      fetchAdVideoPicturesById(videoIds),
+      fetchSharpCreativeThumbnails(creativeIds),
       videoIds.length > 0
         ? fetchVideoSourcesByIds(videoIds)
         : Promise.resolve(new Map<string, string>()),
     ])
     imageHashMap = hashUrls
-    videoPictureMap = pictures
+    sharpThumbMap = sharpThumbs
     videoUrlMap = sources
   } catch (error) {
     console.error("Error fetching creative media:", error)
@@ -171,15 +172,20 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
     const vId = videoIdMap.get(adId)
     const creative = creativeMap.get(adId)
     const media = creative
-      ? resolveCreativeMediaUrls(creative, imageHashMap, videoPictureMap)
+      ? resolveCreativeMediaUrls(creative, imageHashMap)
       : { thumbnailUrl: "", imageUrl: undefined }
 
-    const displayUrl = pickDisplayImageUrl(media.thumbnailUrl, media.imageUrl)
+    const sharpThumb = creative?.id ? sharpThumbMap.get(creative.id) : undefined
+    const isVideo = Boolean(vId)
+    const displayUrl =
+      isVideo && sharpThumb
+        ? sharpThumb
+        : pickDisplayImageUrl(media.thumbnailUrl, media.imageUrl)
 
     return {
       ...r,
       thumbnail_url: displayUrl,
-      image_url: media.imageUrl || displayUrl,
+      image_url: isVideo && sharpThumb ? sharpThumb : media.imageUrl || displayUrl,
       video_url: vId ? videoUrlMap.get(vId) || "" : "",
       video_id: vId || "",
       effective_status: statusMap.get(adId) || "",

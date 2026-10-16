@@ -4,7 +4,7 @@ import axios from "axios"
 import { createServerAction } from "@/lib/server-action"
 import {
   fetchAdImageUrlsByHash,
-  fetchAdVideoPicturesById,
+  fetchSharpCreativeThumbnails,
   pickDisplayImageUrl,
   resolveCreativeMediaUrls,
 } from "@/lib/services/meta/creative-media"
@@ -124,13 +124,13 @@ export const getCreativesList = createServerAction(
       return hashes
     })
 
-    const videoIds = [...aggregates.values()]
-      .map(({ creative }) => creative.video_id)
-      .filter((id): id is string => Boolean(id))
+    const creativeIds = [...aggregates.values()].map(
+      ({ creative }) => creative.id
+    )
 
-    const [imageHashMap, videoPictureMap] = await Promise.all([
+    const [imageHashMap, sharpThumbMap] = await Promise.all([
       fetchAdImageUrlsByHash(imageHashes),
-      fetchAdVideoPicturesById(videoIds),
+      fetchSharpCreativeThumbnails(creativeIds),
     ])
 
     return [...aggregates.values()]
@@ -147,17 +147,22 @@ export const getCreativesList = createServerAction(
           const mediaType = creative.video_id ? "video" : "image"
           const { thumbnailUrl, imageUrl } = resolveCreativeMediaUrls(
             creative,
-            imageHashMap,
-            videoPictureMap
+            imageHashMap
           )
-
-          const displayUrl = pickDisplayImageUrl(thumbnailUrl, imageUrl)
+          const sharpThumb = sharpThumbMap.get(creative.id)
+          const displayUrl =
+            mediaType === "video" && sharpThumb
+              ? sharpThumb
+              : pickDisplayImageUrl(thumbnailUrl, imageUrl)
 
           return {
             id: creative.id,
             name: creative.name || creative.title || "Sin nombre",
             thumbnailUrl: displayUrl,
-            imageUrl: imageUrl || displayUrl,
+            imageUrl:
+              mediaType === "video" && sharpThumb
+                ? sharpThumb
+                : imageUrl || displayUrl,
             videoId: creative.video_id,
             mediaType,
             totalSpend,
