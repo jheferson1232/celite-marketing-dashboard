@@ -327,9 +327,7 @@ function buildPlatformDimension(rows: BreakdownRow[]): AudienceDimension {
     totalSpend,
     totalPurchases,
     showCoverage: false,
-    cpaAvailable: false,
-    coverageNote:
-      "Distribución por gasto. CPA por placement no disponible en Meta API.",
+    cpaAvailable: true,
   }
 }
 
@@ -348,9 +346,7 @@ function buildNetworkDimension(rows: BreakdownRow[]): AudienceDimension {
     totalSpend,
     totalPurchases,
     showCoverage: false,
-    cpaAvailable: false,
-    coverageNote:
-      "Distribución por gasto. CPA por red no disponible en Meta API.",
+    cpaAvailable: true,
   }
 }
 
@@ -368,7 +364,7 @@ function buildRegionDimension(rows: BreakdownRow[]): AudienceDimension {
     totalSpend,
     totalPurchases,
     showCoverage: false,
-    cpaAvailable: false,
+    cpaAvailable: true,
     coverageNote:
       "Meta API expone regiones/departamentos, no ciudades específicas.",
   }
@@ -409,7 +405,7 @@ async function fetchAudienceBreakdowns(
 export async function getMetaAudienceBreakdowns(
   dateRange: DateRange
 ): Promise<AudienceBreakdowns> {
-  const cacheKey = `meta-audience:v2:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `meta-audience:v3:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, AUDIENCE_TTL_MS, () =>
     fetchAudienceBreakdowns(dateRange)
   )

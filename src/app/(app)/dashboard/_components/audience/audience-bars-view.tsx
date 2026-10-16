@@ -16,10 +16,12 @@ function segmentMetaLine(
     parts.push(`${formatAudiencePurchases(segment.purchases)} ventas`)
   }
 
+  if (segment.spend > 0) {
+    parts.push(formatAudienceSpend(segment.spend))
+  }
+
   if (cpaAvailable && segment.cpa > 0) {
     parts.push(`CPA ${formatAudienceCpa(segment.cpa)}`)
-  } else if (segment.spend > 0) {
-    parts.push(formatAudienceSpend(segment.spend))
   }
 
   return parts.join(" · ")
