@@ -372,6 +372,7 @@ type SparkCreative = {
   itemId: string
   identityId: string
   identityType: string
+  identityAuthorizedBcId: string | null
 }
 
 type AdCreativeRef = LibraryCreative | SparkCreative
@@ -420,6 +421,7 @@ async function resolveAdCreativeForAdgroup(
       itemId: sparkItemId,
       identityId,
       identityType,
+      identityAuthorizedBcId: post?.identityAuthorizedBcId?.trim() || null,
     }
   }
 
@@ -507,6 +509,9 @@ async function createAdgroupAndAd(
           ad_format: "SINGLE_VIDEO",
           identity_type: creative.identityType,
           identity_id: creative.identityId,
+          ...(creative.identityAuthorizedBcId
+            ? { identity_authorized_bc_id: creative.identityAuthorizedBcId }
+            : {}),
           tiktok_item_id: creative.itemId,
           ...(creative.identityType.toUpperCase() === "AUTH_CODE"
             ? { creative_authorized: true }

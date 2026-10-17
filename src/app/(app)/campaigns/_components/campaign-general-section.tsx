@@ -20,11 +20,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getTikTokVideoSourceAction } from "@/app/(app)/dashboard/_actions/tiktok-video-source"
 import { isTikTokMediaHostname } from "@/lib/services/sociavault/tiktok-media-hosts"
 import {
-  compareTikTokVideosByDateDesc,
   formatTikTokVideoCreateTime,
   isTikTokPostVideoAsset,
   toSparkVideoSelectionId,
   type TikTokAdVideoAsset,
+  type TikTokProfileVideoAccount,
 } from "@/lib/services/tiktok/ad-video-asset"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
@@ -181,6 +181,106 @@ function TikTokAdVideoPreviewDialog({
   )
 }
 
+function CampaignTikTokVideoGrid({
+  videos,
+  selectedIds,
+  disabled,
+  onToggle,
+  onPreview,
+}: {
+  videos: TikTokAdVideoAsset[]
+  selectedIds: Set<string>
+  disabled?: boolean
+  onToggle: (videoId: string, checked: boolean) => void
+  onPreview: (video: TikTokAdVideoAsset) => void
+}) {
+  return (
+    <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3">
+      {videos.map((video) => {
+        const checked = selectedIds.has(video.id)
+        const durationLabel = formatVideoDuration(video.durationMs)
+        const dateLabel = formatTikTokVideoCreateTime(video.createTime)
+        const profileName = video.profileName?.trim()
+        const caption = video.name?.trim()
+        const profileLabel = profileName
+          ? `@${profileName.replace(/^@/, "")}`
+          : caption || "Video TikTok"
+        const titleLabel =
+          caption && caption !== profileName && caption !== profileLabel
+            ? caption
+            : profileLabel
+
+        return (
+          <div
+            key={video.id}
+            className={cn(
+              "relative flex flex-col gap-1.5 rounded-lg border p-2 transition-colors",
+              checked ? "border-primary bg-primary/5" : "hover:bg-muted/40"
+            )}
+          >
+            <div className="bg-muted relative aspect-[9/16] w-full overflow-hidden rounded-md">
+              {video.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={proxyTikTokMedia(video.coverUrl)}
+                  alt={profileLabel}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="text-muted-foreground flex size-full items-center justify-center text-[10px]">
+                  Sin cover
+                </div>
+              )}
+
+              {durationLabel ? (
+                <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums">
+                  {durationLabel}
+                </span>
+              ) : null}
+
+              <Checkbox
+                checked={checked}
+                disabled={disabled}
+                aria-label={`Seleccionar post de ${profileLabel}`}
+                className={cn(
+                  "absolute right-1.5 top-1.5 z-10 border-background bg-background/90 shadow-sm",
+                  checked && "border-primary data-[state=checked]:bg-primary"
+                )}
+                onCheckedChange={(value) => onToggle(video.id, value === true)}
+              />
+
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="absolute bottom-1.5 right-1.5 z-10 size-8 rounded-full shadow-sm"
+                aria-label={`Reproducir post de ${profileLabel}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onPreview(video)
+                }}
+              >
+                <RiPlayFill className="size-4" />
+              </Button>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="truncate text-xs font-medium leading-snug">
+                {titleLabel}
+              </span>
+              {dateLabel ? (
+                <span className="text-muted-foreground text-[11px] tabular-nums">
+                  {dateLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function CampaignGeneralSection({
   name,
   status,
@@ -232,12 +332,12 @@ export function CampaignGeneralSection({
   })
 
   const {
-    data: tikTokVideos = [],
+    data: videoCatalog,
     isLoading: videosLoading,
     isError: videosError,
     error: videosErrorDetail,
   } = useQuery({
-    queryKey: ["tiktok-profile-videos", "mokado.co"],
+    queryKey: ["tiktok-profile-videos", "mokado.co", "mokadomkd", "v3"],
     queryFn: () => runServerAction(listTikTokAdVideosAction()),
     staleTime: 2 * 60 * 1000,
   })
@@ -273,31 +373,37 @@ export function CampaignGeneralSection({
     sparkPreviewQuery.isFetching,
   ])
 
-  const tikTokPostVideos = useMemo(() => {
-    const byId = new Map(tikTokVideos.map((video) => [video.id, video]))
+  const videoAccounts = useMemo(() => {
+    const accounts: TikTokProfileVideoAccount[] = (
+      videoCatalog?.accounts ?? []
+    ).map((account) => ({
+      ...account,
+      videos: [...account.videos],
+    }))
+    const knownIds = new Set(
+      accounts.flatMap((account) => account.videos.map((video) => video.id))
+    )
     const sparkPreview = sparkPreviewQuery.data
 
     for (const id of selectedTikTokVideoIds) {
-      if (byId.has(id)) continue
-      const fromList = tikTokVideos.find((video) => video.id === id)
-      if (fromList) {
-        byId.set(id, fromList)
-        continue
-      }
+      if (knownIds.has(id)) continue
 
       const previewMatches =
         sparkPreview?.itemId != null &&
         toSparkVideoSelectionId(sparkPreview.itemId) === id
-
-      byId.set(id, {
+      const profileName = previewMatches
+        ? sparkPreview.userName?.replace(/^@/, "").trim() || null
+        : null
+      const video: TikTokAdVideoAsset = {
         id,
         name: previewMatches
           ? sparkPreview.userName || "Post autorizado"
           : "Seleccionado",
-        profileName: previewMatches ? sparkPreview.userName : null,
+        profileName,
         itemId: previewMatches ? sparkPreview.itemId : null,
         identityId: null,
         identityType: previewMatches ? "AUTH_CODE" : null,
+        identityAuthorizedBcId: null,
         coverUrl: previewMatches ? sparkPreview.coverUrl : null,
         previewUrl: previewMatches ? sparkPreview.videoUrl : null,
         durationMs: null,
@@ -305,11 +411,34 @@ export function CampaignGeneralSection({
         height: null,
         format: null,
         createTime: null,
-      })
+      }
+
+      const username = profileName?.toLowerCase()
+      const account = username
+        ? accounts.find((row) => row.username.toLowerCase() === username)
+        : undefined
+
+      if (account) {
+        account.videos = [video, ...account.videos]
+      } else {
+        accounts.push({
+          username: username || "codigo",
+          displayName: profileName || "Código de autorización",
+          linked: true,
+          error: null,
+          videos: [video],
+        })
+      }
+      knownIds.add(id)
     }
 
-    return [...byId.values()].sort(compareTikTokVideosByDateDesc)
-  }, [selectedTikTokVideoIds, sparkPreviewQuery.data, tikTokVideos])
+    return accounts
+  }, [selectedTikTokVideoIds, sparkPreviewQuery.data, videoCatalog])
+
+  const totalTikTokVideos = videoAccounts.reduce(
+    (count, account) => count + account.videos.length,
+    0
+  )
 
   function toggleTikTokVideo(videoId: string, checked: boolean) {
     if (checked) {
@@ -455,119 +584,71 @@ export function CampaignGeneralSection({
       <div className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <label className="text-sm font-medium">
-              Videos de @mokado.co
-            </label>
+            <label className="text-sm font-medium">Videos de TikTok</label>
             <p className="text-xs text-muted-foreground">
-              Videos publicados en esa cuenta de TikTok. Cada uno seleccionado
-              crea un conjunto al lanzar.
+              Videos publicados en @mokado.co y @mokadomkd. Cada uno
+              seleccionado crea un conjunto al lanzar.
             </p>
           </div>
-          {tikTokPostVideos.length > 0 ? (
+          {totalTikTokVideos > 0 ? (
             <span className="text-muted-foreground text-xs">
-              {selectedTikTokVideoIds.length}/{tikTokPostVideos.length}{" "}
-              seleccionados
+              {selectedTikTokVideoIds.length}/{totalTikTokVideos} seleccionados
             </span>
           ) : null}
         </div>
 
         {videosLoading ? (
           <p className="text-muted-foreground text-sm">
-            Cargando videos de @mokado.co…
+            Cargando videos de @mokado.co y @mokadomkd…
           </p>
         ) : videosError ? (
           <p className="text-sm text-destructive">
             {videosErrorDetail instanceof Error
               ? videosErrorDetail.message
-              : "No se pudieron cargar los videos de @mokado.co"}
+              : "No se pudieron cargar los videos de TikTok"}
           </p>
-        ) : tikTokPostVideos.length === 0 ? (
+        ) : videoAccounts.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No hay videos de @mokado.co en esta cuenta de TikTok Ads.
+            No hay videos en las cuentas vinculadas de TikTok Ads.
           </p>
         ) : (
-          <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3">
-            {tikTokPostVideos.map((video) => {
-              const checked = selectedTikTokSet.has(video.id)
-              const durationLabel = formatVideoDuration(video.durationMs)
-              const dateLabel = formatTikTokVideoCreateTime(video.createTime)
-              const profileName = video.profileName?.trim()
-              const caption = video.name?.trim()
-              const profileLabel = profileName
-                ? `@${profileName.replace(/^@/, "")}`
-                : caption || "Video TikTok"
-              const titleLabel =
-                caption && caption !== profileName && caption !== profileLabel
-                  ? caption
-                  : profileLabel
+          <div className="space-y-4">
+            {videoAccounts.map((account) => {
+              const selectedInAccount = account.videos.filter((video) =>
+                selectedTikTokSet.has(video.id)
+              ).length
+              const accountLabel = `@${account.username.replace(/^@/, "")}`
+
               return (
-                <div
-                  key={video.id}
-                  className={cn(
-                    "relative flex flex-col gap-1.5 rounded-lg border p-2 transition-colors",
-                    checked
-                      ? "border-primary bg-primary/5"
-                      : "hover:bg-muted/40"
-                  )}
-                >
-                  <div className="bg-muted relative aspect-[9/16] w-full overflow-hidden rounded-md">
-                    {video.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={proxyTikTokMedia(video.coverUrl)}
-                        alt={profileLabel}
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-muted-foreground flex size-full items-center justify-center text-[10px]">
-                        Sin cover
-                      </div>
-                    )}
-
-                    {durationLabel ? (
-                      <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums">
-                        {durationLabel}
+                <div key={account.username} className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium">{accountLabel}</p>
+                    {account.videos.length > 0 ? (
+                      <span className="text-muted-foreground text-xs tabular-nums">
+                        {selectedInAccount}/{account.videos.length}
                       </span>
                     ) : null}
-
-                    <Checkbox
-                      checked={checked}
+                  </div>
+                  {account.error ? (
+                    <p className="text-sm text-destructive">{account.error}</p>
+                  ) : !account.linked ? (
+                    <p className="text-muted-foreground text-sm">
+                      {accountLabel} no está vinculada para anuncios en esta
+                      cuenta de TikTok Ads.
+                    </p>
+                  ) : account.videos.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      No hay videos de {accountLabel}.
+                    </p>
+                  ) : (
+                    <CampaignTikTokVideoGrid
+                      videos={account.videos}
+                      selectedIds={selectedTikTokSet}
                       disabled={disabled}
-                      aria-label={`Seleccionar post de ${profileLabel}`}
-                      className={cn(
-                        "absolute right-1.5 top-1.5 z-10 border-background bg-background/90 shadow-sm",
-                        checked && "border-primary data-[state=checked]:bg-primary"
-                      )}
-                      onCheckedChange={(value) =>
-                        toggleTikTokVideo(video.id, value === true)
-                      }
+                      onToggle={toggleTikTokVideo}
+                      onPreview={setPreviewVideo}
                     />
-
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="secondary"
-                      className="absolute bottom-1.5 right-1.5 z-10 size-8 rounded-full shadow-sm"
-                      aria-label={`Reproducir post de ${profileLabel}`}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        setPreviewVideo(video)
-                      }}
-                    >
-                      <RiPlayFill className="size-4" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="truncate text-xs font-medium leading-snug">
-                      {titleLabel}
-                    </span>
-                    {dateLabel ? (
-                      <span className="text-muted-foreground text-[11px] tabular-nums">
-                        {dateLabel}
-                      </span>
-                    ) : null}
-                  </div>
+                  )}
                 </div>
               )
             })}

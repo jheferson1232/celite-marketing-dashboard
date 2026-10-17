@@ -11,10 +11,15 @@ import {
   compareTikTokVideosByDateDesc,
   toSparkVideoSelectionId,
   type TikTokAdVideoAsset,
+  type TikTokProfileVideoAccount,
 } from "./ad-video-asset"
 
-/** Cuenta orgánica autorizada para anuncios en el formulario de campaña. */
-const PROFILE_USERNAME = "mokado.co"
+/** Cuentas orgánicas autorizadas para anuncios en el formulario de campaña. */
+const PROFILE_USERNAMES = ["mokado.co", "mokadomkd"] as const
+
+export type TikTokProfileVideoCatalog = {
+  accounts: TikTokProfileVideoAccount[]
+}
 const VIDEOS_TTL_MS = 2 * 60 * 1000
 const IDENTITY_PAGE_SIZE = 100
 const VIDEO_PAGE_SIZE = 20
@@ -24,6 +29,7 @@ const MAX_VIDEO_PAGES = 40
 type TikTokIdentityRow = {
   identity_id?: string
   identity_type?: string
+  identity_authorized_bc_id?: string | null
   username?: string | null
   display_name?: string | null
   can_pull_video?: boolean | null
@@ -48,6 +54,7 @@ type IdentityVideoRow = {
 type ProfileIdentity = {
   identityId: string
   identityType: string
+  identityAuthorizedBcId: string | null
   username: string
   displayName: string
 }
@@ -96,6 +103,7 @@ function mapProfileVideo(
     itemId,
     identityId: identity.identityId,
     identityType: identity.identityType,
+    identityAuthorizedBcId: identity.identityAuthorizedBcId,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs: durationSec != null ? Math.round(durationSec * 1000) : null,
@@ -107,8 +115,22 @@ function mapProfileVideo(
   }
 }
 
-async function findProfileIdentity(): Promise<ProfileIdentity> {
+function profileAccountLabel(): string {
+  return PROFILE_USERNAMES.map((username) => `@${username}`).join(" y ")
+}
+
+function identityRank(identityType: string): number {
+  if (identityType === "TT_USER") return 0
+  if (identityType === "BC_AUTH_TT") return 1
+  return 2
+}
+
+async function findCampaignProfileIdentities(): Promise<
+  Map<string, ProfileIdentity>
+> {
   const { client, advertiserId } = await getTikTokRequestContext()
+  const wanted = new Set<string>(PROFILE_USERNAMES)
+  const found = new Map<string, ProfileIdentity>()
   let page = 1
   let totalPage = 1
 
@@ -126,37 +148,50 @@ async function findProfileIdentity(): Promise<ProfileIdentity> {
       },
     })
 
-    const match = (data.data.identity_list ?? []).find((row) => {
-      const username = row.username?.trim().toLowerCase()
-      return (
-        username === PROFILE_USERNAME &&
-        row.identity_type === "TT_USER" &&
-        row.can_pull_video !== false &&
-        Boolean(row.identity_id?.trim())
-      )
-    })
+    for (const row of data.data.identity_list ?? []) {
+      const username = row.username?.trim().toLowerCase() ?? ""
+      if (!wanted.has(username)) continue
+      const identityType = row.identity_type?.trim() ?? ""
+      if (identityType !== "TT_USER" && identityType !== "BC_AUTH_TT") continue
+      if (row.can_pull_video === false) continue
+      const identityId = row.identity_id?.trim()
+      if (!identityId) continue
+      const identityAuthorizedBcId =
+        identityType === "BC_AUTH_TT"
+          ? row.identity_authorized_bc_id?.trim() || null
+          : null
+      if (identityType === "BC_AUTH_TT" && !identityAuthorizedBcId) continue
 
-    if (match?.identity_id) {
-      return {
-        identityId: match.identity_id.trim(),
-        identityType: "TT_USER",
-        username: PROFILE_USERNAME,
-        displayName: match.display_name?.trim() || PROFILE_USERNAME,
+      const current = found.get(username)
+      if (current && identityRank(current.identityType) <= identityRank(identityType)) {
+        continue
       }
+
+      found.set(username, {
+        identityId,
+        identityType,
+        identityAuthorizedBcId,
+        username,
+        displayName: row.display_name?.trim() || username,
+      })
     }
+
+    const hasPreferredIdentity = PROFILE_USERNAMES.every(
+      (username) => found.get(username)?.identityType === "TT_USER"
+    )
+    if (hasPreferredIdentity) break
 
     totalPage = data.data.page_info?.total_page ?? 1
     page += 1
   }
 
-  throw new Error(
-    `La cuenta @${PROFILE_USERNAME} no está vinculada para anuncios en esta cuenta de TikTok Ads.`
-  )
+  return found
 }
 
-async function fetchProfileVideos(): Promise<TikTokAdVideoAsset[]> {
+async function fetchIdentityVideos(
+  identity: ProfileIdentity
+): Promise<TikTokAdVideoAsset[]> {
   const { client, advertiserId } = await getTikTokRequestContext()
-  const identity = await findProfileIdentity()
   const byId = new Map<string, TikTokAdVideoAsset>()
   let cursor = ""
   let page = 0
@@ -174,6 +209,9 @@ async function fetchProfileVideos(): Promise<TikTokAdVideoAsset[]> {
         identity_id: identity.identityId,
         identity_type: identity.identityType,
         count: VIDEO_PAGE_SIZE,
+        ...(identity.identityAuthorizedBcId
+          ? { identity_authorized_bc_id: identity.identityAuthorizedBcId }
+          : {}),
         ...(cursor ? { cursor } : {}),
       },
     })
@@ -193,12 +231,68 @@ async function fetchProfileVideos(): Promise<TikTokAdVideoAsset[]> {
   return [...byId.values()].sort(compareTikTokVideosByDateDesc)
 }
 
-/** Videos publicados en @mokado.co, disponibles para anuncios. */
-export async function listTikTokProfileVideos(): Promise<TikTokAdVideoAsset[]> {
-  const cacheKey = await buildTikTokCacheKey(
-    `profile-videos:${PROFILE_USERNAME}:v1`
+function accountLoadError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message
+  return "No se pudieron cargar los videos de esta cuenta."
+}
+
+async function fetchProfileVideoCatalog(): Promise<TikTokProfileVideoCatalog> {
+  const identities = await findCampaignProfileIdentities()
+  if (identities.size === 0) {
+    throw new Error(
+      `Ninguna de las cuentas ${profileAccountLabel()} está vinculada para anuncios en esta cuenta de TikTok Ads.`
+    )
+  }
+
+  const loaded = await Promise.all(
+    PROFILE_USERNAMES.map(async (username) => {
+      const identity = identities.get(username)
+      if (!identity) {
+        return {
+          username,
+          displayName: username,
+          linked: false,
+          error: null,
+          videos: [],
+        } satisfies TikTokProfileVideoAccount
+      }
+
+      try {
+        const videos = await fetchIdentityVideos(identity)
+        return {
+          username,
+          displayName: identity.displayName,
+          linked: true,
+          error: null,
+          videos,
+        } satisfies TikTokProfileVideoAccount
+      } catch (error) {
+        return {
+          username,
+          displayName: identity.displayName,
+          linked: true,
+          error: accountLoadError(error),
+          videos: [],
+        } satisfies TikTokProfileVideoAccount
+      }
+    })
   )
-  return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchProfileVideos)
+
+  return { accounts: loaded }
+}
+
+/** Videos de @mokado.co y @mokadomkd, disponibles para anuncios. */
+export async function listTikTokProfileVideoCatalog(): Promise<TikTokProfileVideoCatalog> {
+  const cacheKey = await buildTikTokCacheKey(
+    `profile-videos:${PROFILE_USERNAMES.join("+")}:v3`
+  )
+  return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchProfileVideoCatalog)
+}
+
+/** Videos publicados en las cuentas orgánicas vinculadas. */
+export async function listTikTokProfileVideos(): Promise<TikTokAdVideoAsset[]> {
+  const catalog = await listTikTokProfileVideoCatalog()
+  return catalog.accounts.flatMap((account) => account.videos)
 }
 
 export async function getTikTokProfileVideoByItemId(

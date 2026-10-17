@@ -75,6 +75,7 @@ function mapSparkRow(row: SparkListRow): TikTokAdVideoAsset | null {
     itemId,
     identityId: row.user_info?.identity_id?.trim() || null,
     identityType: row.user_info?.identity_type?.trim() || null,
+    identityAuthorizedBcId: null,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs: durationSec != null ? Math.round(durationSec * 1000) : null,

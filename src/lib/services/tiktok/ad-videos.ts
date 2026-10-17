@@ -71,6 +71,7 @@ function mapVideoRow(row: TikTokVideoSearchRow): TikTokAdVideoAsset | null {
     itemId: null,
     identityId: null,
     identityType: null,
+    identityAuthorizedBcId: null,
     coverUrl: rawCover ? normalizeTikTokMediaUrl(rawCover) : null,
     previewUrl: rawPreview ? normalizeTikTokMediaUrl(rawPreview) : null,
     durationMs:
@@ -121,8 +122,8 @@ export async function listTikTokAdVideos(): Promise<TikTokAdVideoAsset[]> {
   return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchTikTokAdVideos)
 }
 
-/** Videos de @mokado.co autorizados para anuncios. Sin biblioteca de archivos. */
-export async function listTikTokCampaignVideos(): Promise<TikTokAdVideoAsset[]> {
-  const { listTikTokProfileVideos } = await import("./profile-videos")
-  return listTikTokProfileVideos()
+/** Videos de las cuentas orgánicas vinculadas. Sin biblioteca de archivos. */
+export async function listTikTokCampaignVideos() {
+  const { listTikTokProfileVideoCatalog } = await import("./profile-videos")
+  return listTikTokProfileVideoCatalog()
 }

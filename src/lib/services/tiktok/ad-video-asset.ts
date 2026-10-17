@@ -10,6 +10,8 @@ export type TikTokAdVideoAsset = {
   /** Identidad Spark Ads asociada al post. */
   identityId: string | null
   identityType: string | null
+  /** Business Center que autoriza una identidad BC_AUTH_TT. */
+  identityAuthorizedBcId: string | null
   coverUrl: string | null
   previewUrl: string | null
   durationMs: number | null
@@ -17,6 +19,15 @@ export type TikTokAdVideoAsset = {
   height: number | null
   format: string | null
   createTime: string | null
+}
+
+/** Cuenta orgánica de TikTok vinculada para elegir videos en una campaña. */
+export type TikTokProfileVideoAccount = {
+  username: string
+  displayName: string
+  linked: boolean
+  error: string | null
+  videos: TikTokAdVideoAsset[]
 }
 
 export function toSparkVideoSelectionId(itemId: string): string {
