@@ -1,17 +1,15 @@
 "use server"
 
 import { createServerAction } from "@/lib/server-action"
-import { getBufferBoard, type BufferBoard } from "@/lib/services/buffer/buffer"
 import {
-  getBufferPostInvestments,
-  type BufferPostInvestmentInput,
-} from "@/lib/services/buffer/post-investment"
+  getSavedBufferSnapshot,
+  refreshBufferSnapshot,
+} from "@/lib/services/buffer/buffer-store"
 
-export const getBufferBoardAction = createServerAction(
-  async (organizationId: string | null): Promise<BufferBoard> =>
-    getBufferBoard(organizationId)
+export const getSavedBufferSnapshotAction = createServerAction(async () =>
+  getSavedBufferSnapshot()
 )
 
-export const getBufferTikTokInvestmentsAction = createServerAction(
-  async (posts: BufferPostInvestmentInput[]) => getBufferPostInvestments(posts)
+export const refreshBufferSnapshotAction = createServerAction(
+  async (organizationId: string | null) => refreshBufferSnapshot(organizationId)
 )

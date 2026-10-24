@@ -2,7 +2,7 @@ import { PrismaClient } from "@/app/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 /** Sube este número cuando cambie el schema y haya que invalidar el singleton en dev/serverless. */
-const PRISMA_CLIENT_VERSION = 25
+const PRISMA_CLIENT_VERSION = 26
 
 type GlobalPrismaStore = {
   prisma?: PrismaClient
@@ -81,6 +81,10 @@ function hasMetaAdAccountModel(client: PrismaClient) {
   return Boolean(client.metaAdAccount)
 }
 
+function hasBufferSnapshotModel(client: PrismaClient) {
+  return Boolean(client.bufferSnapshot)
+}
+
 export function getPrismaClient(forceNew = false): PrismaClient {
   if (
     !forceNew &&
@@ -98,7 +102,8 @@ export function getPrismaClient(forceNew = false): PrismaClient {
     hasMetaDashboardSettingsModel(globalStore.prisma) &&
     hasMetaCampaignOriginModel(globalStore.prisma) &&
     hasSummaryDashboardSettingsModel(globalStore.prisma) &&
-    hasMetaAdAccountModel(globalStore.prisma)
+    hasMetaAdAccountModel(globalStore.prisma) &&
+    hasBufferSnapshotModel(globalStore.prisma)
   ) {
     return globalStore.prisma
   }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, isValid, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { RiCalendarScheduleLine, RiRefreshLine } from "@remixicon/react"
@@ -21,11 +21,11 @@ import {
 import { rememberBufferPosts } from "@/lib/services/buffer/match-post"
 import type { BufferPostInvestment } from "@/lib/services/buffer/post-investment"
 import {
-  getBufferBoardAction,
-  getBufferTikTokInvestmentsAction,
+  getSavedBufferSnapshotAction,
+  refreshBufferSnapshotAction,
 } from "../_actions/buffer"
 
-const BUFFER_QUERY_KEY = ["buffer-board"] as const
+const BUFFER_SNAPSHOT_KEY = ["buffer-snapshot"] as const
 
 const STATUS_LABEL: Record<BufferPostStatus, string> = {
   scheduled: "Programados",
@@ -103,44 +103,32 @@ export function BufferContent() {
   const [channelPicked, setChannelPicked] = useState(false)
   const [status, setStatus] = useState<BufferPostStatus>("sent")
   const organizationIdRef = useRef<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const boardQuery = useQuery({
-    queryKey: BUFFER_QUERY_KEY,
-    queryFn: () => runServerAction(getBufferBoardAction(organizationIdRef.current)),
-    enabled: false,
+  const snapshotQuery = useQuery({
+    queryKey: BUFFER_SNAPSHOT_KEY,
+    queryFn: () => runServerAction(getSavedBufferSnapshotAction()),
     staleTime: Infinity,
-    gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   })
 
-  const board = boardQuery.data
-  const tiktokPosts = useMemo(
-    () =>
-      (board?.posts ?? [])
-        .filter((post) => post.channelService.toLowerCase() === "tiktok")
-        .map((post) => ({
-          id: post.id,
-          text: post.text,
-          externalLink: post.externalLink,
-          thumbnail: post.assets.find((asset) => asset.thumbnail)?.thumbnail ?? null,
-        })),
-    [board?.posts]
-  )
-  const investmentsQuery = useQuery({
-    queryKey: ["buffer-tiktok-investments", "v2", tiktokPosts.map((post) => post.id).join(",")],
-    queryFn: () => runServerAction(getBufferTikTokInvestmentsAction(tiktokPosts)),
-    enabled: tiktokPosts.length > 0,
-    staleTime: 10 * 60 * 1000,
+  const refreshMutation = useMutation({
+    mutationFn: () =>
+      runServerAction(refreshBufferSnapshotAction(organizationIdRef.current)),
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(BUFFER_SNAPSHOT_KEY, snapshot)
+    },
   })
+
+  const snapshot = snapshotQuery.data
+  const board = snapshot?.board ?? null
   const investmentByPostId = useMemo(() => {
     const map = new Map<string, BufferPostInvestment>()
-    for (const investment of investmentsQuery.data ?? []) {
+    for (const investment of snapshot?.investments ?? []) {
       map.set(investment.postId, investment)
     }
     return map
-  }, [investmentsQuery.data])
+  }, [snapshot?.investments])
   organizationIdRef.current = organizationId ?? board?.organizations[0]?.id ?? null
 
   useEffect(() => {
@@ -183,38 +171,47 @@ export function BufferContent() {
             {board?.account.timezone ? ` · ${board.account.timezone}` : null}
           </p>
           <p className="text-muted-foreground text-xs">
-            Buffer solo se consulta al pulsar Actualizar.
-            {boardQuery.dataUpdatedAt
-              ? ` Última consulta: ${format(boardQuery.dataUpdatedAt, "d MMM yyyy, HH:mm", { locale: es })}.`
+            Los datos quedan guardados en el servidor. Buffer solo se consulta al
+            pulsar Actualizar.
+            {snapshot?.syncedAt
+              ? ` Última consulta guardada: ${format(parseISO(snapshot.syncedAt), "d MMM yyyy, HH:mm", { locale: es })}.`
               : null}
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
-          disabled={boardQuery.isFetching}
+          disabled={refreshMutation.isPending}
           onClick={() => {
-            void boardQuery.refetch()
+            refreshMutation.mutate()
           }}
         >
           <RiRefreshLine
-            className={cn("size-4", boardQuery.isFetching && "animate-spin")}
+            className={cn("size-4", refreshMutation.isPending && "animate-spin")}
           />
           Actualizar
         </Button>
       </div>
 
-      {boardQuery.isFetching && !board ? (
+      {refreshMutation.isError ? (
+        <p className="text-destructive text-sm">
+          {refreshMutation.error instanceof Error
+            ? refreshMutation.error.message
+            : "No se pudo actualizar Buffer. Se siguen mostrando los datos guardados."}
+        </p>
+      ) : null}
+
+      {snapshotQuery.isLoading && !board ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className="h-20" />
           ))}
         </div>
-      ) : boardQuery.isError ? (
+      ) : snapshotQuery.isError && !board ? (
         <p className="text-destructive text-sm">
-          {boardQuery.error instanceof Error
-            ? boardQuery.error.message
-            : "No se pudo cargar Buffer."}
+          {snapshotQuery.error instanceof Error
+            ? snapshotQuery.error.message
+            : "No se pudieron leer los datos guardados de Buffer."}
         </p>
       ) : board ? (
         <>
@@ -290,17 +287,16 @@ export function BufferContent() {
         </div>
       </Tabs>
 
-      {boardQuery.isFetching && !board ? (
+      {snapshotQuery.isLoading && !board ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className="h-24" />
           ))}
         </div>
-      ) : boardQuery.isError || !board ? (
+      ) : !board ? (
         <p className="text-muted-foreground text-sm">
-          {boardQuery.isError
-            ? "No se pudo consultar Buffer."
-            : "Todavía no hay datos. Pulsa Actualizar para consultar Buffer una vez."}
+          Todavía no hay datos guardados. Pulsa Actualizar para consultar Buffer
+          una vez.
         </p>
       ) : visiblePosts.length === 0 ? (
         <p className="text-muted-foreground text-sm">
@@ -324,7 +320,7 @@ export function BufferContent() {
               }
               investmentLoading={
                 post.channelService.toLowerCase() === "tiktok" &&
-                investmentsQuery.isFetching &&
+                refreshMutation.isPending &&
                 !investmentByPostId.has(post.id)
               }
             />

@@ -572,6 +572,17 @@ model TikTokCommentAgentRun {
   @@map("TikTokCommentAgentRun")
 }
 
+/** Última consulta de Buffer guardada en el servidor. */
+model BufferSnapshot {
+  id          String   @id @default("default")
+  board       Json
+  investments Json
+  syncedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("BufferSnapshot")
+}
+
 /** Decisión del agente por comentario TikTok (dedupe por tiktokCommentId). */
 model TikTokCommentDecision {
   id             String   @id @default(cuid())

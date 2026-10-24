@@ -11,7 +11,7 @@ function getClient(): AxiosInstance {
   const apiKey = process.env.BUFFER_API_KEY?.trim()
   if (!apiKey) {
     throw new ServerActionError(
-      "Falta BUFFER_API_KEY. Agrégala en .env.local y reinicia el servidor."
+      "Falta BUFFER_API_KEY en este servidor. En local va en .env.local; en Vercel, en Environment Variables, y hay que volver a desplegar."
     )
   }
 
