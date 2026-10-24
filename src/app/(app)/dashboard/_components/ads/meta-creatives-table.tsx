@@ -25,6 +25,7 @@ import {
   type CurrencyCode,
 } from "@/lib/format"
 import type { AdInsightRow } from "@/lib/services/meta/types"
+import { matchBufferPost } from "@/lib/services/buffer/match-post"
 import { CreativePreviewImage } from "./creative-preview-image"
 import {
   type MetricKey,
@@ -146,6 +147,10 @@ function mergeMetaCreativeGroup(group: AdInsightRow[]): MergedMetaCreativeRow {
   base.image_url = best.image_url
   base.video_url = best.video_url
   base.video_id = best.video_id
+  base.body = group.find((row) => row.body?.trim())?.body ?? best.body
+  base.tiktok_item_id =
+    group.find((row) => row.tiktok_item_id?.trim())?.tiktok_item_id ??
+    best.tiktok_item_id
   base.url = pickUrlFromGroup(group)
   base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
   base.created_time = mergeEarliestCreatedTime(group) ?? best.created_time
@@ -361,6 +366,12 @@ export function MetaCreativesTable({
               currency,
               platform
             )
+            const bufferPost =
+              platform === "tiktok"
+                ? matchBufferPost({
+                    itemIds: [row.tiktok_item_id, row.video_id],
+                  })
+                : null
             const genderTotal =
               row.purchasesMale + row.purchasesFemale + row.purchasesUnknown
             const malePct = genderPurchasePercent(
@@ -377,10 +388,11 @@ export function MetaCreativesTable({
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="relative size-12 shrink-0 overflow-hidden rounded border bg-muted">
-                      {row.thumbnail_url || row.image_url ? (
+                      {row.thumbnail_url || row.image_url || bufferPost?.thumbnail ? (
                         <CreativePreviewImage
-                          thumbnailUrl={row.thumbnail_url}
-                          imageUrl={row.image_url}
+                          thumbnailUrl={row.thumbnail_url || bufferPost?.thumbnail}
+                          imageUrl={row.image_url || bufferPost?.thumbnail}
+                          fallbackUrl={bufferPost?.thumbnail}
                           alt=""
                           className="size-full"
                         />

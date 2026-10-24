@@ -37,6 +37,7 @@ import {
   pickUrlFromGroup,
   passesTikTokCreativeSpendFilter,
 } from "./utils"
+import { matchBufferPost } from "@/lib/services/buffer/match-post"
 import { CreativePreviewDialog } from "./creative-preview-dialog"
 import { CreativePreviewImage } from "./creative-preview-image"
 
@@ -128,6 +129,10 @@ function mergeRows(group: AdInsightRow[]): AdInsightRow {
   base.campaign_name = pickCampaignNameFromGroup(group) || best.campaign_name
   base.adset_name = pickAdsetNamesFromGroup(group) || best.adset_name
   base.created_time = mergeEarliestCreatedTime(group) ?? best.created_time
+  base.body = group.find((row) => row.body?.trim())?.body ?? best.body
+  base.tiktok_item_id =
+    group.find((row) => row.tiktok_item_id?.trim())?.tiktok_item_id ??
+    best.tiktok_item_id
 
   return base
 }
@@ -152,6 +157,18 @@ function CreativeCard({
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
   const hasVideo = Boolean(row.video_id || row.video_url)
   const displayTitle = getCreativeCardDisplayTitle(row, currency, platform)
+  const bufferPost =
+    platform === "tiktok"
+      ? matchBufferPost({
+          itemIds: [row.tiktok_item_id, row.video_id],
+        })
+      : null
+  const description = row.body?.trim() || bufferPost?.text || ""
+  const tiktokItemId =
+    row.tiktok_item_id ||
+    (row.video_id?.startsWith("spark:")
+      ? row.video_id.slice("spark:".length)
+      : bufferPost?.videoId)
 
   // We need to adapt AdInsightRow to CreativeRow for CreativePreviewDialog
   const creativeRowAdapter = {
@@ -162,6 +179,7 @@ function CreativeCard({
     imageUrl: row.image_url || row.thumbnail_url,
     videoId: row.video_id,
     videoUrl: row.video_url,
+    tiktokItemId,
     mediaType: (hasVideo ? "video" : "image") as "video" | "image",
     totalSpend: parseFloat(row.spend),
     impressions: parseInt(row.impressions),
@@ -181,8 +199,9 @@ function CreativeCard({
             className="group block w-full cursor-pointer transition-opacity hover:opacity-90"
           >
             <CreativePreviewImage
-              thumbnailUrl={row.thumbnail_url}
-              imageUrl={row.image_url}
+              thumbnailUrl={row.thumbnail_url || bufferPost?.thumbnail}
+              imageUrl={row.image_url || bufferPost?.thumbnail}
+              fallbackUrl={bufferPost?.thumbnail}
               alt={displayTitle}
               className="aspect-9/16 w-full"
             />
@@ -205,13 +224,23 @@ function CreativeCard({
         </div>
 
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <p className="truncate text-sm font-semibold" title={displayTitle}>
-              {displayTitle}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {adsCount} anuncio{adsCount === 1 ? "" : "s"}
-            </p>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold" title={displayTitle}>
+                {displayTitle}
+              </p>
+              <p className="shrink-0 text-xs text-muted-foreground">
+                {adsCount} anuncio{adsCount === 1 ? "" : "s"}
+              </p>
+            </div>
+            {description ? (
+              <p
+                className="line-clamp-2 text-xs text-muted-foreground"
+                title={description}
+              >
+                {description}
+              </p>
+            ) : null}
           </div>
 
           {row.url && (

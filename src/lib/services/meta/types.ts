@@ -259,6 +259,10 @@ export interface AdInsightRow {
   image_url?: string
   video_url: string
   video_id: string
+  /** Texto del post de TikTok (ad_text). */
+  body?: string
+  /** Id del video orgánico cuando el anuncio es Spark. */
+  tiktok_item_id?: string
   effective_status: string
   url: string
   created_time?: string
@@ -278,6 +282,8 @@ export interface CreativeRow {
   imageUrl?: string
   videoId?: string
   videoUrl?: string
+  /** Video orgánico de TikTok para el reproductor embebido. */
+  tiktokItemId?: string
   mediaType: "image" | "video"
   totalSpend: number
   impressions: number

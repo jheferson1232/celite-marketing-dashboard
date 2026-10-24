@@ -41,6 +41,7 @@ type IdentityVideoRow = {
   item_type?: string
   status?: string
   text?: string
+  is_ai_generated?: boolean
   video_info?: {
     poster_url?: string
     url?: string
@@ -99,6 +100,8 @@ function mapProfileVideo(
   return {
     id: toSparkVideoSelectionId(itemId),
     name: caption || `@${identity.username}`,
+    caption,
+    aiGenerated: row.is_ai_generated === true,
     profileName: identity.username,
     itemId,
     identityId: identity.identityId,
@@ -231,6 +234,41 @@ async function fetchIdentityVideos(
   return [...byId.values()].sort(compareTikTokVideosByDateDesc)
 }
 
+const BULK_CAPTION_REPEAT = 3
+const GENERATED_CAPTION =
+  /env[ií]o gratis|contraentrega|entrega r[aá]pida|entrega segura|sin costos ocultos|tenis c[oó]modos y duraderos|asegura tu pedido/i
+
+function captionKey(caption: string): string {
+  return caption.replace(/\s+/g, " ").trim().toLocaleLowerCase("es")
+}
+
+function looksLikePublishedPost(caption: string): boolean {
+  if (caption.includes("#")) return true
+  if (/https?:\/\//i.test(caption)) return true
+  return /\d{10,}/.test(caption.replace(/[\s().+-]/g, ""))
+}
+
+/** Oculta copias en lote (mismo pie genérico) y plantillas de envío que no son posts de la cuenta. */
+export function publishedTikTokProfileVideos(
+  videos: TikTokAdVideoAsset[]
+): TikTokAdVideoAsset[] {
+  const counts = new Map<string, number>()
+  for (const video of videos) {
+    const caption = video.caption?.trim()
+    if (!caption) continue
+    const key = captionKey(caption)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  return videos.filter((video) => {
+    if (video.aiGenerated) return false
+    const caption = video.caption?.trim() ?? ""
+    if (!caption || looksLikePublishedPost(caption)) return true
+    if ((counts.get(captionKey(caption)) ?? 0) >= BULK_CAPTION_REPEAT) return false
+    return !GENERATED_CAPTION.test(caption)
+  })
+}
+
 function accountLoadError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message
   return "No se pudieron cargar los videos de esta cuenta."
@@ -284,7 +322,7 @@ async function fetchProfileVideoCatalog(): Promise<TikTokProfileVideoCatalog> {
 /** Videos de @mokado.co y @mokadomkd, disponibles para anuncios. */
 export async function listTikTokProfileVideoCatalog(): Promise<TikTokProfileVideoCatalog> {
   const cacheKey = await buildTikTokCacheKey(
-    `profile-videos:${PROFILE_USERNAMES.join("+")}:v3`
+    `profile-videos:${PROFILE_USERNAMES.join("+")}:v4`
   )
   return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchProfileVideoCatalog)
 }

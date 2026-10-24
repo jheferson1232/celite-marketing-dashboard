@@ -24,6 +24,7 @@ import {
   launchCampaignFromCampaignAction,
   previewLaunchFromCampaignAction,
 } from "../_actions/campaigns"
+import { tikTokAccountCurrencyLabel } from "@/lib/services/tiktok/account-currency"
 
 type LaunchPhase = "loading" | "preview" | "launching" | "done" | "error"
 
@@ -191,7 +192,9 @@ export function CampaignLaunchDialog({
                       : "Presupuesto/conjunto"}
                   </dt>
                   <dd className="font-medium tabular-nums">
-                    {preflight.dailyBudget} COP
+                    {preflight.dailyBudget}{" "}
+                    {tikTokAccountCurrencyLabel(preflight.currency)}
+                    {preflight.accountName ? ` · ${preflight.accountName}` : ""}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">

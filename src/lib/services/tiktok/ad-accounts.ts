@@ -158,7 +158,7 @@ export async function getTikTokEnvAccountSummary(): Promise<TikTokEnvAccountSumm
 
 export async function connectTikTokAdAccount(input: {
   advertiserId: string
-  accessToken: string
+  accessToken?: string
   refreshToken?: string | null
   name?: string
   identityId?: string
@@ -167,13 +167,16 @@ export async function connectTikTokAdAccount(input: {
   assertTikTokAdAccountPrisma()
 
   const advertiserId = input.advertiserId.trim()
-  const accessToken = input.accessToken.trim()
+  const accessToken =
+    input.accessToken?.trim() || process.env.TIKTOK_ACCESS_TOKEN?.trim() || ""
 
   if (!/^\d+$/.test(advertiserId)) {
     throw new ServerActionError("El Advertiser ID debe ser numérico.")
   }
   if (!accessToken) {
-    throw new ServerActionError("El access token es obligatorio.")
+    throw new ServerActionError(
+      "No hay TIKTOK_ACCESS_TOKEN en el servidor para validar la cuenta."
+    )
   }
 
   let info: TikTokAdvertiserInfo

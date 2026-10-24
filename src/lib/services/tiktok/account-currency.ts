@@ -11,3 +11,9 @@ export function resolveTikTokAccountCurrency(
   if (normalized === "MXN" || normalized === "MX") return "MX"
   return TIKTOK_DASHBOARD_CURRENCY
 }
+
+/** Código visible del presupuesto (COP, PEN, MXN). */
+export function tikTokAccountCurrencyLabel(currency: CurrencyCode): string {
+  if (currency === "MX") return "MXN"
+  return currency
+}

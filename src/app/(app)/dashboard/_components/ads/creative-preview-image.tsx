@@ -9,6 +9,7 @@ import { RiImageLine } from "@remixicon/react"
 interface CreativePreviewImageProps {
   thumbnailUrl?: string
   imageUrl?: string
+  fallbackUrl?: string
   alt: string
   className?: string
 }
@@ -26,9 +27,10 @@ function toDisplayableMediaUrl(url: string): string {
 
 function buildSrcCandidates(
   thumbnailUrl?: string,
-  imageUrl?: string
+  imageUrl?: string,
+  fallbackUrl?: string
 ): string[] {
-  const raw = [imageUrl, thumbnailUrl].filter(Boolean) as string[]
+  const raw = [imageUrl, thumbnailUrl, fallbackUrl].filter(Boolean) as string[]
   const upscaled = raw.map((url) => pickDisplayImageUrl(url, url))
   const unique = new Set<string>()
   for (const url of [...raw, ...upscaled]) {
@@ -41,19 +43,20 @@ function buildSrcCandidates(
 export function CreativePreviewImage({
   thumbnailUrl,
   imageUrl,
+  fallbackUrl,
   alt,
   className,
 }: CreativePreviewImageProps) {
   const candidates = React.useMemo(
-    () => buildSrcCandidates(thumbnailUrl, imageUrl),
-    [thumbnailUrl, imageUrl]
+    () => buildSrcCandidates(thumbnailUrl, imageUrl, fallbackUrl),
+    [thumbnailUrl, imageUrl, fallbackUrl]
   )
   const [candidateIndex, setCandidateIndex] = React.useState(0)
   const src = candidates[candidateIndex]
 
   React.useEffect(() => {
     setCandidateIndex(0)
-  }, [thumbnailUrl, imageUrl])
+  }, [thumbnailUrl, imageUrl, fallbackUrl])
 
   if (!src) {
     return (

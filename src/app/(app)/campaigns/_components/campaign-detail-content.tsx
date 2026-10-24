@@ -31,7 +31,6 @@ import {
 import { CampaignDeleteDialog } from "./campaign-delete-dialog"
 import { CampaignGeneralSection } from "./campaign-general-section"
 import { CampaignLaunchDialog } from "./campaign-launch-dialog"
-import { CampaignVariantSelect } from "./campaign-variant-select"
 import {
   AboStrategyForm,
   type AboStrategyFormPayload,
@@ -389,8 +388,8 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,48rem)_minmax(16rem,1fr)_minmax(20rem,28rem)]">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
           <div className="space-y-2">
             <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
               <Link href="/campaigns">
@@ -429,12 +428,13 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
                 : "No se pudo eliminar"}
             </p>
           ) : null}
+        </div>
 
+        <div className="min-w-0 max-lg:order-2 lg:col-start-1 lg:row-start-2">
           <CampaignGeneralSection
             name={pendingName}
             status={pendingStatus}
             pixelId={pendingPixelId}
-            authCode={pendingAuthCode}
             selectedTikTokVideoIds={pendingTikTokVideoIds}
             disabled={saveMutation.isPending || strategyMutation.isPending}
             onNameChange={(name) => {
@@ -449,17 +449,14 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
               setPendingPixelId(pixelId)
               setSaveNotice(null)
             }}
-            onAuthCodeChange={(code) => {
-              setPendingAuthCode(code)
-              setSaveNotice(null)
-            }}
             onSelectedTikTokVideoIdsChange={(ids) => {
               setPendingTikTokVideoIds(ids)
               setSaveNotice(null)
             }}
           />
+        </div>
 
-          <section className="flex w-full max-w-3xl flex-col gap-4 rounded-xl border bg-muted/10 p-4">
+        <section className="flex min-w-0 w-full flex-col gap-4 rounded-xl border bg-muted/10 p-4 max-lg:order-3 lg:col-start-2 lg:row-start-2">
             <div>
               <h2 className="text-sm font-semibold">Estrategia</h2>
               <p className="text-xs text-muted-foreground">
@@ -495,18 +492,6 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
                 }
               </p>
             </div>
-
-            {campaign.strategy === "ABO" || campaign.strategy === "CBO" ? (
-              <CampaignVariantSelect
-                value={pendingVariantId}
-                disabled={saveMutation.isPending || strategyMutation.isPending}
-                onChange={(variantId, variantName) => {
-                  setPendingVariantId(variantId)
-                  setPendingVariantName(variantName)
-                  setSaveNotice(null)
-                }}
-              />
-            ) : null}
 
             {campaign.strategy === "ABO" && aboConfig && pendingAbo ? (
               <>
@@ -551,11 +536,9 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
                 ) : null}
               </>
             ) : null}
-          </section>
-        </div>
+        </section>
 
-        <aside className="flex w-full flex-col gap-3 lg:sticky lg:top-4">
-          <div className="flex flex-col items-stretch gap-1 sm:items-end">
+        <div className="flex flex-col items-stretch gap-1 max-lg:order-4 sm:items-end lg:col-start-3 lg:row-start-1">
             <div className="flex flex-wrap gap-2 sm:justify-end">
               {showDelete ? (
                 <Button
@@ -596,9 +579,11 @@ export function CampaignDetailContent({ campaignId }: CampaignDetailContentProps
                 {launchBlockedReason}
               </p>
             ) : null}
-          </div>
-          <div ref={setLandingSlotEl} className="min-w-0" />
-        </aside>
+        </div>
+        <div
+          ref={setLandingSlotEl}
+          className="min-w-0 max-lg:order-5 lg:sticky lg:top-4 lg:col-start-3 lg:row-start-2"
+        />
       </div>
 
       <CampaignLaunchDialog

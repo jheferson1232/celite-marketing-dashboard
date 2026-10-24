@@ -22,6 +22,8 @@ import {
 } from "./tiktok-api.server"
 import { withTikTokCache } from "./tiktok-cache"
 import { fetchTikTokPurchaseGenderByAdId } from "./purchase-gender"
+import { listTikTokProfileVideos } from "./profile-videos"
+import { listTikTokSparkPosts } from "./spark-posts"
 import type {
   TikTokAd,
   TikTokAdGroup,
@@ -51,6 +53,7 @@ const AD_GET_FIELDS = JSON.stringify([
   "identity_id",
   "identity_type",
   "ad_format",
+  "ad_text",
   "creative_authorized",
 ])
 
@@ -235,7 +238,7 @@ export async function getTikTokAdInsights(
   dateRange: DateRange
 ): Promise<AdInsightRow[]> {
   const cacheKey = await buildTikTokCacheKey(
-    `ad-insights:v3:${dateRange.from}:${dateRange.to}`
+    `ad-insights:v11:${dateRange.from}:${dateRange.to}`
   )
   return withTikTokCache(cacheKey, AD_INSIGHTS_TTL_MS, () =>
     fetchTikTokAdInsights(dateRange)
@@ -285,18 +288,41 @@ async function fetchTikTokAdInsights(
   const sparkItemIds = [
     ...new Set(
       ads
-        .filter((ad) => !ad.video_id && ad.tiktok_item_id)
-        .map((ad) => String(ad.tiktok_item_id))
+        .map((ad) => ad.tiktok_item_id?.trim())
+        .filter((id): id is string => Boolean(id))
     ),
   ]
 
-  const [imageMap, libraryVideoMap, sparkMap] = await Promise.all([
+  const [imageMap, libraryVideoMap, sparkPosts, profileVideos] = await Promise.all([
     fetchImageUrls(imageIds),
     fetchLibraryVideoMedia(videoIds),
-    fetchSparkItemMedia(sparkItemIds),
+    listTikTokSparkPosts().catch((error) => {
+      console.error("Error fetching TikTok Spark posts:", error)
+      return []
+    }),
+    listTikTokProfileVideos().catch((error) => {
+      console.error("Error fetching TikTok profile videos:", error)
+      return []
+    }),
   ])
+  const sparkByItemId = new Map<string, VideoMedia>()
+  const sparkByCaption = new Map<string, VideoMedia>()
+  for (const post of [...sparkPosts, ...profileVideos]) {
+    if (!post.coverUrl && !post.previewUrl) continue
+    const media = {
+      coverUrl: post.coverUrl ?? "",
+      previewUrl: post.previewUrl ?? "",
+    }
+    if (post.itemId) sparkByItemId.set(post.itemId, media)
+    const rawCaption = post.caption || (post.name?.startsWith("@") ? "" : post.name)
+    const caption = rawCaption?.replace(/\s+/g, " ").trim().toLowerCase()
+    if (caption) sparkByCaption.set(caption, media)
+  }
+  const missingSparkIds = sparkItemIds.filter((id) => !sparkByItemId.has(id))
+  const extraSparkMedia = await fetchSparkItemMedia(missingSparkIds)
+  for (const [id, media] of extraSparkMedia) sparkByItemId.set(id, media)
 
-  return reportRows
+  const insights = reportRows
     .map((row) => {
       const adId = row.dimensions.ad_id
       const ad = adsById.get(adId)
@@ -315,10 +341,12 @@ async function fetchTikTokAdInsights(
       const libraryMedia = ad?.video_id
         ? libraryVideoMap.get(ad.video_id)
         : undefined
+      const captionKey = ad?.ad_text?.replace(/\s+/g, " ").trim().toLowerCase()
       const sparkMedia =
-        !ad?.video_id && ad?.tiktok_item_id
-          ? sparkMap.get(String(ad.tiktok_item_id))
-          : undefined
+        (ad?.tiktok_item_id
+          ? sparkByItemId.get(String(ad.tiktok_item_id))
+          : undefined) ??
+        (captionKey ? sparkByCaption.get(captionKey) : undefined)
 
       const thumbnail =
         libraryMedia?.coverUrl || sparkMedia?.coverUrl || imageUrl || ""
@@ -350,6 +378,8 @@ async function fetchTikTokAdInsights(
         thumbnail_url: thumbnail,
         image_url: imageUrl || thumbnail,
         video_url: videoUrl,
+        body: ad?.ad_text?.trim() || undefined,
+        tiktok_item_id: ad?.tiktok_item_id?.trim() || undefined,
         // Si es Spark sin video_id de biblioteca, marcamos el item para UI/agrupación.
         video_id:
           videoId ||
@@ -367,4 +397,6 @@ async function fetchTikTokAdInsights(
       } satisfies AdInsightRow
     })
     .filter((row) => parseFloat(row.spend) > 0)
+
+  return insights
 }

@@ -18,9 +18,7 @@ type ConnectTikTokAccountDialogProps = {
   onOpenChange: (open: boolean) => void
   onSubmit: (input: {
     advertiserId: string
-    accessToken: string
     name?: string
-    identityId?: string
     setAsDefault: boolean
   }) => Promise<void>
   isPending: boolean
@@ -33,16 +31,12 @@ export function ConnectTikTokAccountDialog({
   isPending,
 }: ConnectTikTokAccountDialogProps) {
   const [advertiserId, setAdvertiserId] = useState("")
-  const [accessToken, setAccessToken] = useState("")
   const [name, setName] = useState("")
-  const [identityId, setIdentityId] = useState("")
   const [setAsDefault, setSetAsDefault] = useState(true)
 
   function resetForm() {
     setAdvertiserId("")
-    setAccessToken("")
     setName("")
-    setIdentityId("")
     setSetAsDefault(true)
   }
 
@@ -50,9 +44,7 @@ export function ConnectTikTokAccountDialog({
     event.preventDefault()
     await onSubmit({
       advertiserId: advertiserId.trim(),
-      accessToken: accessToken.trim(),
       name: name.trim() || undefined,
-      identityId: identityId.trim() || undefined,
       setAsDefault,
     })
     resetForm()
@@ -71,8 +63,8 @@ export function ConnectTikTokAccountDialog({
         <DialogHeader>
           <DialogTitle>Conectar cuenta TikTok Ads</DialogTitle>
           <DialogDescription>
-            Pegá el Advertiser ID y el access token de la Marketing API. Validamos
-            la cuenta contra TikTok antes de guardarla.
+            Pegá el Advertiser ID. Validamos la cuenta contra TikTok antes de
+            guardarla.
           </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
@@ -90,20 +82,6 @@ export function ConnectTikTokAccountDialog({
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="tiktok-access-token" className="text-sm font-medium">
-              Access token
-            </label>
-            <Input
-              id="tiktok-access-token"
-              type="password"
-              autoComplete="off"
-              placeholder="Token de TikTok Marketing API"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              required
-            />
-          </div>
-          <div className="grid gap-2">
             <label htmlFor="tiktok-account-name" className="text-sm font-medium">
               Nombre (opcional)
             </label>
@@ -112,17 +90,6 @@ export function ConnectTikTokAccountDialog({
               placeholder="Ej. HOTEL BOGOTA RESORT"
               value={name}
               onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <label htmlFor="tiktok-identity-id" className="text-sm font-medium">
-              Identity ID (opcional)
-            </label>
-            <Input
-              id="tiktok-identity-id"
-              placeholder="Para lanzar creativos"
-              value={identityId}
-              onChange={(e) => setIdentityId(e.target.value)}
             />
           </div>
           <label className="flex items-center gap-2 text-sm">

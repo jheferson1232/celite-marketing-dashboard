@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { useQuery } from "@tanstack/react-query"
 import {
-  resolveEffectiveVideoCreatives,
   validateABODynamicFields,
   type ABODynamicCreative,
   type ABODynamicFieldErrors,
@@ -12,18 +10,11 @@ import {
   type ABOStrategyConfig,
   type CampaignLandingPageRef,
 } from "@/lib/config/tiktok-strategies"
-import { listCreativesAction } from "@/app/(app)/products/_actions/creatives"
-import { CreativeCard } from "@/app/(app)/baul/_components/creative-card"
-import { CreativePreviewDialog } from "@/app/(app)/baul/_components/creative-preview-dialog"
-import type { CreativeRecord } from "@/lib/services/creative"
-import { runServerAction } from "@/lib/server-action"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { cn } from "@/lib/utils"
 import { CampaignLandingPagesSection } from "../campaign-landing-pages-section"
+import { useTikTokTestAccount } from "../use-tiktok-test-account"
 
-const EMPTY_CREATIVES: CreativeRecord[] = []
+const NO_CREATIVES: ABODynamicCreative[] = []
 
 export type AboStrategyFormPayload = {
   dynamic: ABODynamicFields
@@ -53,27 +44,17 @@ export function AboStrategyForm({
   onChange,
   onValidationChange,
 }: AboStrategyFormProps) {
+  const { account: testAccount, currency, currencyLabel } = useTikTokTestAccount()
   const initialDynamic = config.dynamic
 
   const [budgetPerAdgroup, setBudgetPerAdgroup] = useState(
     String(initialDynamic.budgetPerAdgroup)
   )
-  const [autoCreateAdgroupsFromCreatives, setAutoCreateAdgroupsFromCreatives] =
-    useState(initialDynamic.autoCreateAdgroupsFromCreatives)
-  const [selectedCreativeIds, setSelectedCreativeIds] = useState<string[]>(
-    initialDynamic.selectedCreativeIds
-  )
   const [landingPageId, setLandingPageId] = useState<string>(
     initialDynamic.landingPageId ?? ""
   )
   const [landingPages, setLandingPages] = useState(config.landingPages)
-  const [adText, setAdText] = useState(initialDynamic.adText)
-  const [previewCreative, setPreviewCreative] = useState<CreativeRecord | null>(
-    null
-  )
-
-  /** Si hay videos seleccionados de la biblioteca TikTok, el Baúl no aporta conjuntos. */
-  const usingTikTokVideos = selectedTikTokVideoIds.length > 0
+  const adText = initialDynamic.adText
 
   const onChangeRef = useRef(onChange)
   const onValidationChangeRef = useRef(onValidationChange)
@@ -83,35 +64,7 @@ export function AboStrategyForm({
   onChangeRef.current = onChange
   onValidationChangeRef.current = onValidationChange
 
-  const { data: allCreatives } = useQuery({
-    queryKey: ["creatives"],
-    queryFn: () => runServerAction(listCreativesAction()),
-    staleTime: 30 * 1000,
-  })
-
-  const videoCreativeRecords = useMemo(() => {
-    const records = (allCreatives ?? EMPTY_CREATIVES).filter(
-      (creative) => creative.type === "video"
-    )
-
-    if (!variantId) return records
-
-    return records.filter((creative) =>
-      creative.variants.some((variant) => variant.id === variantId)
-    )
-  }, [allCreatives, variantId])
-
-  const videoCreatives = useMemo(
-    (): ABODynamicCreative[] =>
-      videoCreativeRecords.map((creative) => ({
-        id: creative.id,
-        url: creative.url,
-        type: creative.type,
-        name: creative.name,
-        variantName: creative.variants[0]?.name ?? null,
-      })),
-    [videoCreativeRecords]
-  )
+  const videoCreatives = NO_CREATIVES
 
   useEffect(() => {
     if (landingPages.length === 0) {
@@ -146,29 +99,6 @@ export function AboStrategyForm({
   ])
 
   useEffect(() => {
-    setSelectedCreativeIds((current) =>
-      current.filter((id) =>
-        videoCreativeRecords.some((creative) => creative.id === id)
-      )
-    )
-  }, [variantId, videoCreativeRecords])
-
-  useEffect(() => {
-    if (!autoCreateAdgroupsFromCreatives) return
-
-    setSelectedCreativeIds((current) => {
-      const nextIds = videoCreatives.map((creative) => creative.id)
-      if (
-        current.length === nextIds.length &&
-        current.every((id, index) => id === nextIds[index])
-      ) {
-        return current
-      }
-      return nextIds
-    })
-  }, [autoCreateAdgroupsFromCreatives, videoCreatives])
-
-  useEffect(() => {
     const parsedBudget = Number.parseFloat(budgetPerAdgroup)
     const landing =
       landingOptions.find((page) => page.id === landingPageId) ??
@@ -179,10 +109,8 @@ export function AboStrategyForm({
       variantId,
       variantName,
       budgetPerAdgroup: Number.isFinite(parsedBudget) ? parsedBudget : 0,
-      autoCreateAdgroupsFromCreatives: usingTikTokVideos
-        ? false
-        : autoCreateAdgroupsFromCreatives,
-      selectedCreativeIds: usingTikTokVideos ? [] : selectedCreativeIds,
+      autoCreateAdgroupsFromCreatives: false,
+      selectedCreativeIds: [],
       selectedTikTokVideoIds,
       landingPageId:
         landing?.id === "legacy-landing"
@@ -221,74 +149,17 @@ export function AboStrategyForm({
     }
   }, [
     adText,
-    autoCreateAdgroupsFromCreatives,
     budgetPerAdgroup,
     initialDynamic.landingPageId,
     initialDynamic.landingPageUrl,
     landingPages,
     landingOptions,
     landingPageId,
-    selectedCreativeIds,
     selectedTikTokVideoIds,
-    usingTikTokVideos,
     variantId,
     variantName,
     videoCreatives,
   ])
-
-  const previewVideos = useMemo(() => {
-    const selectedLanding =
-      landingOptions.find((page) => page.id === landingPageId) ??
-      landingOptions[0] ??
-      null
-
-    const dynamic: ABODynamicFields = {
-      variantId,
-      variantName,
-      budgetPerAdgroup: Number.parseFloat(budgetPerAdgroup) || 0,
-      autoCreateAdgroupsFromCreatives: usingTikTokVideos
-        ? false
-        : autoCreateAdgroupsFromCreatives,
-      selectedCreativeIds: usingTikTokVideos ? [] : selectedCreativeIds,
-      selectedTikTokVideoIds,
-      landingPageId:
-        selectedLanding?.id === "legacy-landing"
-          ? initialDynamic.landingPageId
-          : (selectedLanding?.id ?? null),
-      landingPageUrl: selectedLanding?.url ?? initialDynamic.landingPageUrl,
-      adText,
-    }
-
-    return resolveEffectiveVideoCreatives(
-      { budget: 0, landingPages, creatives: videoCreatives },
-      dynamic
-    )
-  }, [
-    adText,
-    autoCreateAdgroupsFromCreatives,
-    budgetPerAdgroup,
-    initialDynamic.landingPageId,
-    initialDynamic.landingPageUrl,
-    landingOptions,
-    landingPageId,
-    landingPages,
-    selectedCreativeIds,
-    selectedTikTokVideoIds,
-    usingTikTokVideos,
-    variantId,
-    variantName,
-    videoCreatives,
-  ])
-
-  const toggleCreative = (creativeId: string, checked: boolean) => {
-    setSelectedCreativeIds((current) => {
-      if (checked) {
-        if (current.includes(creativeId)) return current
-        return [...current, creativeId]
-      }
-      return current.filter((id) => id !== creativeId)
-    })
-  }
 
   const landingSection = (
     <CampaignLandingPagesSection
@@ -307,160 +178,25 @@ export function AboStrategyForm({
         : null}
       <div className="space-y-2">
         <label htmlFor="abo-budget" className="text-sm font-medium">
-          Presupuesto por conjunto (COP)
+          Presupuesto por conjunto ({currencyLabel})
         </label>
         <Input
           id="abo-budget"
           type="number"
           min={0}
-          step={1000}
+          step={currency === "COP" ? 1000 : 1}
           value={budgetPerAdgroup}
           disabled={disabled}
           onChange={(event) => setBudgetPerAdgroup(event.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          {testAccount
+            ? `Moneda de ${testAccount.name}, cuenta default de testeos.`
+            : "Moneda de la cuenta default de testeos."}
+        </p>
       </div>
-
-      {!usingTikTokVideos && (
-        <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-3">
-          <div className="space-y-1">
-            <p className="text-sm font-medium">
-              ¿Crear {videoCreatives.length} conjunto(s) con los videos del
-              Baúl?
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Si está activo, se generará un conjunto por cada video del Baúl.
-              Si no, podrás elegir manualmente los creativos.
-            </p>
-          </div>
-          <Switch
-            checked={autoCreateAdgroupsFromCreatives}
-            disabled={disabled || videoCreatives.length === 0}
-            onCheckedChange={(checked) =>
-              setAutoCreateAdgroupsFromCreatives(checked === true)
-            }
-            aria-label="Crear conjuntos automáticamente con los videos del Baúl"
-          />
-        </div>
-      )}
-
-      {!usingTikTokVideos && !autoCreateAdgroupsFromCreatives ? (
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium">Videos del Baúl</label>
-            <p className="text-xs text-muted-foreground">
-              Selecciona los videos para crear un conjunto por cada uno. Haz
-              clic en una tarjeta para verla en grande.
-            </p>
-          </div>
-
-          {videoCreativeRecords.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {variantId
-                ? "No hay videos del Baúl vinculados a esta variante."
-                : "Selecciona una variante o sube videos en el Baúl antes de continuar."}
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              {videoCreativeRecords.map((creative) => {
-                const checked = selectedCreativeIds.includes(creative.id)
-                return (
-                  <div key={creative.id} className="relative size-[200px]">
-                    <CreativeCard
-                      creative={creative}
-                      selected={checked}
-                      showFooter={false}
-                      className="size-full"
-                      previewClassName="aspect-auto size-[200px]"
-                      onOpenPreview={() => setPreviewCreative(creative)}
-                    />
-                    <Checkbox
-                      id={`creative-${creative.id}`}
-                      checked={checked}
-                      disabled={disabled}
-                      aria-label={`Seleccionar ${creative.name ?? "video"}`}
-                      className={cn(
-                        "absolute top-2 right-2 z-10 border-background bg-background/90 shadow-sm",
-                        checked &&
-                          "border-primary data-[state=checked]:bg-primary"
-                      )}
-                      onCheckedChange={(value) =>
-                        toggleCreative(creative.id, value === true)
-                      }
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <CreativePreviewDialog
-            open={previewCreative !== null}
-            onOpenChange={(open) => {
-              if (!open) setPreviewCreative(null)
-            }}
-            creative={previewCreative}
-          />
-        </div>
-      ) : null}
-
-      {usingTikTokVideos && (
-        <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">
-            {selectedTikTokVideoIds.length} post(s) de TikTok
-          </p>
-          <p className="mt-1">
-            Se generará un conjunto por cada video de TikTok. No se necesitan
-            videos del Baúl.
-          </p>
-        </div>
-      )}
 
       {landingPortalTarget ? null : landingSection}
-
-      <div className="space-y-2">
-        <label htmlFor="abo-ad-text" className="text-sm font-medium">
-          Texto del anuncio
-        </label>
-        <textarea
-          id="abo-ad-text"
-          rows={3}
-          value={adText}
-          disabled={disabled}
-          onChange={(event) => setAdText(event.target.value)}
-          className={cn(
-            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs",
-            "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-            "disabled:cursor-not-allowed disabled:opacity-50"
-          )}
-        />
-      </div>
-
-      <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
-        <p className="font-medium text-foreground">Vista previa de conjuntos</p>
-        <p className="mt-1">
-          {usingTikTokVideos
-            ? selectedTikTokVideoIds.length
-            : previewVideos.length}{" "}
-          conjunto(s) · presupuesto {budgetPerAdgroup || "0"} COP c/u
-        </p>
-        {usingTikTokVideos ? (
-          <p className="mt-2">
-            Desde la biblioteca TikTok (un conjunto por video).
-          </p>
-        ) : previewVideos.length > 0 ? (
-          <ul className="mt-2 space-y-1">
-            {previewVideos.map((video, index) => (
-              <li key={video.id} className="truncate">
-                {index + 1}. {video.name ?? "Video"} · {video.url}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-destructive">
-            Se necesita al menos un video para generar conjuntos en TikTok.
-          </p>
-        )}
-      </div>
     </div>
   )
 }

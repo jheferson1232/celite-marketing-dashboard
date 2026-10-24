@@ -21,6 +21,7 @@ type SparkListRow = {
   item_info?: {
     item_id?: string | number
     item_type?: string
+    text?: string
   }
   user_info?: {
     tiktok_name?: string
@@ -73,6 +74,7 @@ function mapSparkRow(row: SparkListRow): TikTokAdVideoAsset | null {
     name: profileName || `Post ${itemId.slice(-6)}`,
     profileName,
     itemId,
+    caption: row.item_info?.text?.trim() || null,
     identityId: row.user_info?.identity_id?.trim() || null,
     identityType: row.user_info?.identity_type?.trim() || null,
     identityAuthorizedBcId: null,
@@ -119,7 +121,7 @@ async function fetchTikTokSparkPosts(): Promise<TikTokAdVideoAsset[]> {
 
 /** Posts orgánicos autorizados (Spark) — originales con nombre de perfil. */
 export async function listTikTokSparkPosts(): Promise<TikTokAdVideoAsset[]> {
-  const cacheKey = await buildTikTokCacheKey("spark-posts:v2")
+  const cacheKey = await buildTikTokCacheKey("spark-posts:v3")
   return withTikTokCache(cacheKey, SPARK_POSTS_TTL_MS, fetchTikTokSparkPosts)
 }
 

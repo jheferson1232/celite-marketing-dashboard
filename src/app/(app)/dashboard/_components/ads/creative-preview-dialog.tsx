@@ -60,7 +60,20 @@ export function CreativePreviewDialog({
   const metaAccountId = useMetaDashboardAccountId()
   const cachedVideoUrl = creative?.videoUrl?.trim() || ""
   const isVideo = creative?.mediaType === "video"
-  const needsFetch = isVideo && !cachedVideoUrl && Boolean(videoId || adId)
+  const organicItemId =
+    platform === "tiktok"
+      ? creative?.tiktokItemId ||
+        (videoId?.startsWith("spark:") ? videoId.slice("spark:".length) : "")
+      : ""
+  const tiktokEmbedUrl =
+    organicItemId && !cachedVideoUrl
+      ? `https://www.tiktok.com/player/v1/${organicItemId}?embed_from=oembed&music_info=1&description=1&autoplay=1&muted=1`
+      : null
+  const tiktokWatchUrl = organicItemId
+    ? `https://www.tiktok.com/video/${organicItemId}`
+    : null
+  const needsFetch =
+    isVideo && !tiktokEmbedUrl && !cachedVideoUrl && Boolean(videoId || adId)
 
   const {
     data: fetchedMedia,
@@ -113,7 +126,7 @@ export function CreativePreviewDialog({
   const videoSourceUrl = rawVideoSourceUrl
     ? toPlayableVideoUrl(rawVideoSourceUrl, platform)
     : undefined
-  const embedUrl = fetchedMedia?.embedUrl
+  const embedUrl = tiktokEmbedUrl || fetchedMedia?.embedUrl
   const rateLimitMessage = isError ? getErrorMessage(error) : null
   const imageUrl = creative.imageUrl || creative.thumbnailUrl
   const playbackKey = `${creative.id}:${videoSourceUrl ?? embedUrl ?? "empty"}`
@@ -128,7 +141,7 @@ export function CreativePreviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 pb-6">
+        <div className="flex flex-col gap-3 px-6 pb-6">
           {creative.mediaType === "video" ? (
             <VideoPreview
               key={playbackKey}
@@ -151,6 +164,16 @@ export function CreativePreviewDialog({
               No hay preview disponible para este creativo.
             </p>
           )}
+          {tiktokWatchUrl ? (
+            <a
+              href={tiktokWatchUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-center text-sm underline-offset-4 hover:underline"
+            >
+              Abrir en TikTok
+            </a>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -204,7 +227,8 @@ function VideoPreview({
         src={embedUrl}
         title="Preview del anuncio"
         className="aspect-9/16 w-full rounded-lg border-0 bg-muted"
-        allow="autoplay; encrypted-media"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
         scrolling="yes"
       />
     )

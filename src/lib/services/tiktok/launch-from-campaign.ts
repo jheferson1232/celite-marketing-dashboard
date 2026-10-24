@@ -30,6 +30,12 @@ import type { LaunchCheckItem } from "./launch-preflight"
 import { markTikTokCampaignLaunchedFromDashboard } from "./campaign-launch-source"
 import { stageCampaignAdgroupVideosFromBlob } from "./stage-campaign-videos"
 import { hasTikTokCredentialsConfigured } from "./tiktok-credentials.server"
+import { listTikTokAdAccounts } from "./ad-accounts"
+import {
+  resolveTikTokAccountCurrency,
+  tikTokAccountCurrencyLabel,
+} from "./account-currency"
+import type { CurrencyCode } from "@/lib/format"
 
 export type CampaignLaunchPreflightResult = {
   ready: boolean
@@ -37,6 +43,8 @@ export type CampaignLaunchPreflightResult = {
   campaignName: string
   strategy: string
   dailyBudget: number
+  currency: CurrencyCode
+  accountName: string | null
   adGroupCount: number
   videoCount: number
   landingPageUrl: string
@@ -199,13 +207,21 @@ async function buildCampaignLaunchPreflight(
   }
 
   const budget = launchCfg.campaign.daily_budget ?? 0
+  const accounts = await listTikTokAdAccounts().catch(() => [])
+  const testAccount =
+    accounts.find((account) => account.isDefaultForTests) ??
+    accounts.find((account) => account.isDefault) ??
+    accounts[0] ??
+    null
+  const currency = resolveTikTokAccountCurrency(testAccount?.currency)
+  const currencyLabel = tikTokAccountCurrencyLabel(currency)
   checks.push({
     ok: budget > 0,
     label: "Presupuesto diario",
     detail: budget > 0
       ? isCbo
-        ? `${budget} COP/campaña`
-        : `${budget} COP/conjunto`
+        ? `${budget} ${currencyLabel}/campaña`
+        : `${budget} ${currencyLabel}/conjunto`
       : "Debe ser mayor a 0",
   })
 
@@ -284,6 +300,8 @@ async function buildCampaignLaunchPreflight(
     campaignName: campaign.name,
     strategy: campaign.strategy,
     dailyBudget: budget,
+    currency,
+    accountName: testAccount?.name ?? null,
     adGroupCount: launchCfg.adgroups.length,
     videoCount: (() => {
       if (!isCbo) return videoAdgroupCount

@@ -7,6 +7,10 @@ export type TikTokAdVideoAsset = {
   profileName: string | null
   /** item_id del post orgánico (sin prefijo spark:). */
   itemId: string | null
+  /** Texto del post orgánico, cuando TikTok lo devuelve. */
+  caption?: string | null
+  /** TikTok marcó el video como generado por IA. */
+  aiGenerated?: boolean
   /** Identidad Spark Ads asociada al post. */
   identityId: string | null
   identityType: string | null

@@ -24,7 +24,6 @@ import {
   listTikTokStrategiesAction,
 } from "../_actions/campaigns"
 import { CampaignGeneralSection } from "./campaign-general-section"
-import { CampaignVariantSelect } from "./campaign-variant-select"
 import {
   AboStrategyForm,
   type AboStrategyFormPayload,
@@ -174,8 +173,8 @@ export function CampaignCreateContent() {
 
   return (
     <div className="flex w-full flex-col gap-6 p-6 lg:p-8">
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,48rem)_minmax(16rem,1fr)_minmax(20rem,28rem)]">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
           <div className="space-y-2">
             <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
               <Link href="/campaigns">
@@ -200,22 +199,23 @@ export function CampaignCreateContent() {
                 : "No se pudo crear la campaña"}
             </p>
           ) : null}
+        </div>
 
+        <div className="min-w-0 max-lg:order-2 lg:col-start-1 lg:row-start-2">
           <CampaignGeneralSection
             name={pendingName}
             status={pendingStatus}
             pixelId={pendingPixelId}
-            authCode={pendingAuthCode}
             selectedTikTokVideoIds={pendingTikTokVideoIds}
             disabled={createMutation.isPending}
             onNameChange={setPendingName}
             onStatusChange={setPendingStatus}
             onPixelIdChange={setPendingPixelId}
-            onAuthCodeChange={setPendingAuthCode}
             onSelectedTikTokVideoIdsChange={setPendingTikTokVideoIds}
           />
+        </div>
 
-          <section className="flex w-full max-w-3xl flex-col gap-4 rounded-xl border bg-muted/10 p-4">
+        <section className="flex min-w-0 w-full flex-col gap-4 rounded-xl border bg-muted/10 p-4 max-lg:order-3 lg:col-start-2 lg:row-start-2">
             <div>
               <h2 className="text-sm font-semibold">Estrategia</h2>
               <p className="text-xs text-muted-foreground">
@@ -260,17 +260,6 @@ export function CampaignCreateContent() {
               </p>
             </div>
 
-            {strategy === "ABO" || strategy === "CBO" ? (
-              <CampaignVariantSelect
-                value={pendingVariantId}
-                disabled={createMutation.isPending}
-                onChange={(variantId, variantName) => {
-                  setPendingVariantId(variantId)
-                  setPendingVariantName(variantName)
-                }}
-              />
-            ) : null}
-
             {strategy === "ABO" ? (
               <>
                 <AboStrategyForm
@@ -314,22 +303,22 @@ export function CampaignCreateContent() {
                 ) : null}
               </>
             ) : null}
-          </section>
-        </div>
+        </section>
 
-        <aside className="flex w-full flex-col gap-3 lg:sticky lg:top-4">
-          <div className="flex sm:justify-end">
-            <Button
-              type="button"
-              disabled={!canSave}
-              onClick={() => createMutation.mutate()}
-            >
-              <RiSaveLine className="size-4" />
-              {createMutation.isPending ? "Guardando…" : "Guardar"}
-            </Button>
-          </div>
-          <div ref={setLandingSlotEl} className="min-w-0" />
-        </aside>
+        <div className="flex justify-end max-lg:order-4 lg:col-start-3 lg:row-start-1">
+          <Button
+            type="button"
+            disabled={!canSave}
+            onClick={() => createMutation.mutate()}
+          >
+            <RiSaveLine className="size-4" />
+            {createMutation.isPending ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
+        <div
+          ref={setLandingSlotEl}
+          className="min-w-0 max-lg:order-5 lg:sticky lg:top-4 lg:col-start-3 lg:row-start-2"
+        />
       </div>
     </div>
   )

@@ -16,6 +16,7 @@ import {
   RiBookOpenLine,
   RiTiktokLine,
   RiRobotLine,
+  RiCalendarScheduleLine,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import {
@@ -89,6 +90,12 @@ const navItems = [
     icon: RiChat3Line,
   },
   {
+    id: "buffer",
+    title: "Buffer",
+    href: "/buffer",
+    icon: RiCalendarScheduleLine,
+  },
+  {
     id: "campaigns",
     title: "Campaigns",
     href: "/campaigns",
@@ -113,6 +120,18 @@ const navItems = [
     icon: RiArchiveLine,
   },
 ] as const
+
+function isNavActive(id: string, href: string, pathname: string) {
+  if (id === "tiktok") return pathname === "/tiktok"
+  if (id === "products") {
+    return (
+      pathname === "/products" ||
+      pathname.startsWith("/products/") ||
+      pathname.startsWith("/product-stats/")
+    )
+  }
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 function AppSidebarHeader() {
   const { toggleSidebar } = useSidebar()
@@ -181,46 +200,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     asChild
-                    isActive={
-                      item.id === "resumen"
-                        ? pathname === "/resumen" ||
-                          pathname.startsWith("/resumen/")
-                        : item.id === "informe-ia"
-                          ? pathname === "/informe-ia" ||
-                            pathname.startsWith("/informe-ia/")
-                          : item.id === "meta-comentarios"
-                            ? pathname === "/meta/comentarios" ||
-                              pathname.startsWith("/meta/comentarios/")
-                            : item.id === "meta-library"
-                              ? pathname === "/meta/library" ||
-                                pathname.startsWith("/meta/library/")
-                              : item.id === "tiktok"
-                            ? pathname === "/tiktok"
-                            : item.id === "tiktok-cuentas"
-                              ? pathname === "/tiktok/cuentas" ||
-                                pathname.startsWith("/tiktok/cuentas/")
-                              : item.id === "tiktok-agente"
-                                ? pathname === "/tiktok/agente" ||
-                                  pathname.startsWith("/tiktok/agente/")
-                                : item.id === "tiktok-comentarios"
-                                  ? pathname === "/tiktok/comentarios" ||
-                                    pathname.startsWith("/tiktok/comentarios/")
-                                  : item.id === "campaigns"
-                              ? pathname === "/campaigns" ||
-                                pathname.startsWith("/campaigns/")
-                            : item.id === "products"
-                              ? pathname === "/products" ||
-                                pathname.startsWith("/products/") ||
-                                pathname.startsWith("/product-stats/")
-                              : item.id === "productos-pendientes"
-                                ? pathname === "/productos-pendientes" ||
-                                  pathname.startsWith("/productos-pendientes/")
-                                : item.id === "baul"
-                                ? pathname === "/baul" ||
-                                  pathname.startsWith("/baul/")
-                                : pathname === "/dashboard" ||
-                                  pathname.startsWith("/dashboard/")
-                    }
+                    isActive={isNavActive(item.id, item.href, pathname)}
                     tooltip={item.title}
                   >
                     <Link href={item.href}>

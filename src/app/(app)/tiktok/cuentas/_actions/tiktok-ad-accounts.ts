@@ -51,7 +51,7 @@ export const getTikTokEnvAccountSummaryAction = createServerAction(async () =>
 export const connectTikTokAdAccountAction = createServerAction(
   async (input: {
     advertiserId: string
-    accessToken: string
+    accessToken?: string
     name?: string
     identityId?: string
     setAsDefault?: boolean

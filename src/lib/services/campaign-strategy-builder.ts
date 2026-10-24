@@ -45,7 +45,7 @@ export function buildEmptyABOStrategyConfig(campaignName: string): ABOStrategyCo
       variantId: "",
       variantName: "",
       budgetPerAdgroup: 0,
-      autoCreateAdgroupsFromCreatives: true,
+      autoCreateAdgroupsFromCreatives: false,
       selectedCreativeIds: [],
       selectedTikTokVideoIds: [],
       landingPageId: null,

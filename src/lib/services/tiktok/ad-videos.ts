@@ -122,8 +122,15 @@ export async function listTikTokAdVideos(): Promise<TikTokAdVideoAsset[]> {
   return withTikTokCache(cacheKey, VIDEOS_TTL_MS, fetchTikTokAdVideos)
 }
 
-/** Videos de las cuentas orgánicas vinculadas. Sin biblioteca de archivos. */
+/** Videos publicados en las cuentas orgánicas. Sin copias en lote ni plantillas de envío. */
 export async function listTikTokCampaignVideos() {
-  const { listTikTokProfileVideoCatalog } = await import("./profile-videos")
-  return listTikTokProfileVideoCatalog()
+  const { listTikTokProfileVideoCatalog, publishedTikTokProfileVideos } =
+    await import("./profile-videos")
+  const catalog = await listTikTokProfileVideoCatalog()
+  return {
+    accounts: catalog.accounts.map((account) => ({
+      ...account,
+      videos: publishedTikTokProfileVideos(account.videos),
+    })),
+  }
 }

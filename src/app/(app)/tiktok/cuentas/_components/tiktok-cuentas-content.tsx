@@ -107,9 +107,7 @@ export function TikTokCuentasContent() {
   const connectMutation = useMutation({
     mutationFn: (input: {
       advertiserId: string
-      accessToken: string
       name?: string
-      identityId?: string
       setAsDefault: boolean
     }) => runServerAction(connectTikTokAdAccountAction(input)),
     onSuccess: (account) => {
@@ -411,7 +409,7 @@ export function TikTokCuentasContent() {
           className="text-muted-foreground"
           onClick={() => setDialogOpen(true)}
         >
-          Conexión manual (token)
+          Conexión manual
         </Button>
         <Button
           type="button"
