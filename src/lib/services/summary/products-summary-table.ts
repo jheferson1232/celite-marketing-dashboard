@@ -9,8 +9,11 @@ import { withMetaCache } from "@/lib/services/meta/meta-cache"
 import { isMetaCampaignActiveForCount } from "@/lib/services/meta/meta-campaign-status"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import { normalizeMetaId } from "@/lib/services/meta/meta-ids"
+import {
+  buildMetaGraphUrl,
+  metaGraphFetchJson,
+} from "@/lib/services/meta/meta-graph-fetch"
 import { pacedMetaRequest } from "@/lib/services/meta/meta-request-pacing"
-import { fetchAllMetaPages } from "@/lib/services/meta/paginated-fetch"
 import { getPurchaseSpendAndCpaFromInsight } from "@/lib/services/meta/purchase-metrics"
 import type { DateRange, MetaCampaign } from "@/lib/services/meta/types"
 import { listProducts, type ProductRecord } from "@/lib/services/product"
@@ -42,7 +45,6 @@ export type SummaryProductTableRow = {
   imageUrl: string | null
   notes: string | null
   campaignCount: number
-  activeCampaignCount: number
   meta: SummaryProductPlatformMetrics | null
   tiktok: SummaryProductPlatformMetrics | null
   total: {
@@ -84,8 +86,7 @@ function aggregatePlatformMetrics(
 function buildRow(
   product: ProductRecord,
   metaByCampaign: Map<string, SummaryProductPlatformMetrics>,
-  tiktokByCampaign: Map<string, SummaryProductPlatformMetrics>,
-  activeCampaignIds: ActiveCampaignIds
+  tiktokByCampaign: Map<string, SummaryProductPlatformMetrics>
 ): SummaryProductTableRow {
   const metaIds = product.campaigns
     .filter((c) => c.platform === "meta")
@@ -112,10 +113,6 @@ function buildRow(
     imageUrl: getProductCoverImage(product),
     notes: product.notes,
     campaignCount: product.campaigns.length,
-    activeCampaignCount:
-      metaIds.filter((id) => activeCampaignIds.meta.has(normalizeMetaId(id)))
-        .length +
-      tiktokIds.filter((id) => activeCampaignIds.tiktok.has(id)).length,
     meta,
     tiktok,
     total: {
@@ -256,8 +253,6 @@ async function loadBatchCampaignMetrics(dateRange: DateRange): Promise<{
   return { metaByCampaign, tiktokByCampaign }
 }
 
-type ActiveCampaignIds = { meta: Set<string>; tiktok: Set<string> }
-
 const STATUS_ID_CHUNK = 100
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -291,37 +286,37 @@ async function loadActiveMetaCampaignIds(ids: string[]): Promise<Set<string>> {
     const accountIds =
       accounts.length > 0
         ? accounts.map((account) => account.accountId)
-        : [undefined]
+        : [process.env.META_AD_ACCOUNT_ID ?? ""]
 
     await Promise.all(
-      accountIds.map((accountId) =>
-        withMetaDashboardAccount(accountId, async () => {
-          const api = getMetaClient()
+      accountIds.map(async (rawAccountId) => {
+        const accountId = rawAccountId.replace(/^act_/i, "").trim()
+        try {
           for (const idsChunk of chunk(ids, STATUS_ID_CHUNK)) {
-            const campaigns = await fetchAllMetaPages<MetaCampaign>(
-              api,
-              "/campaigns",
-              {
-                fields: "id,status,effective_status",
-                filtering: JSON.stringify([
-                  { field: "id", operator: "IN", value: idsChunk },
-                ]),
-                limit: "500",
-              }
-            )
-            for (const campaign of campaigns) {
+            // Sin caché: el estado ON/OFF tiene que reflejarse al instante.
+            const url = buildMetaGraphUrl(`act_${accountId}/campaigns`, {
+              fields: "id,status,effective_status",
+              filtering: JSON.stringify([
+                { field: "id", operator: "IN", value: idsChunk },
+              ]),
+              limit: "500",
+            })
+            const { data } = await metaGraphFetchJson<{
+              data?: MetaCampaign[]
+            }>(url, { cache: "no-store" })
+            for (const campaign of data ?? []) {
               if (isMetaCampaignActiveForCount(campaign)) {
                 active.add(normalizeMetaId(campaign.id))
               }
             }
           }
-        }).catch((error) => {
+        } catch (error) {
           console.warn(
-            `[summary-products] No se pudo leer el estado de campañas Meta de ${accountId ?? "env"}:`,
+            `[summary-products] No se pudo leer el estado de campañas Meta de ${accountId}:`,
             error
           )
-        })
-      )
+        }
+      })
     )
   })
 
@@ -370,25 +365,37 @@ async function loadActiveTikTokCampaignIds(
   return active
 }
 
+/** Campañas con interruptor ON por producto. Sin caché: refleja cambios al instante. */
+export async function getSummaryActiveCampaignCounts(): Promise<
+  Record<string, number>
+> {
+  const products = await listProducts()
+  const [activeMeta, activeTiktok] = await Promise.all([
+    loadActiveMetaCampaignIds(linkedCampaignIds(products, "meta")),
+    loadActiveTikTokCampaignIds(linkedCampaignIds(products, "tiktok")),
+  ])
+
+  const counts: Record<string, number> = {}
+  for (const product of products) {
+    counts[product.id] = product.campaigns.filter((c) =>
+      c.platform === "meta"
+        ? activeMeta.has(normalizeMetaId(c.campaignId))
+        : c.platform === "tiktok" && activeTiktok.has(c.campaignId)
+    ).length
+  }
+  return counts
+}
+
 async function fetchSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const productsPromise = listProducts()
-  const [products, { metaByCampaign, tiktokByCampaign }, activeCampaignIds] =
-    await Promise.all([
-      productsPromise,
-      loadBatchCampaignMetrics(dateRange),
-      productsPromise.then(async (list) => {
-        const [meta, tiktok] = await Promise.all([
-          loadActiveMetaCampaignIds(linkedCampaignIds(list, "meta")),
-          loadActiveTikTokCampaignIds(linkedCampaignIds(list, "tiktok")),
-        ])
-        return { meta, tiktok }
-      }),
-    ])
+  const [products, { metaByCampaign, tiktokByCampaign }] = await Promise.all([
+    listProducts(),
+    loadBatchCampaignMetrics(dateRange),
+  ])
 
   const rows = products.map((product) =>
-    buildRow(product, metaByCampaign, tiktokByCampaign, activeCampaignIds)
+    buildRow(product, metaByCampaign, tiktokByCampaign)
   )
 
   rows.sort((a, b) => {
@@ -403,7 +410,7 @@ async function fetchSummaryProductsTable(
 export async function getSummaryProductsTable(
   dateRange: DateRange
 ): Promise<SummaryProductsTable> {
-  const cacheKey = `summary-products:v8:${dateRange.from}:${dateRange.to}`
+  const cacheKey = `summary-products:v9:${dateRange.from}:${dateRange.to}`
   return withMetaCache(cacheKey, SUMMARY_PRODUCTS_TTL_MS, () =>
     fetchSummaryProductsTable(dateRange)
   )

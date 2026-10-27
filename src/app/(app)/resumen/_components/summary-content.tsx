@@ -76,7 +76,11 @@ export function SummaryContent() {
       await queryClient.invalidateQueries({
         predicate: (query) => {
           const key = String(query.queryKey[0])
-          return key === "summary-kpis" || key === "summary-products-table"
+          return (
+            key === "summary-kpis" ||
+            key === "summary-products-table" ||
+            key === "summary-active-campaigns"
+          )
         },
       })
     } finally {

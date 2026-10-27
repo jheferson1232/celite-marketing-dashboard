@@ -28,7 +28,10 @@ import type {
 } from "@/lib/services/summary/products-summary-table"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
-import { getSummaryProductsTableAction } from "../_actions/summary-products-table"
+import {
+  getSummaryActiveCampaignCountsAction,
+  getSummaryProductsTableAction,
+} from "../_actions/summary-products-table"
 import {
   formatSummaryCpa,
   formatSummaryOrders,
@@ -121,9 +124,11 @@ function sumPlatformMetrics(
 
 function ProductRow({
   row,
+  activeCount,
   onArchive,
 }: {
   row: SummaryProductTableRow
+  activeCount: number | undefined
   onArchive: (product: { id: string; name: string }) => void
 }) {
   return (
@@ -152,16 +157,14 @@ function ProductRow({
             <div className="min-w-0">
               <p className="text-sm leading-tight font-medium">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {row.activeCampaignCount > 0 ? (
+                {activeCount === undefined ? null : activeCount > 0 ? (
                   <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                    {row.activeCampaignCount === 1
-                      ? "1 activa"
-                      : `${row.activeCampaignCount} activas`}
+                    {activeCount === 1 ? "1 activa" : `${activeCount} activas`}
                   </span>
                 ) : (
                   "Sin activas"
                 )}
-                {` de ${row.campaignCount} ${row.campaignCount === 1 ? "campaña" : "campañas"}`}
+                {`${activeCount === undefined ? "" : " de "}${row.campaignCount} ${row.campaignCount === 1 ? "campaña" : "campañas"}`}
               </p>
             </div>
           </Link>
@@ -221,6 +224,14 @@ export function SummaryProductsTableSection({
     queryFn: () => runServerAction(getSummaryProductsTableAction(dateRange)),
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+  })
+
+  const { data: activeCounts } = useQuery({
+    queryKey: ["summary-active-campaigns"],
+    queryFn: () => runServerAction(getSummaryActiveCampaignCountsAction()),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60 * 1000,
   })
 
   const rowsWithCampaigns =
@@ -336,6 +347,7 @@ export function SummaryProductsTableSection({
                       <ProductRow
                         key={row.id}
                         row={row}
+                        activeCount={activeCounts?.[row.id]}
                         onArchive={archiveProduct}
                       />
                     ))}
