@@ -128,7 +128,7 @@ function ProductRow({
 }) {
   return (
     <TableRow className="hover:bg-muted/40">
-      <TableCell className="min-w-[10rem] whitespace-normal py-3">
+      <TableCell className="min-w-[10rem] py-3 whitespace-normal">
         <div className="flex items-center gap-2">
           <Link
             href={`/product-stats/${row.id}`}
@@ -150,18 +150,19 @@ function ProductRow({
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium leading-tight">{row.name}</p>
-              {row.campaignCount > 0 ? (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {row.campaignCount === 1
-                    ? "1 campaña"
-                    : `${row.campaignCount} campañas`}
-                </p>
-              ) : (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Sin campañas
-                </p>
-              )}
+              <p className="text-sm leading-tight font-medium">{row.name}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {row.activeCampaignCount > 0 ? (
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                    {row.activeCampaignCount === 1
+                      ? "1 activa"
+                      : `${row.activeCampaignCount} activas`}
+                  </span>
+                ) : (
+                  "Sin activas"
+                )}
+                {` de ${row.campaignCount} ${row.campaignCount === 1 ? "campaña" : "campañas"}`}
+              </p>
             </div>
           </Link>
           <Button
@@ -238,8 +239,7 @@ export function SummaryProductsTableSection({
     0
   )
 
-  const hasAnyLinked =
-    data?.rows.some((row) => row.campaignCount > 0) ?? false
+  const hasAnyLinked = data?.rows.some((row) => row.campaignCount > 0) ?? false
 
   return (
     <section className="flex flex-col gap-3 sm:gap-4">
@@ -355,7 +355,7 @@ export function SummaryProductsTableSection({
                         currency="COP"
                         emphasized
                       />
-                      <TableCell className="py-3 text-right text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                      <TableCell className="py-3 text-right text-sm font-semibold text-emerald-700 tabular-nums dark:text-emerald-400">
                         {totalVentas > 0
                           ? formatSummaryOrders(totalVentas)
                           : "—"}
