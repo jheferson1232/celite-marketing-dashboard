@@ -5,6 +5,7 @@ import {
   getSummaryActiveCampaignCounts,
   getSummaryProductsTable,
   type SummaryProductsTable,
+  type SummaryTikTokCampaignCounts,
 } from "@/lib/services/summary/products-summary-table"
 import type { DateRange } from "@/lib/services/meta/types"
 
@@ -14,5 +15,6 @@ export const getSummaryProductsTableAction = createServerAction(
 )
 
 export const getSummaryActiveCampaignCountsAction = createServerAction(
-  async (): Promise<Record<string, number>> => getSummaryActiveCampaignCounts()
+  async (): Promise<Record<string, SummaryTikTokCampaignCounts>> =>
+    getSummaryActiveCampaignCounts()
 )

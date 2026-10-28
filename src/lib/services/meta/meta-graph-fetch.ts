@@ -52,7 +52,7 @@ export async function metaGraphFetch(
       const response = await fetch(url, {
         ...init,
         method: init?.method ?? "GET",
-        next: init?.cache === "no-store" ? undefined : metaFetchCacheNext,
+        next: metaFetchCacheNext,
       })
 
       if (response.ok) {

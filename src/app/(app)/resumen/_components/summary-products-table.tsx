@@ -25,6 +25,7 @@ import type { DateRange } from "@/lib/services/meta/types"
 import type {
   SummaryProductPlatformMetrics,
   SummaryProductTableRow,
+  SummaryTikTokCampaignCounts,
 } from "@/lib/services/summary/products-summary-table"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
@@ -124,11 +125,11 @@ function sumPlatformMetrics(
 
 function ProductRow({
   row,
-  activeCount,
+  tiktokCounts,
   onArchive,
 }: {
   row: SummaryProductTableRow
-  activeCount: number | undefined
+  tiktokCounts: SummaryTikTokCampaignCounts | undefined
   onArchive: (product: { id: string; name: string }) => void
 }) {
   return (
@@ -157,14 +158,22 @@ function ProductRow({
             <div className="min-w-0">
               <p className="text-sm leading-tight font-medium">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {activeCount === undefined ? null : activeCount > 0 ? (
-                  <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                    {activeCount === 1 ? "1 activa" : `${activeCount} activas`}
-                  </span>
+                {tiktokCounts && tiktokCounts.total > 0 ? (
+                  <>
+                    {tiktokCounts.active > 0 ? (
+                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                        {tiktokCounts.active === 1
+                          ? "1 activa"
+                          : `${tiktokCounts.active} activas`}
+                      </span>
+                    ) : (
+                      "Sin activas"
+                    )}
+                    {` de ${tiktokCounts.total} en TikTok`}
+                  </>
                 ) : (
-                  "Sin activas"
+                  `${row.campaignCount} ${row.campaignCount === 1 ? "campaña" : "campañas"}`
                 )}
-                {`${activeCount === undefined ? "" : " de "}${row.campaignCount} ${row.campaignCount === 1 ? "campaña" : "campañas"}`}
               </p>
             </div>
           </Link>
@@ -347,7 +356,7 @@ export function SummaryProductsTableSection({
                       <ProductRow
                         key={row.id}
                         row={row}
-                        activeCount={activeCounts?.[row.id]}
+                        tiktokCounts={activeCounts?.[row.id]}
                         onArchive={archiveProduct}
                       />
                     ))}

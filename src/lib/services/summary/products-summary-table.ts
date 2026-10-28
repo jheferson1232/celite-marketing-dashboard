@@ -6,16 +6,11 @@ import {
 import { listMetaAdAccounts } from "@/lib/services/meta/meta-ad-accounts"
 import { getMetaClient } from "@/lib/services/meta/meta"
 import { withMetaCache } from "@/lib/services/meta/meta-cache"
-import { isMetaCampaignActiveForCount } from "@/lib/services/meta/meta-campaign-status"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import { normalizeMetaId } from "@/lib/services/meta/meta-ids"
-import {
-  buildMetaGraphUrl,
-  metaGraphFetchJson,
-} from "@/lib/services/meta/meta-graph-fetch"
 import { pacedMetaRequest } from "@/lib/services/meta/meta-request-pacing"
 import { getPurchaseSpendAndCpaFromInsight } from "@/lib/services/meta/purchase-metrics"
-import type { DateRange, MetaCampaign } from "@/lib/services/meta/types"
+import type { DateRange } from "@/lib/services/meta/types"
 import { listProducts, type ProductRecord } from "@/lib/services/product"
 import { listTikTokAdAccounts } from "@/lib/services/tiktok/ad-accounts"
 import { fetchAllPages } from "@/lib/services/tiktok/fetch-all-pages"
@@ -263,66 +258,6 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks
 }
 
-function linkedCampaignIds(
-  products: ProductRecord[],
-  platform: "meta" | "tiktok"
-): string[] {
-  const ids = products.flatMap((product) =>
-    product.campaigns
-      .filter((c) => c.platform === platform)
-      .map((c) =>
-        platform === "meta" ? normalizeMetaId(c.campaignId) : c.campaignId
-      )
-  )
-  return [...new Set(ids.filter(Boolean))]
-}
-
-async function loadActiveMetaCampaignIds(ids: string[]): Promise<Set<string>> {
-  const active = new Set<string>()
-  if (ids.length === 0) return active
-
-  await pacedMetaRequest(async () => {
-    const accounts = await listMetaAdAccounts()
-    const accountIds =
-      accounts.length > 0
-        ? accounts.map((account) => account.accountId)
-        : [process.env.META_AD_ACCOUNT_ID ?? ""]
-
-    await Promise.all(
-      accountIds.map(async (rawAccountId) => {
-        const accountId = rawAccountId.replace(/^act_/i, "").trim()
-        try {
-          for (const idsChunk of chunk(ids, STATUS_ID_CHUNK)) {
-            // Sin caché: el estado ON/OFF tiene que reflejarse al instante.
-            const url = buildMetaGraphUrl(`act_${accountId}/campaigns`, {
-              fields: "id,status,effective_status",
-              filtering: JSON.stringify([
-                { field: "id", operator: "IN", value: idsChunk },
-              ]),
-              limit: "500",
-            })
-            const { data } = await metaGraphFetchJson<{
-              data?: MetaCampaign[]
-            }>(url, { cache: "no-store" })
-            for (const campaign of data ?? []) {
-              if (isMetaCampaignActiveForCount(campaign)) {
-                active.add(normalizeMetaId(campaign.id))
-              }
-            }
-          }
-        } catch (error) {
-          console.warn(
-            `[summary-products] No se pudo leer el estado de campañas Meta de ${accountId}:`,
-            error
-          )
-        }
-      })
-    )
-  })
-
-  return active
-}
-
 async function loadActiveTikTokCampaignIds(
   ids: string[]
 ): Promise<Set<string>> {
@@ -365,23 +300,31 @@ async function loadActiveTikTokCampaignIds(
   return active
 }
 
-/** Campañas con interruptor ON por producto. Sin caché: refleja cambios al instante. */
+export type SummaryTikTokCampaignCounts = { active: number; total: number }
+
+/** Campañas TikTok con interruptor ON por producto. Sin caché: refleja cambios al instante. */
 export async function getSummaryActiveCampaignCounts(): Promise<
-  Record<string, number>
+  Record<string, SummaryTikTokCampaignCounts>
 > {
   const products = await listProducts()
-  const [activeMeta, activeTiktok] = await Promise.all([
-    loadActiveMetaCampaignIds(linkedCampaignIds(products, "meta")),
-    loadActiveTikTokCampaignIds(linkedCampaignIds(products, "tiktok")),
-  ])
+  const tiktokIds = [
+    ...new Set(
+      products.flatMap((product) =>
+        product.campaigns
+          .filter((c) => c.platform === "tiktok")
+          .map((c) => c.campaignId)
+      )
+    ),
+  ].filter(Boolean)
+  const active = await loadActiveTikTokCampaignIds(tiktokIds)
 
-  const counts: Record<string, number> = {}
+  const counts: Record<string, SummaryTikTokCampaignCounts> = {}
   for (const product of products) {
-    counts[product.id] = product.campaigns.filter((c) =>
-      c.platform === "meta"
-        ? activeMeta.has(normalizeMetaId(c.campaignId))
-        : c.platform === "tiktok" && activeTiktok.has(c.campaignId)
-    ).length
+    const linked = product.campaigns.filter((c) => c.platform === "tiktok")
+    counts[product.id] = {
+      active: linked.filter((c) => active.has(c.campaignId)).length,
+      total: linked.length,
+    }
   }
   return counts
 }
