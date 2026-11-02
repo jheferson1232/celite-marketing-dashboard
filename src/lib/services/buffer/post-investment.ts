@@ -392,7 +392,8 @@ export async function getBufferPostInvestments(
         .map((ad) => productByCampaign.get(ad.campaignId))
         .find((name) => name) ??
       null
-    const match = videoSeeds.length > 0 ? "video" : copySeeds.length > 0 ? "descripcion" : "producto"
+    const match: BufferPostInvestment["match"] =
+      videoSeeds.length > 0 ? "video" : copySeeds.length > 0 ? "descripcion" : "producto"
 
     return [
       {
