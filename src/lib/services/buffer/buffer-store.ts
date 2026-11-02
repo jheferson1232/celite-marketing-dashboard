@@ -4,6 +4,7 @@ import { getBufferBoard, type BufferBoard } from "./buffer"
 import {
   getBufferPostInvestments,
   type BufferPostInvestment,
+  type BufferPostVideoAd,
 } from "./post-investment"
 
 const SNAPSHOT_ID = "default"
@@ -11,7 +12,25 @@ const SNAPSHOT_ID = "default"
 export type StoredBufferSnapshot = {
   board: BufferBoard
   investments: BufferPostInvestment[]
+  catalog: BufferPostVideoAd[]
   syncedAt: string
+}
+
+function readInvestments(value: Prisma.JsonValue): {
+  posts: BufferPostInvestment[]
+  catalog: BufferPostVideoAd[]
+} {
+  if (Array.isArray(value)) {
+    return { posts: value as BufferPostInvestment[], catalog: [] }
+  }
+  if (value && typeof value === "object") {
+    const record = value as { posts?: unknown; catalog?: unknown }
+    return {
+      posts: Array.isArray(record.posts) ? (record.posts as BufferPostInvestment[]) : [],
+      catalog: Array.isArray(record.catalog) ? (record.catalog as BufferPostVideoAd[]) : [],
+    }
+  }
+  return { posts: [], catalog: [] }
 }
 
 function asSnapshot(row: {
@@ -19,9 +38,11 @@ function asSnapshot(row: {
   investments: Prisma.JsonValue
   syncedAt: Date
 }): StoredBufferSnapshot {
+  const stored = readInvestments(row.investments)
   return {
     board: row.board as BufferBoard,
-    investments: (row.investments ?? []) as BufferPostInvestment[],
+    investments: stored.posts,
+    catalog: stored.catalog,
     syncedAt: row.syncedAt.toISOString(),
   }
 }
@@ -50,20 +71,21 @@ export async function refreshBufferSnapshot(
       },
     ]
   })
-  const investments = await getBufferPostInvestments(tiktokPosts)
+  const { posts, catalog } = await getBufferPostInvestments(tiktokPosts)
   const syncedAt = new Date()
+  const investments = { posts, catalog } as unknown as Prisma.InputJsonValue
 
   const row = await prisma.bufferSnapshot.upsert({
     where: { id: SNAPSHOT_ID },
     create: {
       id: SNAPSHOT_ID,
       board: board as unknown as Prisma.InputJsonValue,
-      investments: investments as unknown as Prisma.InputJsonValue,
+      investments,
       syncedAt,
     },
     update: {
       board: board as unknown as Prisma.InputJsonValue,
-      investments: investments as unknown as Prisma.InputJsonValue,
+      investments,
       syncedAt,
     },
   })

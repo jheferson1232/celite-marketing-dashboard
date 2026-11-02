@@ -330,6 +330,7 @@ export function BufferContent() {
               channelName={
                 channels.find((channel) => channel.id === post.channelId)?.name
               }
+              catalog={snapshot?.catalog ?? []}
               investment={
                 post.channelService.toLowerCase() === "tiktok"
                   ? investmentByPostId.get(post.id) ?? null
@@ -536,13 +537,21 @@ function MultiPicker({
   )
 }
 
-function PostVideoAds({ ads }: { ads: BufferPostVideoAd[] }) {
+function PostVideoAds({
+  ads,
+  initialCampaignId,
+  initialAdgroupId,
+}: {
+  ads: BufferPostVideoAd[]
+  initialCampaignId?: string
+  initialAdgroupId?: string
+}) {
   const campaigns = useMemo(() => campaignOptions(ads), [ads])
   const [campaignIds, setCampaignIds] = useState<string[]>(() =>
-    ads[0] ? [ads[0].campaignId] : []
+    initialCampaignId ? [initialCampaignId] : []
   )
   const [adgroupIds, setAdgroupIds] = useState<string[]>(() =>
-    ads[0] ? [ads[0].adgroupId] : []
+    initialAdgroupId ? [initialAdgroupId] : []
   )
   const selectedCampaignIds = campaignIds.filter((id) =>
     campaigns.some((campaign) => campaign.value === id)
@@ -663,15 +672,19 @@ function PostVideoAds({ ads }: { ads: BufferPostVideoAd[] }) {
 function PostRow({
   post,
   channelName,
+  catalog,
   investment,
   investmentLoading,
 }: {
   post: BufferPost
   channelName?: string
+  catalog: BufferPostVideoAd[]
   investment: BufferPostInvestment | null
   investmentLoading: boolean
 }) {
   const thumbnail = post.assets.find((asset) => asset.thumbnail)?.thumbnail
+  const pickerAds = catalog.length > 0 ? catalog : investment?.videoAds ?? null
+  const initialAd = investment?.videoAds?.[0]
 
   return (
     <li className="flex items-start gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
@@ -685,8 +698,8 @@ function PostRow({
       <div className="min-w-0 flex-1 space-y-1">
         <p className="line-clamp-3 text-sm whitespace-pre-wrap">{post.text || "Sin texto"}</p>
         {post.channelService.toLowerCase() === "tiktok" ? (
-          investment ? (
-            <>
+          <>
+            {investment ? (
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                 <span>Gasto {formatCop(investment.spend)}</span>
                 <span>Compras {investment.purchases.toLocaleString("es-CO")}</span>
@@ -699,17 +712,21 @@ function PostRow({
                     : `${investment.campaignNames.length} campañas`}
                 </span>
               </p>
-              {investment.videoAds == null ? (
-                <p className="text-muted-foreground text-xs">
-                  Pulsa Actualizar para elegir campaña y conjunto.
-                </p>
-              ) : (
-                <PostVideoAds ads={investment.videoAds} />
-              )}
-            </>
-          ) : investmentLoading ? (
-            <p className="text-muted-foreground text-xs">Cargando TikTok Ads…</p>
-          ) : null
+            ) : null}
+            {pickerAds != null ? (
+              <PostVideoAds
+                ads={pickerAds}
+                initialCampaignId={initialAd?.campaignId}
+                initialAdgroupId={initialAd?.adgroupId}
+              />
+            ) : investmentLoading ? (
+              <p className="text-muted-foreground text-xs">Cargando TikTok Ads…</p>
+            ) : investment ? (
+              <p className="text-muted-foreground text-xs">
+                Pulsa Actualizar para elegir campaña y conjunto.
+              </p>
+            ) : null}
+          </>
         ) : null}
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <span>{serviceLabel(post.channelService)}</span>

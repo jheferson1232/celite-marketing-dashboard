@@ -61,6 +61,11 @@ export type BufferPostInvestment = {
   to: string
 }
 
+export type BufferPostInvestmentsResult = {
+  posts: BufferPostInvestment[]
+  catalog: BufferPostVideoAd[]
+}
+
 type VideoAd = {
   adId: string
   campaignId: string
@@ -290,9 +295,9 @@ function adsInSameCampaigns(
 
 export async function getBufferPostInvestments(
   posts: BufferPostInvestmentInput[]
-): Promise<BufferPostInvestment[]> {
+): Promise<BufferPostInvestmentsResult> {
   const uniquePosts = posts.filter((post) => post.id.trim()).slice(0, 60)
-  if (uniquePosts.length === 0) return []
+  if (uniquePosts.length === 0) return { posts: [], catalog: [] }
 
   const range = getTikTokLifetimeDateRange()
   const [accounts, productRows] = await Promise.all([
@@ -363,7 +368,8 @@ export async function getBufferPostInvestments(
     adsByItemId.set(ad.itemId, itemAds)
   }
 
-  return uniquePosts.flatMap((post) => {
+  const catalog = listVideoAds(ads)
+  const matchedPosts = uniquePosts.flatMap((post) => {
     const itemIds = extractItemIds([post.externalLink, post.thumbnail])
     const videoSeeds = itemIds.flatMap((itemId) => adsByItemId.get(itemId) ?? [])
     const copySeeds = videoSeeds.length > 0 ? [] : adsMatchingCopy(post.text, ads)
@@ -403,4 +409,5 @@ export async function getBufferPostInvestments(
       },
     ]
   })
+  return { posts: matchedPosts, catalog }
 }
