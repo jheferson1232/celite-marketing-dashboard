@@ -87,11 +87,11 @@ function isStatus(value: string): value is BufferPostStatus {
   return (BUFFER_POST_STATUSES as readonly string[]).includes(value)
 }
 
-function formatWhen(value: string | null) {
+function formatWhen(value: string | null, pattern = "d MMM yyyy, HH:mm") {
   if (!value) return "Sin fecha"
   const date = parseISO(value)
   if (!isValid(date)) return "Sin fecha"
-  return format(date, "d MMM yyyy, HH:mm", { locale: es })
+  return format(date, pattern, { locale: es })
 }
 
 function postMoment(post: BufferPost) {
@@ -322,7 +322,7 @@ export function BufferContent() {
           última consulta.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2">
           {visiblePosts.map((post) => (
             <PostRow
               key={post.id}
@@ -407,10 +407,6 @@ function ChannelFilter({
   )
 }
 
-function formatCop(value: number) {
-  return `${formatCurrency(value, "COP")} COP`
-}
-
 type VideoOption = { value: string; label: string }
 
 function adStatusLabel(status: string | null) {
@@ -419,6 +415,16 @@ function adStatusLabel(status: string | null) {
   if (value === "DISABLE" || value === "PAUSED") return "Pausado"
   if (value === "DELETE" || value === "DELETED") return "Eliminado"
   return status?.trim() || "Sin estado"
+}
+
+function shortMoney(value: number) {
+  return formatCurrency(value, "COP")
+}
+
+function shortMetrics(spend: number, purchases: number, cpa: number | null) {
+  return `${shortMoney(spend)} · ${purchases.toLocaleString("es-CO")} compras · CPA ${
+    cpa == null ? "—" : shortMoney(cpa)
+  }`
 }
 
 function campaignOptions(ads: BufferPostVideoAd[]): VideoOption[] {
@@ -446,11 +452,6 @@ function adgroupOptions(ads: BufferPostVideoAd[], campaignIds: string[]): VideoO
         ? `${item.campaignName} · ${item.label}`
         : item.label,
   }))
-}
-
-function adCpa(ad: BufferPostVideoAd) {
-  if (ad.spend == null || ad.purchases == null || ad.purchases <= 0) return null
-  return ad.spend / ad.purchases
 }
 
 function selectionTotals(ads: BufferPostVideoAd[]) {
@@ -492,8 +493,8 @@ function MultiPicker({
   const selected = options.filter((option) => value.includes(option.value))
 
   return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-xs">{label}</span>
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="text-muted-foreground w-14 shrink-0 text-[11px]">{label}</span>
       <Combobox
         items={options}
         multiple
@@ -504,14 +505,17 @@ function MultiPicker({
         itemToStringLabel={(item) => item.label}
         itemToStringValue={(item) => item.value}
       >
-        <ComboboxChips ref={anchor} className="w-full">
+        <ComboboxChips ref={anchor} className="min-h-7 w-full flex-1 py-0.5 text-xs shadow-none">
           <ComboboxValue>
             {(values: VideoOption[]) => (
               <>
                 {values.map((item) => (
-                  <ComboboxChip key={item.value}>{item.label}</ComboboxChip>
+                  <ComboboxChip key={item.value} className="h-5 max-w-40">
+                    <span className="truncate">{item.label}</span>
+                  </ComboboxChip>
                 ))}
                 <ComboboxChipsInput
+                  className="min-w-8 text-xs"
                   placeholder={values.length === 0 ? placeholder : ""}
                 />
               </>
@@ -569,101 +573,47 @@ function PostVideoAds({
       selectedAdgroupIds.includes(ad.adgroupId)
   )
   const totals = selectionTotals(visibleAds)
+  const singleAd = visibleAds.length === 1 ? visibleAds[0] : null
 
   if (campaigns.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2 pt-1">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <MultiPicker
-          label="Campañas"
-          placeholder="Agregar campaña"
-          options={campaigns}
-          value={selectedCampaignIds}
-          onValueChange={(next) => {
-            setCampaignIds(next)
-            setAdgroupIds((current) =>
-              current.filter((id) =>
-                ads.some((ad) => next.includes(ad.campaignId) && ad.adgroupId === id)
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+          <MultiPicker
+            label="Campaña"
+            placeholder="+"
+            options={campaigns}
+            value={selectedCampaignIds}
+            onValueChange={(next) => {
+              setCampaignIds(next)
+              setAdgroupIds((current) =>
+                current.filter((id) =>
+                  ads.some((ad) => next.includes(ad.campaignId) && ad.adgroupId === id)
+                )
               )
-            )
-          }}
-        />
-        <MultiPicker
-          label="Conjuntos"
-          placeholder="Agregar conjunto"
-          options={adgroups}
-          value={selectedAdgroupIds}
-          onValueChange={setAdgroupIds}
-        />
+            }}
+          />
+          <MultiPicker
+            label="Conjunto"
+            placeholder="+"
+            options={adgroups}
+            value={selectedAdgroupIds}
+            onValueChange={setAdgroupIds}
+          />
+        </div>
+        {visibleAds.length > 0 && totals.hasMetrics ? (
+          <p className="text-xs whitespace-nowrap">
+            {shortMetrics(totals.spend, totals.purchases, totals.cpa)}
+            {singleAd ? ` · ${adStatusLabel(singleAd.operationStatus)}` : ""}
+          </p>
+        ) : null}
       </div>
       {visibleAds.length === 0 ? (
-        <p className="text-muted-foreground text-xs">
-          Agrega una campaña y un conjunto para ver sus anuncios.
-        </p>
-      ) : (
-        <>
-          {totals.hasMetrics ? (
-            <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <span>Gasto {formatCop(totals.spend)}</span>
-              <span>Compras {totals.purchases.toLocaleString("es-CO")}</span>
-              <span>CPA {totals.cpa == null ? "—" : formatCop(totals.cpa)}</span>
-            </p>
-          ) : (
-            <p className="text-muted-foreground text-xs">
-              Pulsa Actualizar para ver compras y CPA.
-            </p>
-          )}
-          <ul className="flex flex-col gap-1">
-            {visibleAds.map((ad) => {
-              const status = adStatusLabel(ad.operationStatus)
-              const cpa = adCpa(ad)
-              const title = [
-                selectedCampaignIds.length > 1 ? ad.campaignName : null,
-                selectedAdgroupIds.length > 1 && ad.adgroupName !== ad.adName
-                  ? ad.adgroupName
-                  : null,
-                ad.adName,
-              ]
-                .filter((part) => part)
-                .join(" · ")
-              return (
-                <li
-                  key={ad.adId}
-                  className="flex min-w-0 flex-col gap-1 rounded-md bg-muted/40 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <span className="truncate text-xs" title={title}>
-                    {title}
-                  </span>
-                  <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    {totals.hasMetrics ? (
-                      <>
-                        <span>
-                          Compras{" "}
-                          {ad.purchases == null
-                            ? "—"
-                            : ad.purchases.toLocaleString("es-CO")}
-                        </span>
-                        <span>CPA {cpa == null ? "—" : formatCop(cpa)}</span>
-                      </>
-                    ) : null}
-                    <Badge
-                      variant={
-                        status === "Activo"
-                          ? "secondary"
-                          : status === "Eliminado"
-                            ? "destructive"
-                            : "outline"
-                      }
-                    >
-                      {status}
-                    </Badge>
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </>
+        <p className="text-muted-foreground text-[11px]">Elige campaña y conjunto.</p>
+      ) : totals.hasMetrics ? null : (
+        <p className="text-muted-foreground text-[11px]">Pulsa Actualizar para ver el CPA.</p>
       )}
     </div>
   )
@@ -687,32 +637,18 @@ function PostRow({
   const initialAd = investment?.videoAds?.[0]
 
   return (
-    <li className="flex items-start gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+    <li className="flex items-start gap-2 rounded-lg bg-card px-2.5 py-2 ring-1 ring-foreground/10">
       {thumbnail ? (
         <img
           src={thumbnail}
           alt=""
-          className="size-16 shrink-0 rounded-lg object-cover"
+          className="size-10 shrink-0 rounded-md object-cover"
         />
       ) : null}
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="line-clamp-3 text-sm whitespace-pre-wrap">{post.text || "Sin texto"}</p>
+        <p className="line-clamp-1 text-sm">{post.text || "Sin texto"}</p>
         {post.channelService.toLowerCase() === "tiktok" ? (
           <>
-            {investment ? (
-              <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                <span>Gasto {formatCop(investment.spend)}</span>
-                <span>Compras {investment.purchases.toLocaleString("es-CO")}</span>
-                <span>
-                  CPA {investment.cpa == null ? "—" : formatCop(investment.cpa)}
-                </span>
-                <span>
-                  {investment.campaignNames.length === 1
-                    ? "1 campaña"
-                    : `${investment.campaignNames.length} campañas`}
-                </span>
-              </p>
-            ) : null}
             {pickerAds != null ? (
               <PostVideoAds
                 ads={pickerAds}
@@ -728,26 +664,26 @@ function PostRow({
             ) : null}
           </>
         ) : null}
-        <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-          <span>{serviceLabel(post.channelService)}</span>
-          {channelName ? <span>{channelName}</span> : null}
-          <span>{formatWhen(postMoment(post))}</span>
-          <Badge variant={post.status === "error" ? "destructive" : "outline"}>
-            {STATUS_LABEL[post.status]}
-          </Badge>
+        <p className="text-muted-foreground flex min-w-0 items-center gap-x-1.5 truncate text-[11px]">
+          <span className="shrink-0">{serviceLabel(post.channelService)}</span>
+          {channelName ? <span className="truncate">{channelName}</span> : null}
+          <span className="shrink-0">{formatWhen(postMoment(post), "d MMM HH:mm")}</span>
+          {post.status === "error" ? (
+            <Badge variant="destructive">{STATUS_LABEL[post.status]}</Badge>
+          ) : null}
+          {post.externalLink ? (
+            <a
+              href={post.externalLink}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 underline-offset-2 hover:underline"
+            >
+              Ver
+            </a>
+          ) : null}
         </p>
         {post.errorMessage ? (
-          <p className="text-destructive text-xs">{post.errorMessage}</p>
-        ) : null}
-        {post.externalLink ? (
-          <a
-            href={post.externalLink}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs underline-offset-4 hover:underline"
-          >
-            Ver publicación
-          </a>
+          <p className="text-destructive truncate text-[11px]">{post.errorMessage}</p>
         ) : null}
       </div>
     </li>
