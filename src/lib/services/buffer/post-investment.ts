@@ -11,7 +11,7 @@ import {
 import { buildTikTokCacheKey } from "@/lib/services/tiktok/tiktok-api.server"
 import { withTikTokCache } from "@/lib/services/tiktok/tiktok-cache"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"
-import type { TikTokAd } from "@/lib/services/tiktok/types"
+import type { TikTokAd, TikTokAdGroup } from "@/lib/services/tiktok/types"
 
 const SPEND_TTL_MS = 10 * 60 * 1000
 const accountLoads = new Map<string, Promise<VideoAd[]>>()
@@ -21,9 +21,12 @@ const AD_FIELDS = JSON.stringify([
   "ad_text",
   "campaign_id",
   "campaign_name",
+  "adgroup_id",
+  "operation_status",
   "tiktok_item_id",
   "video_id",
 ])
+const ADGROUP_FIELDS = JSON.stringify(["adgroup_id", "adgroup_name"])
 const AD_METRICS = ["spend", "complete_payment", "total_purchase", "purchase"] as const
 
 export type BufferPostInvestmentInput = {
@@ -33,11 +36,24 @@ export type BufferPostInvestmentInput = {
   thumbnail?: string | null
 }
 
+export type BufferPostVideoAd = {
+  adId: string
+  adName: string
+  campaignId: string
+  campaignName: string
+  adgroupId: string
+  adgroupName: string
+  operationStatus: string | null
+  spend?: number
+  purchases?: number
+}
+
 export type BufferPostInvestment = {
   postId: string
   match: "video" | "producto" | "descripcion"
   productName: string | null
   campaignNames: string[]
+  videoAds?: BufferPostVideoAd[]
   spend: number
   purchases: number
   cpa: number | null
@@ -49,6 +65,9 @@ type VideoAd = {
   adId: string
   campaignId: string
   campaignName: string
+  adgroupId: string
+  adgroupName: string
+  operationStatus: string | null
   adName: string
   adText: string
   itemId: string | null
@@ -109,10 +128,10 @@ async function loadAccountVideoAds(account: {
   const load = withTikTokDashboardAccount(account.id, async () => {
     const range = getTikTokLifetimeDateRange()
     const cacheKey = await buildTikTokCacheKey(
-      `buffer-video-spend:v2:${range.from}:${range.to}`
+      `buffer-video-spend:v3:${range.from}:${range.to}`
     )
     return withTikTokCache(cacheKey, SPEND_TTL_MS, async () => {
-      const [ads, rows] = await Promise.all([
+      const [ads, rows, adGroups] = await Promise.all([
         fetchAllPages<TikTokAd>("/ad/get/", {
           fields: AD_FIELDS,
           filtering: JSON.stringify({ primary_status: "STATUS_ALL" }),
@@ -124,9 +143,18 @@ async function loadAccountVideoAds(account: {
           range.from,
           range.to
         ),
+        fetchAllPages<TikTokAdGroup>("adgroup/get/", {
+          fields: ADGROUP_FIELDS,
+        }).catch(() => [] as TikTokAdGroup[]),
       ])
 
       const metricsByAd = new Map(rows.map((row) => [row.dimensions.ad_id, row.metrics]))
+      const adgroupNameById = new Map(
+        adGroups.map((group) => [
+          group.adgroup_id,
+          group.adgroup_name?.trim() || group.adgroup_id,
+        ])
+      )
 
       return ads.flatMap((ad) => {
         const campaignId = ad.campaign_id?.trim() ?? ""
@@ -137,11 +165,17 @@ async function loadAccountVideoAds(account: {
           account.currency
         )
         const purchases = getPurchases(metrics ?? {})
+        const adgroupId = ad.adgroup_id?.trim() || "sin-conjunto"
         return [
           {
             adId: ad.ad_id,
             campaignId,
             campaignName: ad.campaign_name?.trim() || ad.ad_name?.trim() || campaignId,
+            adgroupId,
+            adgroupName:
+              adgroupNameById.get(ad.adgroup_id ?? "") ||
+              (adgroupId === "sin-conjunto" ? "Sin conjunto" : adgroupId),
+            operationStatus: ad.operation_status?.trim() || null,
             adName: ad.ad_name?.trim() || "",
             adText: ad.ad_text?.trim() || "",
             itemId: ad.tiktok_item_id?.trim() || null,
@@ -217,6 +251,32 @@ function adsMatchingCopy(text: string, ads: VideoAd[]) {
       sameCreativeCopy(text, ad.adText) ||
       sameCreativeCopy(text, ad.adName) ||
       nameOverlaps(text, ad.campaignName)
+  )
+}
+
+function listVideoAds(ads: VideoAd[]): BufferPostVideoAd[] {
+  const seen = new Set<string>()
+  const videoAds: BufferPostVideoAd[] = []
+  for (const ad of ads) {
+    if (seen.has(ad.adId)) continue
+    seen.add(ad.adId)
+    videoAds.push({
+      adId: ad.adId,
+      adName: ad.adName || ad.adId,
+      campaignId: ad.campaignId,
+      campaignName: ad.campaignName,
+      adgroupId: ad.adgroupId,
+      adgroupName: ad.adgroupName,
+      operationStatus: ad.operationStatus,
+      spend: ad.spend,
+      purchases: ad.purchases,
+    })
+  }
+  return videoAds.toSorted(
+    (left, right) =>
+      left.campaignName.localeCompare(right.campaignName, "es") ||
+      left.adgroupName.localeCompare(right.adgroupName, "es") ||
+      left.adName.localeCompare(right.adName, "es")
   )
 }
 
@@ -334,6 +394,7 @@ export async function getBufferPostInvestments(
         match,
         productName,
         campaignNames: totals.campaignNames,
+        videoAds: listVideoAds(seeds),
         spend: totals.spend,
         purchases: totals.purchases,
         cpa: totals.cpa,

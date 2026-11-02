@@ -7,6 +7,20 @@ import { es } from "date-fns/locale"
 import { RiCalendarScheduleLine, RiRefreshLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@/components/ui/combobox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCurrency } from "@/lib/format"
@@ -19,7 +33,10 @@ import {
   type BufferPostStatus,
 } from "@/lib/services/buffer/buffer"
 import { rememberBufferPosts } from "@/lib/services/buffer/match-post"
-import type { BufferPostInvestment } from "@/lib/services/buffer/post-investment"
+import type {
+  BufferPostInvestment,
+  BufferPostVideoAd,
+} from "@/lib/services/buffer/post-investment"
 import {
   getSavedBufferSnapshotAction,
   refreshBufferSnapshotAction,
@@ -393,6 +410,256 @@ function formatCop(value: number) {
   return `${formatCurrency(value, "COP")} COP`
 }
 
+type VideoOption = { value: string; label: string }
+
+function adStatusLabel(status: string | null) {
+  const value = (status ?? "").toUpperCase()
+  if (value === "ENABLE" || value === "ACTIVE") return "Activo"
+  if (value === "DISABLE" || value === "PAUSED") return "Pausado"
+  if (value === "DELETE" || value === "DELETED") return "Eliminado"
+  return status?.trim() || "Sin estado"
+}
+
+function campaignOptions(ads: BufferPostVideoAd[]): VideoOption[] {
+  const names = new Map<string, string>()
+  for (const ad of ads) {
+    if (!names.has(ad.campaignId)) names.set(ad.campaignId, ad.campaignName)
+  }
+  return [...names.entries()].map(([value, label]) => ({ value, label }))
+}
+
+function adgroupOptions(ads: BufferPostVideoAd[], campaignIds: string[]): VideoOption[] {
+  const names = new Map<string, { label: string; campaignName: string }>()
+  for (const ad of ads) {
+    if (!campaignIds.includes(ad.campaignId) || names.has(ad.adgroupId)) continue
+    names.set(ad.adgroupId, { label: ad.adgroupName, campaignName: ad.campaignName })
+  }
+  const labelCounts = new Map<string, number>()
+  for (const item of names.values()) {
+    labelCounts.set(item.label, (labelCounts.get(item.label) ?? 0) + 1)
+  }
+  return [...names.entries()].map(([value, item]) => ({
+    value,
+    label:
+      (labelCounts.get(item.label) ?? 0) > 1
+        ? `${item.campaignName} · ${item.label}`
+        : item.label,
+  }))
+}
+
+function adCpa(ad: BufferPostVideoAd) {
+  if (ad.spend == null || ad.purchases == null || ad.purchases <= 0) return null
+  return ad.spend / ad.purchases
+}
+
+function selectionTotals(ads: BufferPostVideoAd[]) {
+  let spend = 0
+  let purchases = 0
+  let hasMetrics = false
+  for (const ad of ads) {
+    if (ad.spend == null || ad.purchases == null) continue
+    hasMetrics = true
+    spend += ad.spend
+    purchases += ad.purchases
+  }
+  return {
+    hasMetrics,
+    spend,
+    purchases,
+    cpa: purchases > 0 ? spend / purchases : null,
+  }
+}
+
+function sameOption(left: VideoOption, right: VideoOption) {
+  return left.value === right.value
+}
+
+function MultiPicker({
+  label,
+  placeholder,
+  options,
+  value,
+  onValueChange,
+}: {
+  label: string
+  placeholder: string
+  options: VideoOption[]
+  value: string[]
+  onValueChange: (value: string[]) => void
+}) {
+  const anchor = useComboboxAnchor()
+  const selected = options.filter((option) => value.includes(option.value))
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-xs">{label}</span>
+      <Combobox
+        items={options}
+        multiple
+        autoHighlight
+        value={selected}
+        onValueChange={(next) => onValueChange(next.map((item) => item.value))}
+        isItemEqualToValue={sameOption}
+        itemToStringLabel={(item) => item.label}
+        itemToStringValue={(item) => item.value}
+      >
+        <ComboboxChips ref={anchor} className="w-full">
+          <ComboboxValue>
+            {(values: VideoOption[]) => (
+              <>
+                {values.map((item) => (
+                  <ComboboxChip key={item.value}>{item.label}</ComboboxChip>
+                ))}
+                <ComboboxChipsInput
+                  placeholder={values.length === 0 ? placeholder : ""}
+                />
+              </>
+            )}
+          </ComboboxValue>
+        </ComboboxChips>
+        <ComboboxContent anchor={anchor}>
+          <ComboboxEmpty>Sin resultados.</ComboboxEmpty>
+          <ComboboxList>
+            <ComboboxGroup>
+              <ComboboxCollection>
+                {(item: VideoOption) => (
+                  <ComboboxItem key={item.value} value={item}>
+                    {item.label}
+                  </ComboboxItem>
+                )}
+              </ComboboxCollection>
+            </ComboboxGroup>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    </div>
+  )
+}
+
+function PostVideoAds({ ads }: { ads: BufferPostVideoAd[] }) {
+  const campaigns = useMemo(() => campaignOptions(ads), [ads])
+  const [campaignIds, setCampaignIds] = useState<string[]>(() =>
+    ads[0] ? [ads[0].campaignId] : []
+  )
+  const [adgroupIds, setAdgroupIds] = useState<string[]>(() =>
+    ads[0] ? [ads[0].adgroupId] : []
+  )
+  const selectedCampaignIds = campaignIds.filter((id) =>
+    campaigns.some((campaign) => campaign.value === id)
+  )
+  const adgroups = useMemo(
+    () => adgroupOptions(ads, selectedCampaignIds),
+    [ads, selectedCampaignIds]
+  )
+  const selectedAdgroupIds = adgroupIds.filter((id) =>
+    adgroups.some((group) => group.value === id)
+  )
+  const visibleAds = ads.filter(
+    (ad) =>
+      selectedCampaignIds.includes(ad.campaignId) &&
+      selectedAdgroupIds.includes(ad.adgroupId)
+  )
+  const totals = selectionTotals(visibleAds)
+
+  if (campaigns.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 pt-1">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <MultiPicker
+          label="Campañas"
+          placeholder="Agregar campaña"
+          options={campaigns}
+          value={selectedCampaignIds}
+          onValueChange={(next) => {
+            setCampaignIds(next)
+            setAdgroupIds((current) =>
+              current.filter((id) =>
+                ads.some((ad) => next.includes(ad.campaignId) && ad.adgroupId === id)
+              )
+            )
+          }}
+        />
+        <MultiPicker
+          label="Conjuntos"
+          placeholder="Agregar conjunto"
+          options={adgroups}
+          value={selectedAdgroupIds}
+          onValueChange={setAdgroupIds}
+        />
+      </div>
+      {visibleAds.length === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          Agrega una campaña y un conjunto para ver sus anuncios.
+        </p>
+      ) : (
+        <>
+          {totals.hasMetrics ? (
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <span>Gasto {formatCop(totals.spend)}</span>
+              <span>Compras {totals.purchases.toLocaleString("es-CO")}</span>
+              <span>CPA {totals.cpa == null ? "—" : formatCop(totals.cpa)}</span>
+            </p>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              Pulsa Actualizar para ver compras y CPA.
+            </p>
+          )}
+          <ul className="flex flex-col gap-1">
+            {visibleAds.map((ad) => {
+              const status = adStatusLabel(ad.operationStatus)
+              const cpa = adCpa(ad)
+              const title = [
+                selectedCampaignIds.length > 1 ? ad.campaignName : null,
+                selectedAdgroupIds.length > 1 && ad.adgroupName !== ad.adName
+                  ? ad.adgroupName
+                  : null,
+                ad.adName,
+              ]
+                .filter((part) => part)
+                .join(" · ")
+              return (
+                <li
+                  key={ad.adId}
+                  className="flex min-w-0 flex-col gap-1 rounded-md bg-muted/40 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="truncate text-xs" title={title}>
+                    {title}
+                  </span>
+                  <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    {totals.hasMetrics ? (
+                      <>
+                        <span>
+                          Compras{" "}
+                          {ad.purchases == null
+                            ? "—"
+                            : ad.purchases.toLocaleString("es-CO")}
+                        </span>
+                        <span>CPA {cpa == null ? "—" : formatCop(cpa)}</span>
+                      </>
+                    ) : null}
+                    <Badge
+                      variant={
+                        status === "Activo"
+                          ? "secondary"
+                          : status === "Eliminado"
+                            ? "destructive"
+                            : "outline"
+                      }
+                    >
+                      {status}
+                    </Badge>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PostRow({
   post,
   channelName,
@@ -407,7 +674,7 @@ function PostRow({
   const thumbnail = post.assets.find((asset) => asset.thumbnail)?.thumbnail
 
   return (
-    <li className="flex gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+    <li className="flex items-start gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
       {thumbnail ? (
         <img
           src={thumbnail}
@@ -432,14 +699,13 @@ function PostRow({
                     : `${investment.campaignNames.length} campañas`}
                 </span>
               </p>
-              {investment.campaignNames.length > 0 ? (
-                <p
-                  className="text-muted-foreground line-clamp-2 text-xs"
-                  title={investment.campaignNames.join(" · ")}
-                >
-                  {investment.campaignNames.join(" · ")}
+              {investment.videoAds == null ? (
+                <p className="text-muted-foreground text-xs">
+                  Pulsa Actualizar para elegir campaña y conjunto.
                 </p>
-              ) : null}
+              ) : (
+                <PostVideoAds ads={investment.videoAds} />
+              )}
             </>
           ) : investmentLoading ? (
             <p className="text-muted-foreground text-xs">Cargando TikTok Ads…</p>
