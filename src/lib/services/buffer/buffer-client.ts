@@ -5,13 +5,17 @@ const BUFFER_API_URL = "https://api.buffer.com"
 
 let client: AxiosInstance | null = null
 
+export function isBufferApiKeyConfigured(): boolean {
+  return Boolean(process.env.BUFFER_API_KEY?.trim())
+}
+
 function getClient(): AxiosInstance {
   if (client) return client
 
   const apiKey = process.env.BUFFER_API_KEY?.trim()
   if (!apiKey) {
     throw new ServerActionError(
-      "Falta BUFFER_API_KEY en este servidor. En local va en .env.local; en Vercel, en Environment Variables, y hay que volver a desplegar."
+      "Falta BUFFER_API_KEY en este servidor. En local va en .env.local; en Vercel, en Environment Variables, y hay que volver a desplegar. Si la variable aparece con «Needs Attention», edítala, vuelve a pegar el token y redeploy."
     )
   }
 
