@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,15 @@ import {
   RiImageLine,
   RiExternalLinkLine,
 } from "@remixicon/react"
+import { runServerAction } from "@/lib/server-action"
+import { getSavedBufferSnapshotAction } from "@/app/(app)/buffer/_actions/buffer"
+import {
+  bufferPostLinkOptionsFromBoardPosts,
+  mergeBufferPostLinkOptions,
+  normalizeTikTokVideoId,
+  readBufferPostCatalog,
+  type BufferPostLinkOption,
+} from "@/lib/services/buffer/buffer-ad-selection"
 import {
   formatLandingPagePath,
   META_DASHBOARD_CURRENCY,
@@ -38,6 +48,7 @@ import {
   passesTikTokCreativeSpendFilter,
 } from "./utils"
 import { matchBufferPost } from "@/lib/services/buffer/match-post"
+import { BufferPostLinkMenu } from "./buffer-post-link-menu"
 import { CreativePreviewDialog } from "./creative-preview-dialog"
 import { CreativePreviewImage } from "./creative-preview-image"
 
@@ -140,19 +151,27 @@ function mergeRows(group: AdInsightRow[]): AdInsightRow {
 function CreativeCard({
   creativeKey,
   row,
+  group,
   metrics,
   metricOptions,
   currency,
   platform,
   adsCount,
+  bufferPosts,
+  bufferPostsLoading,
+  bufferPostsTruncated,
 }: {
   creativeKey: string
   row: AdInsightRow
+  group: AdInsightRow[]
   metrics: MetricKey[]
   metricOptions: { key: MetricKey; label: string }[]
   currency: CurrencyCode
   platform: "meta" | "tiktok"
   adsCount: number
+  bufferPosts: BufferPostLinkOption[]
+  bufferPostsLoading: boolean
+  bufferPostsTruncated: boolean
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
   const hasVideo = Boolean(row.video_id || row.video_url)
@@ -169,6 +188,15 @@ function CreativeCard({
     (row.video_id?.startsWith("spark:")
       ? row.video_id.slice("spark:".length)
       : bufferPost?.videoId)
+  const bufferVideoId =
+    platform === "tiktok"
+      ? normalizeTikTokVideoId([
+          row.tiktok_item_id,
+          row.video_id,
+          ...group.map((r) => r.tiktok_item_id),
+          ...group.map((r) => r.video_id),
+        ])
+      : null
 
   // We need to adapt AdInsightRow to CreativeRow for CreativePreviewDialog
   const creativeRowAdapter = {
@@ -256,6 +284,16 @@ function CreativeCard({
             </a>
           )}
 
+          {platform === "tiktok" && bufferVideoId ? (
+            <BufferPostLinkMenu
+              bufferVideoId={bufferVideoId}
+              group={group}
+              posts={bufferPosts}
+              postsLoading={bufferPostsLoading}
+              postsTruncated={bufferPostsTruncated}
+            />
+          ) : null}
+
           <dl className="space-y-2">
             {metrics.map((metric) => (
               <div
@@ -296,6 +334,33 @@ export function TopCreativesPanel({
   const metricOptions =
     platform === "meta" ? META_CREATIVES_TABLE_METRICS : METRIC_OPTIONS
 
+  const bufferSnapshotQuery = useQuery({
+    queryKey: ["buffer-snapshot"],
+    queryFn: () => runServerAction(getSavedBufferSnapshotAction()),
+    enabled: platform === "tiktok",
+    staleTime: 60_000,
+  })
+
+  const bufferPosts = React.useMemo(
+    () =>
+      mergeBufferPostLinkOptions(
+        bufferPostLinkOptionsFromBoardPosts(
+          bufferSnapshotQuery.data?.board.posts ?? []
+        ),
+        readBufferPostCatalog()
+      ),
+    [bufferSnapshotQuery.data?.board.posts]
+  )
+
+  const bufferPostsTruncated = Boolean(
+    bufferSnapshotQuery.data?.board.hasMorePosts
+  )
+
+  const bufferPostsLoading =
+    platform === "tiktok" &&
+    bufferSnapshotQuery.isLoading &&
+    bufferPosts.length === 0
+
   const [selectedMetrics, setSelectedMetrics] = React.useState<MetricKey[]>([
     "spend",
     "created_at",
@@ -314,6 +379,7 @@ export function TopCreativesPanel({
       key,
       merged: mergeRows(group),
       count: group.length,
+      group,
     }))
   }, [rows])
 
@@ -413,16 +479,20 @@ export function TopCreativesPanel({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-        {sortedRows.map(({ key, merged, count }) => (
+        {sortedRows.map(({ key, merged, count, group }) => (
           <CreativeCard
             key={key}
             creativeKey={key}
             row={merged}
+            group={group}
             metrics={selectedMetrics}
             metricOptions={metricOptions}
             currency={currency}
             platform={platform}
             adsCount={count}
+            bufferPosts={bufferPosts}
+            bufferPostsLoading={bufferPostsLoading}
+            bufferPostsTruncated={bufferPostsTruncated}
           />
         ))}
       </div>

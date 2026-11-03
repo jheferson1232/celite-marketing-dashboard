@@ -67,7 +67,29 @@ export type BufferBoard = {
   hasMorePosts: boolean
 }
 
-const POST_LIMIT = 60
+const POST_LIMIT = 100
+const MAX_POST_PAGES = 20
+
+const POST_NODE_FIELDS = `
+  id
+  text
+  status
+  dueAt
+  sentAt
+  createdAt
+  channelId
+  channelService
+  externalLink
+  shareMode
+  assets {
+    thumbnail
+    type
+    mimeType
+  }
+  error {
+    message
+  }
+`
 
 let cachedOrganizationId: string | null = null
 
@@ -120,29 +142,38 @@ const BOARD_QUERY = `
       }
     ) {
       edges {
+        cursor
         node {
-          id
-          text
-          status
-          dueAt
-          sentAt
-          createdAt
-          channelId
-          channelService
-          externalLink
-          shareMode
-          assets {
-            thumbnail
-            type
-            mimeType
-          }
-          error {
-            message
-          }
+          ${POST_NODE_FIELDS}
         }
       }
       pageInfo {
         hasNextPage
+        endCursor
+      }
+    }
+  }
+`
+
+const POSTS_PAGE_QUERY = `
+  query BufferPostsPage($organizationId: OrganizationId!, $after: String) {
+    posts(
+      first: ${POST_LIMIT}
+      after: $after
+      input: {
+        organizationId: $organizationId
+        sort: [{ field: createdAt, direction: desc }]
+      }
+    ) {
+      edges {
+        cursor
+        node {
+          ${POST_NODE_FIELDS}
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }
@@ -157,32 +188,95 @@ type OverviewData = {
   }
 }
 
-type BoardData = OverviewData & {
-  channels: BufferChannel[]
-  posts: {
-    edges: Array<{
-      node: {
-        id: string
-        text: string
-        status: BufferPostStatus
-        dueAt: string | null
-        sentAt: string | null
-        createdAt: string
-        channelId: string
-        channelService: string
-        externalLink: string | null
-        shareMode: string
-        assets: BufferPostAsset[]
-        error: { message: string } | null
-      }
-    }> | null
-    pageInfo: {
-      hasNextPage: boolean
-    }
+type BufferPostNode = {
+  id: string
+  text: string
+  status: BufferPostStatus
+  dueAt: string | null
+  sentAt: string | null
+  createdAt: string
+  channelId: string
+  channelService: string
+  externalLink: string | null
+  shareMode: string
+  assets: BufferPostAsset[]
+  error: { message: string } | null
+}
+
+type PostsConnection = {
+  edges: Array<{ cursor: string; node: BufferPostNode }> | null
+  pageInfo: {
+    hasNextPage: boolean
+    endCursor?: string | null
   }
 }
 
-function mapBoard(data: BoardData): BufferBoard {
+type BoardData = OverviewData & {
+  channels: BufferChannel[]
+  posts: PostsConnection
+}
+
+type PostsPageData = {
+  posts: PostsConnection
+}
+
+function mapPostNode(node: BufferPostNode): BufferPost {
+  return {
+    id: node.id,
+    text: node.text,
+    status: node.status,
+    dueAt: node.dueAt,
+    sentAt: node.sentAt,
+    createdAt: node.createdAt,
+    channelId: node.channelId,
+    channelService: node.channelService,
+    externalLink: node.externalLink,
+    shareMode: node.shareMode,
+    assets: node.assets,
+    errorMessage: node.error?.message ?? null,
+  }
+}
+
+function mapPostsConnection(connection: PostsConnection): BufferPost[] {
+  return (connection.edges ?? []).map((edge) => mapPostNode(edge.node))
+}
+
+async function fetchAllBoardPosts(
+  organizationId: string,
+  firstPage: PostsConnection
+): Promise<{ posts: BufferPost[]; hasMorePosts: boolean }> {
+  const posts = mapPostsConnection(firstPage)
+  let hasMorePosts = firstPage.pageInfo.hasNextPage
+  let after =
+    firstPage.pageInfo.endCursor ??
+    firstPage.edges?.at(-1)?.cursor ??
+    null
+
+  for (
+    let page = 1;
+    page < MAX_POST_PAGES && hasMorePosts && after;
+    page += 1
+  ) {
+    const data = await bufferQuery<PostsPageData>(POSTS_PAGE_QUERY, {
+      organizationId,
+      after,
+    })
+    const connection = data.posts
+    posts.push(...mapPostsConnection(connection))
+    hasMorePosts = connection.pageInfo.hasNextPage
+    after =
+      connection.pageInfo.endCursor ?? connection.edges?.at(-1)?.cursor ?? null
+    if ((connection.edges ?? []).length === 0) break
+  }
+
+  return { posts, hasMorePosts }
+}
+
+function mapBoard(
+  data: BoardData,
+  allPosts: BufferPost[],
+  hasMorePosts: boolean
+): BufferBoard {
   return {
     account: {
       id: data.account.id,
@@ -191,21 +285,8 @@ function mapBoard(data: BoardData): BufferBoard {
     },
     organizations: data.account.organizations,
     channels: data.channels,
-    posts: (data.posts.edges ?? []).map((edge) => ({
-      id: edge.node.id,
-      text: edge.node.text,
-      status: edge.node.status,
-      dueAt: edge.node.dueAt,
-      sentAt: edge.node.sentAt,
-      createdAt: edge.node.createdAt,
-      channelId: edge.node.channelId,
-      channelService: edge.node.channelService,
-      externalLink: edge.node.externalLink,
-      shareMode: edge.node.shareMode,
-      assets: edge.node.assets,
-      errorMessage: edge.node.error?.message ?? null,
-    })),
-    hasMorePosts: data.posts.pageInfo.hasNextPage,
+    posts: allPosts,
+    hasMorePosts,
   }
 }
 
@@ -236,5 +317,9 @@ export async function getBufferBoard(
   const data = await bufferQuery<BoardData>(BOARD_QUERY, {
     organizationId: resolvedOrganizationId,
   })
-  return mapBoard(data)
+  const { posts, hasMorePosts } = await fetchAllBoardPosts(
+    resolvedOrganizationId,
+    data.posts
+  )
+  return mapBoard(data, posts, hasMorePosts)
 }

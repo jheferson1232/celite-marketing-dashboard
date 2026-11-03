@@ -73,8 +73,9 @@ export function TikTokComentariosContent() {
     queryKey: ["tiktok-live-comments"],
     queryFn: () => runServerAction(listTikTokLiveCommentsAction()),
     enabled: ready,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 4 * 60_000,
+    refetchOnWindowFocus: false,
   })
 
   const invalidateDashboard = async () => {

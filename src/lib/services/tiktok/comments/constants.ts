@@ -19,6 +19,11 @@ export const TIKTOK_COMMENT_FETCH_CONCURRENCY = 4
 export const TIKTOK_COMMENT_ACCOUNT_CONCURRENCY = 2
 export const TIKTOK_LIVE_COMMENTS_LIMIT = 80
 
+/** La vista en vivo no recorre el catálogo: solo conjuntos con vistas recientes. */
+export const TIKTOK_LIVE_ADGROUP_CAP = 30
+export const TIKTOK_LIVE_FETCH_BUDGET_MS = 35_000
+export const TIKTOK_LIVE_REQUEST_TIMEOUT_MS = 12_000
+
 export function matchesTikTokCommentSparkProfile(
   profileName: string | null | undefined
 ): boolean {

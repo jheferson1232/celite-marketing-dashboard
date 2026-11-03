@@ -33,6 +33,14 @@ import {
   type BufferPostStatus,
 } from "@/lib/services/buffer/buffer"
 import { rememberBufferPosts } from "@/lib/services/buffer/match-post"
+import {
+  defaultSelectionForVideoAds,
+  filterSelectionToVideoAds,
+  readBufferAdSelectionForPost,
+  rememberBufferPostCatalog,
+  hasExplicitBufferAdSelectionForPost,
+  videoIdFromBufferExternalLink,
+} from "@/lib/services/buffer/buffer-ad-selection"
 import type {
   BufferPostInvestment,
   BufferPostVideoAd,
@@ -151,6 +159,7 @@ export function BufferContent() {
   useEffect(() => {
     if (!board) return
     rememberBufferPosts(board.posts)
+    rememberBufferPostCatalog(board.posts)
   }, [board])
   const selectedOrganization =
     board?.organizations.find((item) => item.id === organizationId) ??
@@ -541,22 +550,87 @@ function MultiPicker({
   )
 }
 
+function mergeVideoAdsWithCatalog(
+  videoAds: BufferPostVideoAd[],
+  catalog: BufferPostVideoAd[]
+): BufferPostVideoAd[] {
+  if (catalog.length === 0) return videoAds
+  const byAdId = new Map(catalog.map((ad) => [ad.adId, ad]))
+  return videoAds.map((ad) => {
+    const metrics = byAdId.get(ad.adId)
+    if (!metrics) return ad
+    return {
+      ...ad,
+      spend: metrics.spend,
+      purchases: metrics.purchases,
+      operationStatus: metrics.operationStatus ?? ad.operationStatus,
+    }
+  })
+}
+
+/** Solo ads que publican el mismo video que el post (no el catálogo entero). */
+function postPickerAds(
+  catalog: BufferPostVideoAd[],
+  investment: BufferPostInvestment | null
+): BufferPostVideoAd[] | null {
+  const videoAds = investment?.videoAds
+  if (!videoAds?.length) return null
+  return mergeVideoAdsWithCatalog(videoAds, catalog)
+}
+
+function resolvePickerSelection(input: {
+  bufferPostId: string
+  bufferVideoId: string | null
+  ads: BufferPostVideoAd[]
+}): { campaignIds: string[]; adgroupIds: string[]; fromTikTokDashboard: boolean } {
+  const saved = readBufferAdSelectionForPost(
+    input.bufferPostId,
+    input.bufferVideoId
+  )
+  if (saved && input.ads.length > 0) {
+    const filtered = filterSelectionToVideoAds(saved, input.ads)
+    if (filtered.campaignIds.length > 0 || filtered.adgroupIds.length > 0) {
+      const explicit = hasExplicitBufferAdSelectionForPost(input.bufferPostId)
+      const legacyOnly =
+        !explicit &&
+        saved.videoId === input.bufferVideoId &&
+        Boolean(input.bufferVideoId)
+      return {
+        ...filtered,
+        fromTikTokDashboard: explicit || legacyOnly,
+      }
+    }
+  }
+  return {
+    ...defaultSelectionForVideoAds(input.ads),
+    fromTikTokDashboard: false,
+  }
+}
+
 function PostVideoAds({
   ads,
-  initialCampaignId,
-  initialAdgroupId,
+  bufferPostId,
+  bufferVideoId,
 }: {
   ads: BufferPostVideoAd[]
-  initialCampaignId?: string
-  initialAdgroupId?: string
+  bufferPostId: string
+  bufferVideoId: string | null
 }) {
   const campaigns = useMemo(() => campaignOptions(ads), [ads])
-  const [campaignIds, setCampaignIds] = useState<string[]>(() =>
-    initialCampaignId ? [initialCampaignId] : []
-  )
-  const [adgroupIds, setAdgroupIds] = useState<string[]>(() =>
-    initialAdgroupId ? [initialAdgroupId] : []
-  )
+  const [campaignIds, setCampaignIds] = useState<string[]>([])
+  const [adgroupIds, setAdgroupIds] = useState<string[]>([])
+  const [fromTikTokDashboard, setFromTikTokDashboard] = useState(false)
+
+  useEffect(() => {
+    const next = resolvePickerSelection({
+      bufferPostId,
+      bufferVideoId,
+      ads,
+    })
+    setCampaignIds(next.campaignIds)
+    setAdgroupIds(next.adgroupIds)
+    setFromTikTokDashboard(next.fromTikTokDashboard)
+  }, [bufferPostId, bufferVideoId, ads])
   const selectedCampaignIds = campaignIds.filter((id) =>
     campaigns.some((campaign) => campaign.value === id)
   )
@@ -579,6 +653,11 @@ function PostVideoAds({
 
   return (
     <div className="flex flex-col gap-1">
+      <p className="text-muted-foreground text-[10px] leading-snug">
+        {fromTikTokDashboard
+          ? "Selección desde TikTok · campañas y conjuntos que anuncian este video."
+          : "Campañas y conjuntos que anuncian este video."}
+      </p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
           <MultiPicker
@@ -633,8 +712,8 @@ function PostRow({
   investmentLoading: boolean
 }) {
   const thumbnail = post.assets.find((asset) => asset.thumbnail)?.thumbnail
-  const pickerAds = catalog.length > 0 ? catalog : investment?.videoAds ?? null
-  const initialAd = investment?.videoAds?.[0]
+  const pickerAds = postPickerAds(catalog, investment)
+  const bufferVideoId = videoIdFromBufferExternalLink(post.externalLink)
 
   return (
     <li className="flex items-start gap-2 rounded-lg bg-card px-2.5 py-2 ring-1 ring-foreground/10">
@@ -652,16 +731,17 @@ function PostRow({
             {pickerAds != null ? (
               <PostVideoAds
                 ads={pickerAds}
-                initialCampaignId={initialAd?.campaignId}
-                initialAdgroupId={initialAd?.adgroupId}
+                bufferPostId={post.id}
+                bufferVideoId={bufferVideoId}
               />
             ) : investmentLoading ? (
               <p className="text-muted-foreground text-xs">Cargando TikTok Ads…</p>
-            ) : investment ? (
+            ) : (
               <p className="text-muted-foreground text-xs">
-                Pulsa Actualizar para elegir campaña y conjunto.
+                Sin anuncios TikTok vinculados a este video. Usá «Pasar a Buffer» en
+                el creativo del dashboard TikTok o pulsa Actualizar.
               </p>
-            ) : null}
+            )}
           </>
         ) : null}
         <p className="text-muted-foreground flex min-w-0 items-center gap-x-1.5 truncate text-[11px]">
