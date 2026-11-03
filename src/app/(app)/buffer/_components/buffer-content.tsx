@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/combobox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, TIKTOK_DASHBOARD_CURRENCY } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
 import {
@@ -105,6 +105,18 @@ function formatWhen(value: string | null, pattern = "d MMM yyyy, HH:mm") {
 function postMoment(post: BufferPost) {
   if (post.status === "sent") return post.sentAt ?? post.createdAt
   return post.dueAt ?? post.createdAt
+}
+
+function bufferPublishLabel(post: BufferPost) {
+  const when = formatWhen(postMoment(post), "d MMM yyyy, HH:mm")
+  if (post.status === "sent") return `Publicado ${when}`
+  if (post.status === "scheduled") return `Programado ${when}`
+  if (post.status === "draft") return `Borrador · ${when}`
+  return when
+}
+
+function shortMoney(value: number) {
+  return formatCurrency(value, TIKTOK_DASHBOARD_CURRENCY)
 }
 
 function channelTitle(channel: BufferChannel) {
@@ -426,10 +438,6 @@ function adStatusLabel(status: string | null) {
   return status?.trim() || "Sin estado"
 }
 
-function shortMoney(value: number) {
-  return formatCurrency(value, "COP")
-}
-
 function shortMetrics(spend: number, purchases: number, cpa: number | null) {
   return `${shortMoney(spend)} · ${purchases.toLocaleString("es-CO")} compras · CPA ${
     cpa == null ? "—" : shortMoney(cpa)
@@ -481,6 +489,61 @@ function selectionTotals(ads: BufferPostVideoAd[]) {
   }
 }
 
+function collectTikTokAccountNames(
+  investment: BufferPostInvestment | null,
+  videoAds: BufferPostVideoAd[] | null,
+  catalog: BufferPostVideoAd[]
+): string[] {
+  const names = new Set<string>()
+  const catalogByAdId = new Map(catalog.map((ad) => [ad.adId, ad]))
+
+  for (const name of investment?.accountNames ?? []) {
+    const trimmed = name.trim()
+    if (trimmed) names.add(trimmed)
+  }
+  for (const ad of investment?.videoAds ?? []) {
+    const trimmed =
+      ad.accountName?.trim() || catalogByAdId.get(ad.adId)?.accountName?.trim()
+    if (trimmed) names.add(trimmed)
+  }
+  for (const ad of videoAds ?? []) {
+    const trimmed =
+      ad.accountName?.trim() || catalogByAdId.get(ad.adId)?.accountName?.trim()
+    if (trimmed) names.add(trimmed)
+  }
+  return [...names].sort((left, right) => left.localeCompare(right, "es"))
+}
+
+function PostTikTokAdSummary({
+  post,
+  investment,
+  videoAds,
+  catalog,
+}: {
+  post: BufferPost
+  investment: BufferPostInvestment | null
+  videoAds: BufferPostVideoAd[] | null
+  catalog: BufferPostVideoAd[]
+}) {
+  const accountNames = collectTikTokAccountNames(investment, videoAds, catalog)
+
+  return (
+    <div className="text-muted-foreground flex flex-col gap-0.5 text-[11px] leading-snug">
+      <p>{bufferPublishLabel(post)}</p>
+      {accountNames.length > 0 ? (
+        <p className="text-foreground text-xs font-medium">
+          Anunciando en TikTok Ads: {accountNames.join(" · ")}
+        </p>
+      ) : (
+        <p>
+          Sin cuenta TikTok Ads detectada para este video. Pulsa Actualizar si ya
+          está en campaña.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function sameOption(left: VideoOption, right: VideoOption) {
   return left.value === right.value
 }
@@ -491,15 +554,22 @@ function MultiPicker({
   options,
   value,
   onValueChange,
+  compact = false,
 }: {
   label: string
   placeholder: string
   options: VideoOption[]
   value: string[]
   onValueChange: (value: string[]) => void
+  compact?: boolean
 }) {
   const anchor = useComboboxAnchor()
   const selected = options.filter((option) => value.includes(option.value))
+
+  const triggerLabel =
+    selected.length === 0
+      ? placeholder
+      : `${selected.length} seleccionado${selected.length === 1 ? "" : "s"}`
 
   return (
     <div className="flex min-w-0 items-center gap-1">
@@ -514,24 +584,39 @@ function MultiPicker({
         itemToStringLabel={(item) => item.label}
         itemToStringValue={(item) => item.value}
       >
-        <ComboboxChips ref={anchor} className="min-h-7 w-full flex-1 py-0.5 text-xs shadow-none">
-          <ComboboxValue>
-            {(values: VideoOption[]) => (
-              <>
-                {values.map((item) => (
-                  <ComboboxChip key={item.value} className="h-5 max-w-40">
-                    <span className="truncate">{item.label}</span>
-                  </ComboboxChip>
-                ))}
-                <ComboboxChipsInput
-                  className="min-w-8 text-xs"
-                  placeholder={values.length === 0 ? placeholder : ""}
-                />
-              </>
-            )}
-          </ComboboxValue>
-        </ComboboxChips>
-        <ComboboxContent anchor={anchor}>
+        {compact ? (
+          <Button
+            ref={anchor}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 min-w-0 flex-1 justify-between gap-1 px-2 text-xs font-normal"
+          >
+            <span className="truncate">{triggerLabel}</span>
+          </Button>
+        ) : (
+          <ComboboxChips
+            ref={anchor}
+            className="max-h-24 min-h-7 w-full flex-1 overflow-y-auto py-0.5 text-xs shadow-none"
+          >
+            <ComboboxValue>
+              {(values: VideoOption[]) => (
+                <>
+                  {values.map((item) => (
+                    <ComboboxChip key={item.value} className="h-5 max-w-40">
+                      <span className="truncate">{item.label}</span>
+                    </ComboboxChip>
+                  ))}
+                  <ComboboxChipsInput
+                    className="min-w-8 text-xs"
+                    placeholder={values.length === 0 ? placeholder : ""}
+                  />
+                </>
+              )}
+            </ComboboxValue>
+          </ComboboxChips>
+        )}
+        <ComboboxContent anchor={anchor} className={compact ? "min-w-[16rem]" : undefined}>
           <ComboboxEmpty>Sin resultados.</ComboboxEmpty>
           <ComboboxList>
             <ComboboxGroup>
@@ -546,6 +631,169 @@ function MultiPicker({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
+    </div>
+  )
+}
+
+type AdSelectionPairRow = {
+  key: string
+  campaignName: string
+  adgroupName: string
+  accountName?: string
+  spend: number
+  purchases: number
+  cpa: number | null
+  hasMetrics: boolean
+}
+
+function adSelectionPairRows(ads: BufferPostVideoAd[]): AdSelectionPairRow[] {
+  const byKey = new Map<
+    string,
+    AdSelectionPairRow & { seenAdIds: Set<string> }
+  >()
+
+  for (const ad of ads) {
+    const key = `${ad.campaignId}:${ad.adgroupId}`
+    let row = byKey.get(key)
+    if (!row) {
+      row = {
+        key,
+        campaignName: ad.campaignName,
+        adgroupName: ad.adgroupName,
+        accountName: ad.accountName,
+        spend: 0,
+        purchases: 0,
+        cpa: null,
+        hasMetrics: false,
+        seenAdIds: new Set(),
+      }
+      byKey.set(key, row)
+    }
+    if (row.seenAdIds.has(ad.adId)) continue
+    row.seenAdIds.add(ad.adId)
+    if (ad.spend == null || ad.purchases == null) continue
+    row.hasMetrics = true
+    row.spend += ad.spend
+    row.purchases += ad.purchases
+  }
+
+  return [...byKey.values()]
+    .map(({ seenAdIds: _seen, ...row }) => ({
+      ...row,
+      cpa: row.purchases > 0 ? row.spend / row.purchases : null,
+    }))
+    .sort(
+      (left, right) =>
+        left.campaignName.localeCompare(right.campaignName, "es") ||
+        left.adgroupName.localeCompare(right.adgroupName, "es")
+    )
+}
+
+function formatPairCpa(row: AdSelectionPairRow) {
+  if (!row.hasMetrics) return "—"
+  if (row.purchases <= 0) return "—"
+  return shortMoney(row.cpa ?? row.spend / row.purchases)
+}
+
+function formatPairPurchases(row: AdSelectionPairRow) {
+  if (!row.hasMetrics) return "—"
+  return row.purchases.toLocaleString("es-CO")
+}
+
+const AD_SELECTION_TABLE_GRID =
+  "grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)_minmax(0,3.25rem)_minmax(0,4.5rem)] gap-x-2"
+
+function AdSelectionMetricsPanel({
+  visibleAds,
+  totals,
+  singleAd,
+}: {
+  visibleAds: BufferPostVideoAd[]
+  totals: ReturnType<typeof selectionTotals>
+  singleAd: BufferPostVideoAd | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const rows = useMemo(() => adSelectionPairRows(visibleAds), [visibleAds])
+  const pairLimit = 5
+  const hiddenCount = Math.max(0, rows.length - pairLimit)
+  const visibleRows = expanded ? rows : rows.slice(0, pairLimit)
+
+  if (visibleAds.length === 0) {
+    return (
+      <p className="text-muted-foreground text-[11px]">Elige campaña y conjunto.</p>
+    )
+  }
+
+  return (
+    <div className="bg-muted/40 flex min-w-0 flex-col gap-2 rounded-md p-2 ring-1 ring-foreground/5">
+      {totals.hasMetrics ? (
+        <p className="text-muted-foreground text-[10px]">
+          Total selección:{" "}
+          <span className="text-foreground text-xs font-semibold tabular-nums">
+            {shortMetrics(totals.spend, totals.purchases, totals.cpa)}
+          </span>
+          {singleAd ? ` · ${adStatusLabel(singleAd.operationStatus)}` : ""}
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-[11px]">
+          Pulsa Actualizar para ver gasto y CPA.
+        </p>
+      )}
+      {rows.length > 0 ? (
+        <div className="min-w-0">
+          <div
+            className={`text-muted-foreground mb-1 ${AD_SELECTION_TABLE_GRID} px-2 text-[10px] font-medium`}
+            aria-hidden
+          >
+            <span>Campaña</span>
+            <span>Conjunto</span>
+            <span className="text-right">Ventas</span>
+            <span className="text-right">CPA</span>
+          </div>
+          <ul className="divide-border/60 max-h-40 divide-y overflow-y-auto rounded-sm bg-background/80">
+            {visibleRows.map((row) => (
+              <li
+                key={row.key}
+                className={`${AD_SELECTION_TABLE_GRID} items-start px-2 py-1.5 text-[11px] leading-snug`}
+              >
+                <span className="truncate font-medium" title={row.campaignName}>
+                  {row.campaignName}
+                </span>
+                <span className="truncate" title={row.adgroupName}>
+                  {row.adgroupName}
+                </span>
+                <span
+                  className="text-right tabular-nums"
+                  title={
+                    row.hasMetrics
+                      ? `${row.purchases} venta${row.purchases === 1 ? "" : "s"}`
+                      : undefined
+                  }
+                >
+                  {formatPairPurchases(row)}
+                </span>
+                <span
+                  className="truncate text-right font-medium tabular-nums"
+                  title={formatPairCpa(row)}
+                >
+                  {formatPairCpa(row)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {hiddenCount > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground mt-1 h-6 w-full text-[10px]"
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? "Ver menos" : `Ver ${hiddenCount} más`}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -652,17 +900,18 @@ function PostVideoAds({
   if (campaigns.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <p className="text-muted-foreground text-[10px] leading-snug">
         {fromTikTokDashboard
           ? "Selección desde TikTok · campañas y conjuntos que anuncian este video."
           : "Campañas y conjuntos que anuncian este video."}
       </p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:items-start">
+        <div className="flex flex-col gap-1.5">
           <MultiPicker
+            compact
             label="Campaña"
-            placeholder="+"
+            placeholder="Elegir…"
             options={campaigns}
             value={selectedCampaignIds}
             onValueChange={(next) => {
@@ -675,25 +924,22 @@ function PostVideoAds({
             }}
           />
           <MultiPicker
+            compact
             label="Conjunto"
-            placeholder="+"
+            placeholder="Elegir…"
             options={adgroups}
             value={selectedAdgroupIds}
             onValueChange={setAdgroupIds}
           />
         </div>
-        {visibleAds.length > 0 && totals.hasMetrics ? (
-          <p className="text-xs whitespace-nowrap">
-            {shortMetrics(totals.spend, totals.purchases, totals.cpa)}
-            {singleAd ? ` · ${adStatusLabel(singleAd.operationStatus)}` : ""}
-          </p>
-        ) : null}
+        <div className="min-w-0 sm:pl-1">
+          <AdSelectionMetricsPanel
+            visibleAds={visibleAds}
+            totals={totals}
+            singleAd={singleAd}
+          />
+        </div>
       </div>
-      {visibleAds.length === 0 ? (
-        <p className="text-muted-foreground text-[11px]">Elige campaña y conjunto.</p>
-      ) : totals.hasMetrics ? null : (
-        <p className="text-muted-foreground text-[11px]">Pulsa Actualizar para ver el CPA.</p>
-      )}
     </div>
   )
 }
@@ -725,9 +971,15 @@ function PostRow({
         />
       ) : null}
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="line-clamp-1 text-sm">{post.text || "Sin texto"}</p>
+        <p className="line-clamp-2 text-sm">{post.text || "Sin texto"}</p>
         {post.channelService.toLowerCase() === "tiktok" ? (
           <>
+            <PostTikTokAdSummary
+              post={post}
+              investment={investment}
+              videoAds={pickerAds}
+              catalog={catalog}
+            />
             {pickerAds != null ? (
               <PostVideoAds
                 ads={pickerAds}
@@ -747,7 +999,6 @@ function PostRow({
         <p className="text-muted-foreground flex min-w-0 items-center gap-x-1.5 truncate text-[11px]">
           <span className="shrink-0">{serviceLabel(post.channelService)}</span>
           {channelName ? <span className="truncate">{channelName}</span> : null}
-          <span className="shrink-0">{formatWhen(postMoment(post), "d MMM HH:mm")}</span>
           {post.status === "error" ? (
             <Badge variant="destructive">{STATUS_LABEL[post.status]}</Badge>
           ) : null}

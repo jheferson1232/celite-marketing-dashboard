@@ -1,5 +1,4 @@
 import prisma from "@/lib/prisma"
-import { convertToCopIfPen } from "@/lib/format/pen-to-cop"
 import { listTikTokAdAccounts } from "@/lib/services/tiktok/ad-accounts"
 import { fetchAllPages } from "@/lib/services/tiktok/fetch-all-pages"
 import {
@@ -44,6 +43,8 @@ export type BufferPostVideoAd = {
   adgroupId: string
   adgroupName: string
   operationStatus: string | null
+  accountId?: string
+  accountName?: string
   spend?: number
   purchases?: number
 }
@@ -53,6 +54,7 @@ export type BufferPostInvestment = {
   match: "video" | "producto" | "descripcion"
   productName: string | null
   campaignNames: string[]
+  accountNames: string[]
   videoAds?: BufferPostVideoAd[]
   spend: number
   purchases: number
@@ -75,7 +77,10 @@ type VideoAd = {
   operationStatus: string | null
   adName: string
   adText: string
-  itemId: string | null
+  tiktokItemId: string | null
+  videoId: string | null
+  accountId: string
+  accountName: string
   spend: number
   purchases: number
 }
@@ -125,6 +130,7 @@ function matchProduct(text: string, products: ProductCandidate[]) {
 
 async function loadAccountVideoAds(account: {
   id: string
+  name: string
   currency: string | null
 }): Promise<VideoAd[]> {
   const current = accountLoads.get(account.id)
@@ -165,10 +171,7 @@ async function loadAccountVideoAds(account: {
         const campaignId = ad.campaign_id?.trim() ?? ""
         if (!ad.ad_id || !campaignId) return []
         const metrics = metricsByAd.get(ad.ad_id)
-        const spend = convertToCopIfPen(
-          getMetricNumber(metrics ?? {}, "spend"),
-          account.currency
-        )
+        const spend = getMetricNumber(metrics ?? {}, "spend")
         const purchases = getPurchases(metrics ?? {})
         const adgroupId = ad.adgroup_id?.trim() || "sin-conjunto"
         return [
@@ -183,7 +186,10 @@ async function loadAccountVideoAds(account: {
             operationStatus: ad.operation_status?.trim() || null,
             adName: ad.ad_name?.trim() || "",
             adText: ad.ad_text?.trim() || "",
-            itemId: ad.tiktok_item_id?.trim() || null,
+            tiktokItemId: ad.tiktok_item_id?.trim() || null,
+            videoId: ad.video_id?.trim() || null,
+            accountId: account.id,
+            accountName: account.name,
             spend,
             purchases,
           },
@@ -273,6 +279,8 @@ function listVideoAds(ads: VideoAd[]): BufferPostVideoAd[] {
       adgroupId: ad.adgroupId,
       adgroupName: ad.adgroupName,
       operationStatus: ad.operationStatus,
+      accountId: ad.accountId,
+      accountName: ad.accountName,
       spend: ad.spend,
       purchases: ad.purchases,
     })
@@ -283,6 +291,16 @@ function listVideoAds(ads: VideoAd[]): BufferPostVideoAd[] {
       left.adgroupName.localeCompare(right.adgroupName, "es") ||
       left.adName.localeCompare(right.adName, "es")
   )
+}
+
+function itemIdsForAd(ad: VideoAd): string[] {
+  const ids = new Set<string>()
+  for (const raw of [ad.tiktokItemId, ad.videoId]) {
+    if (!raw?.trim()) continue
+    const spark = raw.startsWith("spark:") ? raw.slice("spark:".length) : raw
+    if (/^\d{8,}$/.test(spark)) ids.add(spark)
+  }
+  return [...ids]
 }
 
 function adsInSameCampaigns(
@@ -296,7 +314,7 @@ function adsInSameCampaigns(
 export async function getBufferPostInvestments(
   posts: BufferPostInvestmentInput[]
 ): Promise<BufferPostInvestmentsResult> {
-  const uniquePosts = posts.filter((post) => post.id.trim()).slice(0, 60)
+  const uniquePosts = posts.filter((post) => post.id.trim())
   if (uniquePosts.length === 0) return { posts: [], catalog: [] }
 
   const range = getTikTokLifetimeDateRange()
@@ -362,15 +380,16 @@ export async function getBufferPostInvestments(
     const campaignAds = adsByCampaignId.get(ad.campaignId) ?? []
     campaignAds.push(ad)
     adsByCampaignId.set(ad.campaignId, campaignAds)
-    if (!ad.itemId) continue
-    const itemAds = adsByItemId.get(ad.itemId) ?? []
-    itemAds.push(ad)
-    adsByItemId.set(ad.itemId, itemAds)
+    for (const itemId of itemIdsForAd(ad)) {
+      const itemAds = adsByItemId.get(itemId) ?? []
+      itemAds.push(ad)
+      adsByItemId.set(itemId, itemAds)
+    }
   }
 
   const catalog = listVideoAds(ads)
   const matchedPosts = uniquePosts.flatMap((post) => {
-    const itemIds = extractItemIds([post.externalLink, post.thumbnail])
+    const itemIds = extractItemIds([post.externalLink, post.thumbnail, post.text])
     const videoSeeds = itemIds.flatMap((itemId) => adsByItemId.get(itemId) ?? [])
     const copySeeds = videoSeeds.length > 0 ? [] : adsMatchingCopy(post.text, ads)
     const seeds = videoSeeds.length > 0 ? videoSeeds : copySeeds
@@ -385,7 +404,7 @@ export async function getBufferPostInvestments(
       seeds.length > 0 ? adsInSameCampaigns(seeds, adsByCampaignId) : productAds
     if (matchedAds.length === 0) return []
 
-    const totals = sumAds(matchedAds)
+    const totals = sumAds(seeds.length > 0 ? seeds : matchedAds)
     const productName =
       product?.name ??
       matchedAds
@@ -395,13 +414,24 @@ export async function getBufferPostInvestments(
     const match: BufferPostInvestment["match"] =
       videoSeeds.length > 0 ? "video" : copySeeds.length > 0 ? "descripcion" : "producto"
 
+    const adsForVideo = seeds.length > 0 ? seeds : matchedAds
+    const videoAds = listVideoAds(adsForVideo)
+    const accountNames = [
+      ...new Set(
+        adsForVideo
+          .map((ad) => ad.accountName.trim())
+          .filter((name) => name.length > 0)
+      ),
+    ].sort((left, right) => left.localeCompare(right, "es"))
+
     return [
       {
         postId: post.id,
         match,
         productName,
         campaignNames: totals.campaignNames,
-        videoAds: listVideoAds(seeds),
+        accountNames,
+        videoAds,
         spend: totals.spend,
         purchases: totals.purchases,
         cpa: totals.cpa,
