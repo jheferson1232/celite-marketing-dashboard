@@ -398,7 +398,7 @@ export async function fetchLiveTikTokAdComments(): Promise<{
   fetchErrors: string[]
 }> {
   const accounts = await listTikTokAdAccounts().catch(() => [])
-  const targets =
+  const targets: Array<{ id: string | null; name: string | null }> =
     accounts.length > 0
       ? accounts.map((account) => ({ id: account.id, name: account.name }))
       : [{ id: null, name: null }]

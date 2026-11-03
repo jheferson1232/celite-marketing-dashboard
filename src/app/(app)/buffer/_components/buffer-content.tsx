@@ -585,15 +585,16 @@ function MultiPicker({
         itemToStringValue={(item) => item.value}
       >
         {compact ? (
-          <Button
-            ref={anchor}
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 min-w-0 flex-1 justify-between gap-1 px-2 text-xs font-normal"
-          >
-            <span className="truncate">{triggerLabel}</span>
-          </Button>
+          <div ref={anchor} className="min-w-0 flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 w-full justify-between gap-1 px-2 text-xs font-normal"
+            >
+              <span className="truncate">{triggerLabel}</span>
+            </Button>
+          </div>
         ) : (
           <ComboboxChips
             ref={anchor}
