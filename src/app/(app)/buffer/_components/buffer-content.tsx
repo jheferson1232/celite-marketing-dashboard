@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, isValid, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { RiCalendarScheduleLine, RiRefreshLine } from "@remixicon/react"
+import { RiCalendarScheduleLine, RiRefreshLine, RiAdvertisementLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -47,7 +47,8 @@ import type {
 } from "@/lib/services/buffer/post-investment"
 import {
   getSavedBufferSnapshotAction,
-  refreshBufferSnapshotAction,
+  refreshBufferBoardAction,
+  refreshBufferTikTokInvestmentsAction,
 } from "../_actions/buffer"
 
 const BUFFER_SNAPSHOT_KEY = ["buffer-snapshot"] as const
@@ -149,9 +150,16 @@ export function BufferContent() {
     refetchOnWindowFocus: false,
   })
 
-  const refreshMutation = useMutation({
+  const bufferRefreshMutation = useMutation({
     mutationFn: () =>
-      runServerAction(refreshBufferSnapshotAction(organizationIdRef.current)),
+      runServerAction(refreshBufferBoardAction(organizationIdRef.current)),
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(BUFFER_SNAPSHOT_KEY, snapshot)
+    },
+  })
+
+  const tiktokRefreshMutation = useMutation({
+    mutationFn: () => runServerAction(refreshBufferTikTokInvestmentsAction()),
     onSuccess: (snapshot) => {
       queryClient.setQueryData(BUFFER_SNAPSHOT_KEY, snapshot)
     },
@@ -210,32 +218,64 @@ export function BufferContent() {
           </p>
           <p className="text-muted-foreground text-xs">
             Los datos quedan guardados en el servidor. Buffer solo se consulta al
-            pulsar Actualizar.
+            pulsar Actualizar; TikTok Ads (gasto, CPA, campañas) con Actualizar
+            métricas TikTok.
             {snapshot?.syncedAt
-              ? ` Última consulta guardada: ${format(parseISO(snapshot.syncedAt), "d MMM yyyy, HH:mm", { locale: es })}.`
+              ? ` Buffer: ${format(parseISO(snapshot.syncedAt), "d MMM yyyy, HH:mm", { locale: es })}.`
+              : null}
+            {snapshot?.tiktokSyncedAt
+              ? ` TikTok: ${format(parseISO(snapshot.tiktokSyncedAt), "d MMM yyyy, HH:mm", { locale: es })}.`
               : null}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={refreshMutation.isPending}
-          onClick={() => {
-            refreshMutation.mutate()
-          }}
-        >
-          <RiRefreshLine
-            className={cn("size-4", refreshMutation.isPending && "animate-spin")}
-          />
-          Actualizar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={bufferRefreshMutation.isPending}
+            onClick={() => {
+              bufferRefreshMutation.mutate()
+            }}
+          >
+            <RiRefreshLine
+              className={cn(
+                "size-4",
+                bufferRefreshMutation.isPending && "animate-spin"
+              )}
+            />
+            Actualizar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={tiktokRefreshMutation.isPending || !board}
+            onClick={() => {
+              tiktokRefreshMutation.mutate()
+            }}
+          >
+            <RiAdvertisementLine
+              className={cn(
+                "size-4",
+                tiktokRefreshMutation.isPending && "animate-spin"
+              )}
+            />
+            Actualizar métricas TikTok
+          </Button>
+        </div>
       </div>
 
-      {refreshMutation.isError ? (
+      {bufferRefreshMutation.isError ? (
         <p className="text-destructive text-sm">
-          {refreshMutation.error instanceof Error
-            ? refreshMutation.error.message
+          {bufferRefreshMutation.error instanceof Error
+            ? bufferRefreshMutation.error.message
             : "No se pudo actualizar Buffer. Se siguen mostrando los datos guardados."}
+        </p>
+      ) : null}
+      {tiktokRefreshMutation.isError ? (
+        <p className="text-destructive text-sm">
+          {tiktokRefreshMutation.error instanceof Error
+            ? tiktokRefreshMutation.error.message
+            : "No se pudieron actualizar las métricas de TikTok Ads."}
         </p>
       ) : null}
 
@@ -359,7 +399,7 @@ export function BufferContent() {
               }
               investmentLoading={
                 post.channelService.toLowerCase() === "tiktok" &&
-                refreshMutation.isPending &&
+                tiktokRefreshMutation.isPending &&
                 !investmentByPostId.has(post.id)
               }
             />
@@ -536,7 +576,8 @@ function PostTikTokAdSummary({
         </p>
       ) : (
         <p>
-          Sin cuenta TikTok Ads detectada para este video. Pulsa Actualizar si ya
+          Sin cuenta TikTok Ads detectada para este video. Pulsa Actualizar métricas
+          TikTok si ya
           está en campaña.
         </p>
       )}
@@ -737,7 +778,7 @@ function AdSelectionMetricsPanel({
         </p>
       ) : (
         <p className="text-muted-foreground text-[11px]">
-          Pulsa Actualizar para ver gasto y CPA.
+          Pulsa Actualizar métricas TikTok para ver gasto y CPA.
         </p>
       )}
       {rows.length > 0 ? (
@@ -992,7 +1033,7 @@ function PostRow({
             ) : (
               <p className="text-muted-foreground text-xs">
                 Sin anuncios TikTok vinculados a este video. Usá «Pasar a Buffer» en
-                el creativo del dashboard TikTok o pulsa Actualizar.
+                el creativo del dashboard TikTok o pulsa Actualizar métricas TikTok.
               </p>
             )}
           </>
