@@ -18,6 +18,7 @@ import {
   ComboboxGroup,
   ComboboxItem,
   ComboboxList,
+  ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
 } from "@/components/ui/combobox"
@@ -627,14 +628,18 @@ function MultiPicker({
       >
         {compact ? (
           <div ref={anchor} className="min-w-0 flex-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 w-full justify-between gap-1 px-2 text-xs font-normal"
+            <ComboboxTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full justify-between gap-1 px-2 text-xs font-normal"
+                />
+              }
             >
               <span className="truncate">{triggerLabel}</span>
-            </Button>
+            </ComboboxTrigger>
           </div>
         ) : (
           <ComboboxChips
