@@ -23,7 +23,6 @@ import type { ChatPlatform } from "@/lib/chat/kpi-response"
 import { createDashboardChat } from "../_actions/chat"
 import { usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
-import { NOTION_LAUNCH_SUGGESTION } from "@/app/(app)/tiktok/_components/notion-launch-flow"
 
 const META_SUGGESTIONS = [
   "¿Cómo nos fue hoy?",
@@ -34,7 +33,6 @@ const META_SUGGESTIONS = [
 /** Textos cortos para el panel lateral / móvil (evitan recorte). */
 const TIKTOK_SUGGESTIONS = [
   "¿Cómo nos fue hoy en TikTok?",
-  NOTION_LAUNCH_SUGGESTION,
   "Apaga la campaña cbo urbano",
   "Sube 20% presupuesto del mejor conjunto",
   "Prende la campaña Hertz Art",

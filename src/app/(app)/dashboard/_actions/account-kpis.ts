@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { getAccountKpis } from "@/lib/services/meta/account-kpis"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import type { AccountKpis, DateRange } from "@/lib/services/meta/types"

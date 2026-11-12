@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import type { DateRange } from "@/lib/services/meta/types"
 import { getTikTokAdSetsGroupedByCampaign } from "@/lib/services/tiktok/campaign-adgroups"
 import { withTikTokDashboardAccount } from "@/lib/services/tiktok/tiktok-dashboard-account.server"

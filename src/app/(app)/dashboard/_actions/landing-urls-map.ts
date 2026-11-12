@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { getMetaLandingUrlsByCampaignMap } from "@/lib/services/meta/landing-urls-map"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 

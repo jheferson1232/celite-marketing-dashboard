@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath, revalidateTag, updateTag } from "next/cache"
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { META_DATA_CACHE_TAG } from "@/lib/services/meta/meta-graph-fetch"
 import { getMetaInformePayload } from "@/lib/services/meta/meta-operative-service"
 import {

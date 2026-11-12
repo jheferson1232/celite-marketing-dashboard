@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidateTag, updateTag } from "next/cache"
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { clearMetaCache } from "@/lib/services/meta/meta-cache"
 import { META_DATA_CACHE_TAG } from "@/lib/services/meta/meta-graph-fetch"
 import { clearTikTokCache } from "@/lib/services/tiktok/tiktok-cache"

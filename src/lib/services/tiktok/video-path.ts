@@ -308,9 +308,9 @@ export function listMp4BasenamesForUrlSlug(
   )
 }
 
-/** Una fila por URL de Notion; solo variantes con al menos un video en carpeta. */
+/** Una fila por URL del draft; solo variantes con al menos un video en carpeta. */
 export function buildVariantFolderSummary(
-  notionUrls: string[],
+  draftUrls: string[],
   videosDir: string
 ): VariantFolderSummary[] {
   const dir = normalizeVideosDirectory(videosDir)
@@ -318,7 +318,7 @@ export function buildVariantFolderSummary(
   const seenSlugs = new Set<string>()
   const rows: VariantFolderSummary[] = []
 
-  for (const url of notionUrls) {
+  for (const url of draftUrls) {
     const slug = extractUrlSlug(url)
     if (!slug || seenSlugs.has(slug)) continue
     seenSlugs.add(slug)
@@ -338,7 +338,7 @@ export function buildVariantFolderSummary(
   return rows
 }
 
-export function collectNotionUrlsForSummary(
+export function collectDraftUrlsForSummary(
   draftUrls: string[],
   cfg: TikTokLaunchCampaignConfig
 ): string[] {

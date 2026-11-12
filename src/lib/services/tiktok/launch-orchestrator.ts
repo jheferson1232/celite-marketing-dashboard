@@ -1,6 +1,6 @@
 import {
   buildBaseConfigFromDraft,
-  mergeNotionIntoCampaignConfig,
+  mergeDraftIntoCampaignConfig,
 } from "./launch-base-config"
 import type { TikTokLaunchDraft } from "./launch-draft"
 import { buildLaunchPreflight, type LaunchPreflightResult } from "./launch-preflight"
@@ -14,7 +14,7 @@ import {
   applyVideosDirectoryToConfig,
   buildAdgroupsOneConjuntoPerVideo,
   buildVariantFolderSummary,
-  collectNotionUrlsForSummary,
+  collectDraftUrlsForSummary,
   filterLaunchableAdgroups,
   getDefaultVideosDirectory,
   normalizeVideosDirectory,
@@ -40,12 +40,12 @@ function prepareConfigFromLaunchDraft(
   draft: TikTokLaunchDraft,
   videosDir: string
 ): {
-  cfg: ReturnType<typeof mergeNotionIntoCampaignConfig>
+  cfg: ReturnType<typeof mergeDraftIntoCampaignConfig>
   variantSummary: ReturnType<typeof buildVariantFolderSummary>
   skippedAds: number
 } {
   const baseConfig = buildBaseConfigFromDraft(draft)
-  let cfg = mergeNotionIntoCampaignConfig(baseConfig, {
+  let cfg = mergeDraftIntoCampaignConfig(baseConfig, {
     dailyBudget: draft.dailyBudget,
     urls: draft.urls,
   })
@@ -54,7 +54,7 @@ function prepareConfigFromLaunchDraft(
     cfg.campaign.name = draft.name.trim()
   }
 
-  const draftUrls = collectNotionUrlsForSummary(draft.urls, cfg)
+  const draftUrls = collectDraftUrlsForSummary(draft.urls, cfg)
 
   if (draftUrls.length > 0) {
     const variantSummary = buildVariantFolderSummary(draftUrls, videosDir)
@@ -84,7 +84,7 @@ function prepareConfigFromLaunchDraft(
   return {
     cfg,
     variantSummary: buildVariantFolderSummary(
-      collectNotionUrlsForSummary(draft.urls, cfg),
+      collectDraftUrlsForSummary(draft.urls, cfg),
       videosDir
     ),
     skippedAds,

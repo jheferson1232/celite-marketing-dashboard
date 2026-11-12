@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import type { ABODynamicFields, CBODynamicFields } from "@/lib/config/tiktok-strategies"
 import type { TikTokStrategyId } from "@/lib/config/tiktok-strategies"
 import type { CampaignStatus } from "@/lib/campaigns/status"

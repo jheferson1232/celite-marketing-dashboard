@@ -17,11 +17,13 @@ import {
   RiTiktokLine,
   RiRobotLine,
   RiCalendarScheduleLine,
+  RiLogoutBoxLine,
 } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -33,6 +35,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { logoutAction } from "@/app/login/_actions/auth"
 
 const navItems = [
   {
@@ -214,6 +217,18 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <form action={logoutAction}>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton type="submit" tooltip="Cerrar sesión">
+                <RiLogoutBoxLine />
+                <span>Cerrar sesión</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </form>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

@@ -1,8 +1,7 @@
-import type { NotionCampaignDraft } from "@/lib/services/notion/campaigns"
 import { getProductVideoUrls } from "@/lib/products/creatives"
 import type { ProductRecord } from "@/lib/services/product"
 
-export type TikTokLaunchDraftSource = "notion" | "product"
+export type TikTokLaunchDraftSource = "product"
 
 export type TikTokLaunchDraft = {
   id: string
@@ -40,19 +39,6 @@ export function collectProductLaunchUrls(product: ProductRecord): string[] {
   for (const landingPage of product.landingPages) add(landingPage.url)
 
   return urls
-}
-
-export function notionDraftToLaunchDraft(
-  draft: NotionCampaignDraft
-): TikTokLaunchDraft {
-  return {
-    id: draft.pageId,
-    name: draft.name,
-    dailyBudget: draft.dailyBudget,
-    urls: draft.urls,
-    platform: draft.platform,
-    source: "notion",
-  }
 }
 
 export function productToLaunchDraft(product: ProductRecord): TikTokLaunchDraft {

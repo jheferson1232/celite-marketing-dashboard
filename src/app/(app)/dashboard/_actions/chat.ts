@@ -1,7 +1,9 @@
 "use server"
 
+import { requireSessionOrRedirect } from "@/lib/auth/server"
+import { safeRedirectPath } from "@/lib/auth/session"
 import { createChat } from "@/lib/chat/chat-store"
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { redirect } from "next/navigation"
 
 export const createAssistantChatAction = createServerAction(
@@ -12,7 +14,11 @@ export const createAssistantChatAction = createServerAction(
 )
 
 export async function createDashboardChat(formData: FormData) {
-  const returnPath = String(formData.get("returnPath") || "/dashboard")
+  await requireSessionOrRedirect()
+  const returnPath = safeRedirectPath(
+    String(formData.get("returnPath") || ""),
+    "/dashboard"
+  )
   const id = await createChat()
   redirect(`${returnPath}?chat=${id}&assistant=true`)
 }

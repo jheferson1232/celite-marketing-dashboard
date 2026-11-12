@@ -10,7 +10,8 @@ Toda obtención de datos del servidor sigue este flujo:
 - Exportar funciones puras: `export async function getX(...): Promise<T>`.
 
 ### 2. Server Action (archivo separado con 'use server')
-- Envolver cada función del servicio con `createServerAction()` de `@/lib/server-action`.
+- Envolver cada función del servicio con `createServerAction()` de `@/lib/create-server-action` (exige sesión antes de ejecutar).
+- Nunca exportar una server action sin envolver: el proxy deja pasar las server actions y la sesión solo se valida en `createServerAction`. Las de formulario (`<form action>`) llaman `requireSessionOrRedirect()` de `@/lib/auth/server`.
 - No poner lógica de negocio en la action, solo delegar al servicio.
 
 ### 3. Componente cliente
@@ -32,3 +33,9 @@ Toda obtención de datos del servidor sigue este flujo:
 - Cron 2×/día 8:00 y 20:00 Lima (GitHub Actions → `meta-hourly-report.ts`): Telegram con conjuntos **ON** en Crítico. Botón «Enviar a Telegram» = mismo informe manual. Historial sync: 7 días (`META_INFORME_MAX_DAYS`).
 - Caché Meta del informe con prefijo `meta-informe:`; no invalidar `clearMetaCache()` del dashboard.
 - El informe **no** llama a `campaigns-list`, `campaign-adsets` ni al catálogo completo `meta:adsets:catalog` / `meta:campaigns:catalog` del dashboard.
+
+## Autenticación
+
+- Clave maestra única en `APP_PASSWORD` (sin usuarios ni tablas). Sin esa variable la app queda bloqueada.
+- `src/proxy.ts` exige la cookie `celite_session` en todo salvo `/login`, `/api/cron/*` (CRON_SECRET), `/api/telegram/webhook` (TELEGRAM_WEBHOOK_SECRET obligatorio) y `/api/health/*`.
+- Una ruta pública nueva necesita su propio secreto y agregarse a `PUBLIC_PATHS`/`PUBLIC_PREFIXES` en `src/proxy.ts`.

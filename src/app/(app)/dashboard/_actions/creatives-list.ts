@@ -1,7 +1,7 @@
 "use server"
 
 import axios from "axios"
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import {
   fetchAdImageUrlsByHash,
   fetchSharpCreativeThumbnails,

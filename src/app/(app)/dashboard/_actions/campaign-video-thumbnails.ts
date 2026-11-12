@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { getMetaCampaignVideoThumbnails } from "@/lib/services/meta/campaign-video-thumbnails"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 

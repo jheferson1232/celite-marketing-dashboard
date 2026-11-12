@@ -4,6 +4,7 @@ import { es } from "date-fns/locale"
 import { RiAddLine, RiChat3Line } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { requireSessionOrRedirect } from "@/lib/auth/server"
 import { createChat, loadChats } from "@/lib/chat/chat-store"
 
 interface ChatListProps {
@@ -63,6 +64,7 @@ export function ChatList({ chats, activeChatId }: ChatListProps) {
 
 async function createNewChat() {
   "use server"
+  await requireSessionOrRedirect()
   const { redirect } = await import("next/navigation")
   const id = await createChat()
   redirect(`/inbox/${id}`)

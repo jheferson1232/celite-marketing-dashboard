@@ -3,14 +3,14 @@ import { isCloudHosted } from "@/lib/deployment/cloud-host"
 import type { TikTokLaunchDraft } from "./launch-draft"
 import {
   buildBaseConfigFromDraft,
-  mergeNotionIntoCampaignConfig,
+  mergeDraftIntoCampaignConfig,
 } from "./launch-base-config"
 import type { TikTokLaunchCampaignConfig } from "./launch-campaign-types"
 import {
   applyVideosDirectoryToConfig,
   buildAdgroupsOneConjuntoPerVideo,
   buildVariantFolderSummary,
-  collectNotionUrlsForSummary,
+  collectDraftUrlsForSummary,
   filterLaunchableAdgroups,
   normalizeVideosDirectory,
   type VariantFolderSummary,
@@ -48,7 +48,7 @@ export function buildLaunchPreflight(
 ): LaunchPreflightResult {
   const checks: LaunchCheckItem[] = []
   const normalizedDir = normalizeVideosDirectory(videosDir)
-  const sourceLabel = draft.source === "product" ? "Producto" : "Notion"
+  const sourceLabel = "Producto"
   const hasBlobVideos = (draft.blobVideoUrls?.length ?? 0) > 0
 
   checks.push({
@@ -78,7 +78,7 @@ export function buildLaunchPreflight(
     detail: baseConfig.campaign.name,
   })
 
-  const cfg = mergeNotionIntoCampaignConfig(baseConfig, {
+  const cfg = mergeDraftIntoCampaignConfig(baseConfig, {
     dailyBudget: draft.dailyBudget,
     urls: draft.urls,
   })
@@ -92,9 +92,7 @@ export function buildLaunchPreflight(
     detail:
       budget != null && budget > 0
         ? `S/ ${budget}`
-        : draft.source === "product"
-          ? "Falta en el producto y en el JSON"
-          : "Falta en Notion y en el JSON",
+        : "Falta en el producto y en el JSON",
   })
 
   checks.push({
@@ -108,7 +106,7 @@ export function buildLaunchPreflight(
           : "Faltan URLs",
   })
 
-  const draftUrls = collectNotionUrlsForSummary(draft.urls, cfg)
+  const draftUrls = collectDraftUrlsForSummary(draft.urls, cfg)
   const useUrlVariants = draftUrls.length > 0
 
   if (!useUrlVariants && draft.urls.length > 0 && draft.urls.length < urlGroupsNeeded) {

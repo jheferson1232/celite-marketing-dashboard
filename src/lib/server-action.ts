@@ -1,12 +1,21 @@
 // NOTA: Esta funcion es una copia de la funcion de next-server-actions-parallel
 // Modificado para manejar los errores ya que al combinar server actions con react-query no se pueden capturar
+// La parte de servidor (createServerAction, con verificación de sesión) está en ./create-server-action.ts
 
 import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
 
 export type ServerActionResponse<T> = {
   ok: boolean
+  /** UNAUTHENTICATED: la sesión no es válida; el cliente redirige al login. */
+  code?: "UNAUTHENTICATED"
   errorMessage?: string
   result: T
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return
+  const next = `${window.location.pathname}${window.location.search}`
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`)
 }
 
 export class ServerActionError extends Error {
@@ -14,44 +23,6 @@ export class ServerActionError extends Error {
     super(message)
     this.name = 'ServerActionError'
   }
-}
-
-export function createServerAction<R, A = void>(action: (args: A) => Promise<R>) {
-  return async (args: A) =>
-    [
-      action(args)
-        .then((result) => ({
-          ok: true,
-          result,
-          errorMessage: undefined
-        }))
-        .catch((error) => {
-          console.error(error)
-
-          const metaError = error?.response?.data?.error as
-            | {
-                error_user_msg?: string
-                message?: string
-              }
-            | undefined
-
-          const metaUserMessage = metaError?.error_user_msg || metaError?.message
-
-          const message =
-            metaUserMessage ||
-            (error instanceof ServerActionError
-              ? error.message
-              : error instanceof Error && error.message.trim()
-                ? error.message
-                : "Error desconocido al ejecutar acción. Contacta al desarrollador.")
-
-          return {
-            ok: false,
-            result: undefined,
-            errorMessage: message
-          }
-        })
-    ] as const
 }
 
 export async function runServerAction<T>(
@@ -81,6 +52,7 @@ export async function runServerAction<T>(
   }
 
   if (data.ok === false) {
+    if (data.code === 'UNAUTHENTICATED') redirectToLogin()
     throw new Error(data.errorMessage || 'Error desconocido')
   }
 

@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { getAdInsights } from "@/lib/services/meta/ad-insights"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
 import type { DateRange } from "@/lib/services/meta/types"

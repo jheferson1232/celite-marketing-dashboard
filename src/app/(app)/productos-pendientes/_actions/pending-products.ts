@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 import { listPendingProducts } from "@/lib/services/product-pending/list-pending-products"
 import { addManualPendingProduct } from "@/lib/services/product-pending/add-manual-pending-product"
 import { searchPendingProductInSociaVault } from "@/lib/services/product-pending/search-pending-product-sociavault"

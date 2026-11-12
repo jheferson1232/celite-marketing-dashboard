@@ -2,7 +2,7 @@
 
 import { getAdVideoSource as getAdVideoSourceService } from "@/lib/services/meta/ad-video-source"
 import { withMetaDashboardAccount } from "@/lib/services/meta/meta-dashboard-account.server"
-import { createServerAction } from "@/lib/server-action"
+import { createServerAction } from "@/lib/create-server-action"
 
 export const getAdVideoSource = createServerAction(
   async (

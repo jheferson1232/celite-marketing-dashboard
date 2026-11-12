@@ -4,7 +4,7 @@ import type { TikTokLaunchCampaignConfig } from "./launch-campaign-types"
 
 /**
  * Construye la config base de lanzamiento TikTok desde los defaults de la
- * estrategia ABO (TS) + los datos del draft (Notion/producto).
+ * estrategia ABO (TS) + los datos del producto.
  * Reemplaza al viejo loader de JSONs en `config/tiktok-campaigns/`.
  */
 export function buildBaseConfigFromDraft(
@@ -31,7 +31,7 @@ export function buildBaseConfigFromDraft(
  * Superpone el presupuesto y las URLs del draft sobre la config base.
  * Si hay URLs, mapea cada URL original del config a la nueva del draft (por índice).
  */
-export function mergeNotionIntoCampaignConfig(
+export function mergeDraftIntoCampaignConfig(
   cfg: TikTokLaunchCampaignConfig,
   options: { dailyBudget: number | null; urls: string[] }
 ): TikTokLaunchCampaignConfig {
