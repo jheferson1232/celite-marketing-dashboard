@@ -55,7 +55,8 @@ Los crons viven en [`vercel.json`](../vercel.json) (`schedules`, plan Pro) con `
 | `meta-telegram-8am` / `meta-telegram-8pm` | `/crons/meta-telegram-reports` | 8:00 y 20:00 |
 | `tiktok-agent-8am` / `-2pm` / `-8pm` | `/crons/tiktok-agent` | 8:00, 14:00, 20:00 |
 | `meta-comments-2h` | `/crons/meta-comments-agent` | cada 2 h |
-| `tiktok-comments-2h` | `/crons/tiktok-comments-agent` | cada 2 h |
+
+El agente de comentarios TikTok no tiene cron: se ejecuta solo con «Ejecutar ahora» en `/tiktok/comentarios`.
 
 El agente TikTok deduce el trigger del header `ce-vssschedulename`; en llamadas manuales usa `?trigger=morning_8am|afternoon_2pm|evening_8pm`.
 

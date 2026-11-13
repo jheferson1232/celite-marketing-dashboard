@@ -210,22 +210,27 @@ function normalizeDecision(
   }
 }
 
+/**
+ * `options.model` (id `proveedor/modelo` de Vercel AI Gateway) lo usa TikTok.
+ * Sin él, Meta sigue con Claude vía `ANTHROPIC_API_KEY`.
+ */
 export async function classifyMetaComment(
   message: string,
-  context?: MetaCommentClassifyContext
+  context?: MetaCommentClassifyContext,
+  options?: { model?: string }
 ): Promise<{
   classification: MetaCommentClassification
   action: MetaCommentActionKind
   replyText: string | null
 }> {
-  if (!isAnthropicConfigured()) {
+  if (!options?.model && !isAnthropicConfigured()) {
     throw new Error("ANTHROPIC_API_KEY es requerida para clasificar comentarios")
   }
 
   const system = buildSystemPrompt(context)
 
   const { object } = await generateObject({
-    model: anthropic("claude-sonnet-4-6"),
+    model: options?.model ?? anthropic("claude-sonnet-4-6"),
     schema: decisionSchema,
     system,
     prompt: `Comentario:\n"""${message}"""`,

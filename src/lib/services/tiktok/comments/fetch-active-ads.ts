@@ -124,8 +124,10 @@ function unitsFromAds(ads: TikTokActiveAdRef[]): {
 
   const byAdgroup = new Map<string, TikTokCommentSearchUnit>()
   for (const ad of sourceAds) {
-    if (!ad.adgroupId || byAdgroup.has(ad.adgroupId)) continue
-    byAdgroup.set(ad.adgroupId, { adgroupId: ad.adgroupId, ad })
+    if (!ad.adgroupId) continue
+    const unit = byAdgroup.get(ad.adgroupId)
+    if (unit) unit.ads.push(ad)
+    else byAdgroup.set(ad.adgroupId, { adgroupId: ad.adgroupId, ad, ads: [ad] })
   }
 
   return {
@@ -133,6 +135,16 @@ function unitsFromAds(ads: TikTokActiveAdRef[]): {
     adsScanned: sourceAds.length,
     sparkTargetAds: sparkAds.length,
   }
+}
+
+/** Ad del conjunto al que pertenece el comentario (cada ad puede ser otro post). */
+export function resolveUnitAd(
+  unit: TikTokCommentSearchUnit,
+  adId: string | null | undefined
+): TikTokActiveAdRef {
+  const id = adId?.trim()
+  if (!id) return unit.ad
+  return unit.ads.find((ad) => ad.adId === id) ?? { ...unit.ad, adId: id }
 }
 
 /**
@@ -159,14 +171,18 @@ function withAccountName(
   return {
     adsScanned: result.adsScanned,
     sparkTargetAds: result.sparkTargetAds,
-    units: result.units.map((unit) => ({
-      ...unit,
-      ad: {
-        ...unit.ad,
+    units: result.units.map((unit) => {
+      const withAccount = (ad: TikTokActiveAdRef): TikTokActiveAdRef => ({
+        ...ad,
         accountId: account.id,
         accountName: account.name,
-      },
-    })),
+      })
+      return {
+        ...unit,
+        ad: withAccount(unit.ad),
+        ads: unit.ads.map(withAccount),
+      }
+    }),
   }
 }
 

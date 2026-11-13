@@ -2,24 +2,34 @@ import "server-only"
 
 import prisma from "@/lib/prisma"
 import { applyTikTokCommentAction } from "./apply-action"
-import { classifyTikTokComment } from "./classify"
-import { listTikTokCommentSearchUnitsAllAccounts } from "./fetch-active-ads"
+import { classifyTikTokComment, loadTikTokClassifyContext } from "./classify"
+import {
+  listTikTokCommentSearchUnitsAllAccounts,
+  resolveUnitAd,
+} from "./fetch-active-ads"
 import { fetchRecentAdgroupComments } from "./fetch-comments"
 import { withTikTokDashboardAccount } from "../tiktok-dashboard-account.server"
 import { mapWithConcurrency } from "../concurrency"
-import { TIKTOK_COMMENT_FETCH_CONCURRENCY } from "./constants"
+import {
+  TIKTOK_COMMENT_CLASSIFY_CONCURRENCY,
+  TIKTOK_COMMENT_FETCH_CONCURRENCY,
+  TIKTOK_COMMENT_PENDING_CLASSIFICATION,
+  TIKTOK_COMMENT_RUN_BUDGET_MS,
+  TIKTOK_COMMENT_STALE_RUN_MS,
+} from "./constants"
 import { getTikTokCommentAgentSetupMessage } from "./env"
 import type {
+  TikTokActiveAdRef,
   TikTokCommentAgentRunSummary,
   TikTokCommentAgentTrigger,
-  TikTokCommentDecisionRecord,
+  TikTokCommentSearchUnit,
+  TikTokFetchedComment,
 } from "./types"
 
 function toRunSummary(row: {
   id: string
   trigger: string
   status: string
-  dryRun: boolean
   startedAt: Date
   finishedAt: Date | null
   adsScanned: number
@@ -32,7 +42,6 @@ function toRunSummary(row: {
     runId: row.id,
     trigger: row.trigger as TikTokCommentAgentTrigger,
     status: row.status as TikTokCommentAgentRunSummary["status"],
-    dryRun: row.dryRun,
     startedAt: row.startedAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
     adsScanned: row.adsScanned,
@@ -43,41 +52,16 @@ function toRunSummary(row: {
   }
 }
 
-function toDecisionRecord(row: {
-  id: string
-  runId: string | null
-  tiktokCommentId: string
-  adId: string | null
-  tiktokItemId: string | null
-  identityId: string | null
-  identityType: string | null
-  authorName: string | null
-  message: string
-  classification: string
-  action: string
-  replyText: string | null
-  applied: boolean
-  errorMessage: string | null
-  createdAt: Date
-}): TikTokCommentDecisionRecord {
-  return {
-    id: row.id,
-    runId: row.runId,
-    tiktokCommentId: row.tiktokCommentId,
-    adId: row.adId,
-    tiktokItemId: row.tiktokItemId,
-    identityId: row.identityId,
-    identityType: row.identityType,
-    authorName: row.authorName,
-    message: row.message,
-    classification:
-      row.classification as TikTokCommentDecisionRecord["classification"],
-    action: row.action as TikTokCommentDecisionRecord["action"],
-    replyText: row.replyText,
-    applied: row.applied,
-    errorMessage: row.errorMessage,
-    createdAt: row.createdAt.toISOString(),
-  }
+function errorText(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  )
 }
 
 export async function listTikTokCommentAgentRuns(
@@ -90,42 +74,146 @@ export async function listTikTokCommentAgentRuns(
   return rows.map(toRunSummary)
 }
 
-export async function listTikTokCommentDecisions(
-  limit = 50
-): Promise<TikTokCommentDecisionRecord[]> {
-  const rows = await prisma.tikTokCommentDecision.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
+/**
+ * Cierra corridas que Vercel cortó por timeout (quedaron en `running`) y libera
+ * los comentarios que tenían reservados para que la próxima corrida los procese.
+ */
+async function closeStaleRuns(): Promise<void> {
+  const cutoff = new Date(Date.now() - TIKTOK_COMMENT_STALE_RUN_MS)
+  const stale = await prisma.tikTokCommentAgentRun.findMany({
+    where: { status: "running", startedAt: { lt: cutoff } },
+    select: { id: true },
   })
-  return rows.map(toDecisionRecord)
+  if (stale.length === 0) return
+
+  const ids = stale.map((run) => run.id)
+  await prisma.tikTokCommentDecision.deleteMany({
+    where: {
+      runId: { in: ids },
+      classification: TIKTOK_COMMENT_PENDING_CLASSIFICATION,
+    },
+  })
+  await prisma.tikTokCommentAgentRun.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      status: "failed",
+      finishedAt: new Date(),
+      errorMessage:
+        "La corrida superó el tiempo máximo y se cerró automáticamente.",
+    },
+  })
+}
+
+type Candidate = { comment: TikTokFetchedComment; ad: TikTokActiveAdRef }
+
+async function fetchAccountCandidates(
+  units: TikTokCommentSearchUnit[],
+  fetchErrors: string[]
+): Promise<Candidate[]> {
+  const fetched = await mapWithConcurrency(
+    units,
+    TIKTOK_COMMENT_FETCH_CONCURRENCY,
+    async (unit) => {
+      try {
+        return {
+          unit,
+          comments: await fetchRecentAdgroupComments(unit.adgroupId),
+        }
+      } catch (error) {
+        fetchErrors.push(
+          `${unit.ad.profileName ?? unit.ad.adName}: ${errorText(error, "Error al leer comentarios")}`
+        )
+        return { unit, comments: [] as TikTokFetchedComment[] }
+      }
+    }
+  )
+
+  const byId = new Map<string, Candidate>()
+  for (const { unit, comments } of fetched) {
+    for (const comment of comments) {
+      if (byId.has(comment.id)) continue
+      byId.set(comment.id, { comment, ad: resolveUnitAd(unit, comment.adId) })
+    }
+  }
+  if (byId.size === 0) return []
+
+  const existing = await prisma.tikTokCommentDecision.findMany({
+    where: { tiktokCommentId: { in: [...byId.keys()] } },
+    select: { tiktokCommentId: true },
+  })
+  for (const row of existing) byId.delete(row.tiktokCommentId)
+  return [...byId.values()]
+}
+
+/**
+ * Reserva el comentario antes de llamar a la IA y a TikTok. Si otra corrida ya lo
+ * tomó, el unique de `tiktokCommentId` falla y se salta (evita responder dos veces).
+ */
+async function reserveComment(
+  runId: string,
+  { comment, ad }: Candidate
+): Promise<string | null> {
+  try {
+    const row = await prisma.tikTokCommentDecision.create({
+      data: {
+        runId,
+        tiktokCommentId: comment.id,
+        adId: ad.adId,
+        accountId: ad.accountId,
+        tiktokItemId: ad.tiktokItemId,
+        identityId: ad.identityId,
+        identityType: ad.identityType,
+        authorName: comment.authorName,
+        message: comment.message,
+        classification: TIKTOK_COMMENT_PENDING_CLASSIFICATION,
+        action: "skip",
+      },
+      select: { id: true },
+    })
+    return row.id
+  } catch (error) {
+    if (isUniqueViolation(error)) return null
+    throw error
+  }
 }
 
 export async function runTikTokCommentAgent(input: {
   trigger: TikTokCommentAgentTrigger
-  dryRun: boolean
 }): Promise<TikTokCommentAgentRunSummary> {
   const setupMessage = await getTikTokCommentAgentSetupMessage()
   if (setupMessage) {
     throw new Error(setupMessage)
   }
 
-  const run = await prisma.tikTokCommentAgentRun.create({
-    data: {
-      trigger: input.trigger,
-      status: "running",
-      dryRun: input.dryRun,
-    },
+  await closeStaleRuns()
+  const active = await prisma.tikTokCommentAgentRun.findFirst({
+    where: { status: "running" },
+    select: { id: true },
   })
+  if (active) {
+    throw new Error("Ya hay una corrida en curso. Esperá a que termine.")
+  }
+
+  const run = await prisma.tikTokCommentAgentRun.create({
+    data: { trigger: input.trigger, status: "running" },
+  })
+  const deadline = Date.now() + TIKTOK_COMMENT_RUN_BUDGET_MS
 
   try {
-    const { units, adsScanned, sparkTargetAds } =
-      await listTikTokCommentSearchUnitsAllAccounts()
-    const fetchErrors: string[] = []
+    const [{ units, adsScanned, sparkTargetAds }, classifyContext] =
+      await Promise.all([
+        listTikTokCommentSearchUnitsAllAccounts(),
+        loadTikTokClassifyContext(),
+      ])
 
+    const fetchErrors: string[] = []
+    const classifyErrors: string[] = []
     let commentsSeen = 0
     let actionsCount = 0
+    let applyErrors = 0
+    let deferred = 0
 
-    const unitsByAccount = new Map<string, typeof units>()
+    const unitsByAccount = new Map<string, TikTokCommentSearchUnit[]>()
     for (const unit of units) {
       const key = unit.ad.accountId ?? "__current__"
       const list = unitsByAccount.get(key)
@@ -133,83 +221,72 @@ export async function runTikTokCommentAgent(input: {
       else unitsByAccount.set(key, [unit])
     }
 
-    for (const [accountId, accountUnits] of unitsByAccount) {
-      const processAccount = async () => {
-        const fetched = await mapWithConcurrency(
-          accountUnits,
-          TIKTOK_COMMENT_FETCH_CONCURRENCY,
-          async (unit) => {
-            try {
-              const comments = await fetchRecentAdgroupComments(unit.adgroupId)
-              return { unit, comments, error: null as string | null }
-            } catch (error) {
-              const message =
-                error instanceof Error
-                  ? error.message
-                  : "Error al leer comentarios"
-              return {
-                unit,
-                comments: [] as Awaited<
-                  ReturnType<typeof fetchRecentAdgroupComments>
-                >,
-                error: `${unit.ad.profileName ?? unit.ad.adName}: ${message}`,
-              }
-            }
-          }
+    const processCandidate = async (candidate: Candidate) => {
+      if (Date.now() > deadline) {
+        deferred += 1
+        return
+      }
+
+      const decisionId = await reserveComment(run.id, candidate)
+      if (!decisionId) return
+
+      let decision: Awaited<ReturnType<typeof classifyTikTokComment>>
+      try {
+        decision = await classifyTikTokComment(
+          candidate.comment.message,
+          classifyContext
         )
+      } catch (error) {
+        // Se libera para que la próxima corrida lo vuelva a intentar.
+        await prisma.tikTokCommentDecision
+          .delete({ where: { id: decisionId } })
+          .catch(() => undefined)
+        classifyErrors.push(errorText(error, "Error al clasificar"))
+        return
+      }
 
-        for (const item of fetched) {
-          if (item.error) {
-            fetchErrors.push(item.error)
-            continue
-          }
+      commentsSeen += 1
+      let applied = false
+      let errorMessage: string | null = null
 
-          for (const comment of item.comments) {
-            const existing = await prisma.tikTokCommentDecision.findUnique({
-              where: { tiktokCommentId: comment.id },
-            })
-            if (existing) continue
+      if (decision.action !== "skip") {
+        actionsCount += 1
+        const result = await applyTikTokCommentAction({
+          commentId: candidate.comment.id,
+          action: decision.action,
+          replyText: decision.replyText,
+          ad: candidate.ad,
+        })
+        applied = result.applied
+        errorMessage = result.errorMessage
+        if (errorMessage) applyErrors += 1
+      }
 
-            commentsSeen += 1
+      await prisma.tikTokCommentDecision.update({
+        where: { id: decisionId },
+        data: {
+          classification: decision.classification,
+          action: decision.action,
+          replyText: decision.replyText,
+          applied,
+          errorMessage,
+        },
+      })
+    }
 
-            const decision = await classifyTikTokComment(comment.message)
-            let applied = false
-            let errorMessage: string | null = null
+    for (const [accountId, accountUnits] of unitsByAccount) {
+      if (Date.now() > deadline) break
 
-            if (!input.dryRun && decision.action !== "skip") {
-              const result = await applyTikTokCommentAction({
-                commentId: comment.id,
-                action: decision.action,
-                replyText: decision.replyText,
-                ad: item.unit.ad,
-              })
-              applied = result.applied
-              errorMessage = result.errorMessage
-            }
-
-            if (decision.action !== "skip") {
-              actionsCount += 1
-            }
-
-            await prisma.tikTokCommentDecision.create({
-              data: {
-                runId: run.id,
-                tiktokCommentId: comment.id,
-                adId: comment.adId || item.unit.ad.adId,
-                tiktokItemId: item.unit.ad.tiktokItemId,
-                identityId: item.unit.ad.identityId,
-                identityType: item.unit.ad.identityType,
-                authorName: comment.authorName,
-                message: comment.message,
-                classification: decision.classification,
-                action: decision.action,
-                replyText: decision.replyText,
-                applied,
-                errorMessage,
-              },
-            })
-          }
-        }
+      const processAccount = async () => {
+        const candidates = await fetchAccountCandidates(
+          accountUnits,
+          fetchErrors
+        )
+        await mapWithConcurrency(
+          candidates,
+          TIKTOK_COMMENT_CLASSIFY_CONCURRENCY,
+          processCandidate
+        )
       }
 
       if (accountId === "__current__") {
@@ -219,19 +296,39 @@ export async function runTikTokCommentAgent(input: {
       }
     }
 
+    if (classifyErrors.length > 0 && commentsSeen === 0) {
+      throw new Error(`La IA no pudo clasificar: ${classifyErrors[0]}`)
+    }
+
     const scopeLabel =
       sparkTargetAds > 0
-        ? `${sparkTargetAds} ads Spark (Urbanos/Elite) · ${units.length} adgroups`
-        : `${adsScanned} ads · ${units.length} adgroups`
+        ? `${sparkTargetAds} ads Spark · ${units.length} conjuntos`
+        : `${adsScanned} ads · ${units.length} conjuntos`
 
-    const summary =
-      commentsSeen === 0
-        ? fetchErrors.length > 0
-          ? `Sin comentarios nuevos en ${scopeLabel}. Errores API: ${fetchErrors.slice(0, 2).join(" · ")}`
-          : `Sin comentarios nuevos en ${scopeLabel} (ventana 7 días). Si los adgroups tenían comentarios desactivados, habilitalos y esperá comentarios nuevos.`
-        : input.dryRun
-          ? `${commentsSeen} comentario(s) clasificado(s); ${actionsCount} acción(es) sugerida(s) (dry run).`
-          : `${commentsSeen} comentario(s) procesado(s); ${actionsCount} acción(es) en ${scopeLabel}.`
+    const parts: string[] = []
+    if (commentsSeen === 0) {
+      parts.push(`Sin comentarios nuevos en ${scopeLabel} (ventana 7 días).`)
+    } else {
+      parts.push(
+        `${commentsSeen} comentario(s) procesado(s); ${actionsCount} acción(es) en ${scopeLabel}.`
+      )
+    }
+    if (applyErrors > 0) {
+      parts.push(`${applyErrors} acción(es) fallaron en TikTok.`)
+    }
+    if (classifyErrors.length > 0) {
+      parts.push(
+        `${classifyErrors.length} sin clasificar (se reintentan en la próxima corrida).`
+      )
+    }
+    if (deferred > 0) {
+      parts.push(
+        `${deferred} quedaron pendientes por tiempo; ejecutá de nuevo para seguir.`
+      )
+    }
+    if (fetchErrors.length > 0) {
+      parts.push(`Errores API: ${fetchErrors.slice(0, 2).join(" · ")}`)
+    }
 
     const finished = await prisma.tikTokCommentAgentRun.update({
       where: { id: run.id },
@@ -241,41 +338,26 @@ export async function runTikTokCommentAgent(input: {
         adsScanned,
         commentsSeen,
         actionsCount,
-        summary,
+        summary: parts.join(" "),
       },
     })
 
     return toRunSummary(finished)
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Error en agente de comentarios TikTok"
+    await prisma.tikTokCommentDecision.deleteMany({
+      where: {
+        runId: run.id,
+        classification: TIKTOK_COMMENT_PENDING_CLASSIFICATION,
+      },
+    })
     const failed = await prisma.tikTokCommentAgentRun.update({
       where: { id: run.id },
       data: {
         status: "failed",
         finishedAt: new Date(),
-        errorMessage: message,
+        errorMessage: errorText(error, "Error en agente de comentarios TikTok"),
       },
     })
     return toRunSummary(failed)
   }
-}
-
-export async function shouldSkipScheduledTikTokCommentRun(
-  trigger: TikTokCommentAgentTrigger
-): Promise<boolean> {
-  if (trigger === "manual") return false
-
-  const since = new Date(Date.now() - 110 * 60 * 1000)
-  const recent = await prisma.tikTokCommentAgentRun.findFirst({
-    where: {
-      trigger,
-      status: { in: ["success", "running"] },
-      startedAt: { gte: since },
-    },
-    orderBy: { startedAt: "desc" },
-  })
-  return recent != null
 }

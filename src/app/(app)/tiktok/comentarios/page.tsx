@@ -8,7 +8,7 @@ export const maxDuration = 300
 export const metadata = {
   title: "Comentarios IA · TikTok | Marketing",
   description:
-    "Agente de comentarios TikTok: Claude clasifica spam, responde preguntas y deja pasar positivos",
+    "Agente de comentarios TikTok: la IA clasifica spam, responde preguntas y deja pasar positivos",
 }
 
 export default function TikTokComentariosPage() {

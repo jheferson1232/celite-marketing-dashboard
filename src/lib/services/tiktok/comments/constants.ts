@@ -1,12 +1,19 @@
 /** Ventana de lectura en /comment/list/ (preguntas tipo precio/ubicación suelen llegar a lo largo de varios días). */
 export const TIKTOK_COMMENT_WINDOW_HOURS = 24 * 7
 
-export const TIKTOK_COMMENT_CRON_EXPRESSION = "0 */2 * * *"
-
 export const TIKTOK_COMMENT_TRIGGER_LABEL: Record<string, string> = {
-  cron_2h: "🌙 Cron 2h",
-  manual: "▶ Manual",
+  cron_2h: "Cron",
+  manual: "Manual",
 }
+
+/** Clasificación de la fila reservada mientras la IA decide (no se muestra). */
+export const TIKTOK_COMMENT_PENDING_CLASSIFICATION = "pending"
+
+/** Corte de la corrida antes del maxDuration (300 s); lo que falte va a la siguiente. */
+export const TIKTOK_COMMENT_RUN_BUDGET_MS = 240_000
+export const TIKTOK_COMMENT_CLASSIFY_CONCURRENCY = 4
+/** Una corrida `running` más vieja que esto murió por timeout. */
+export const TIKTOK_COMMENT_STALE_RUN_MS = 10 * 60_000
 
 /** Perfiles Spark prioritarios para Comentarios IA. */
 export const TIKTOK_COMMENT_SPARK_PROFILES = [

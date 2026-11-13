@@ -1,31 +1,32 @@
 import "server-only"
 
-import { isAnthropicConfigured } from "@/lib/services/meta/comments/env"
-import { resolveTikTokCredentials } from "../tiktok-credentials.server"
+import {
+  AI_GATEWAY_API_KEY_ENV,
+  COMMENT_AGENT_MODEL_LABEL,
+  isAiGatewayConfigured,
+} from "@/lib/services/ai/comment-model"
+import { listTikTokAdAccounts } from "../ad-accounts"
+import { hasTikTokCredentialsConfigured } from "../tiktok-credentials.server"
 import type { TikTokCommentAgentStatus } from "./types"
 
 export async function getTikTokCommentAgentStatus(): Promise<TikTokCommentAgentStatus> {
   const missing: string[] = []
-  if (!isAnthropicConfigured()) missing.push("ANTHROPIC_API_KEY")
+  const aiConfigured = isAiGatewayConfigured()
+  if (!aiConfigured) missing.push(AI_GATEWAY_API_KEY_ENV)
 
-  let tiktokConfigured = false
-  let advertiserId: string | null = null
-  let advertiserName: string | null = null
-
-  try {
-    const creds = await resolveTikTokCredentials()
-    tiktokConfigured = true
-    advertiserId = creds.advertiserId
-    advertiserName = creds.advertiserId
-  } catch {
+  const [tiktokConfigured, accounts] = await Promise.all([
+    hasTikTokCredentialsConfigured().catch(() => false),
+    listTikTokAdAccounts().catch(() => []),
+  ])
+  if (!tiktokConfigured) {
     missing.push("TIKTOK_ACCESS_TOKEN / TIKTOK_ADVERTISER_ID")
   }
 
   return {
-    anthropicConfigured: isAnthropicConfigured(),
+    aiConfigured,
+    aiModelLabel: COMMENT_AGENT_MODEL_LABEL,
     tiktokConfigured,
-    advertiserId,
-    advertiserName,
-    missing: [...new Set(missing)],
+    accountsCount: tiktokConfigured ? Math.max(accounts.length, 1) : 0,
+    missing,
   }
 }

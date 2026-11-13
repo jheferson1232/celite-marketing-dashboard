@@ -42,12 +42,6 @@
       "timezone": "America/Lima",
       "path": "/crons/meta-comments-agent",
       "requestMethod": "GET"
-    },
-    "tiktok-comments-2h": {
-      "schedule": "0 */2 * * *",
-      "timezone": "America/Lima",
-      "path": "/crons/tiktok-comments-agent",
-      "requestMethod": "GET"
     }
   }
 }

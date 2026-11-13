@@ -5,6 +5,7 @@ import {
   getTikTokCommentDashboardMetrics,
   listTikTokCommentActivity,
 } from "@/lib/services/tiktok/comments/dashboard"
+import { retryTikTokCommentDecision } from "@/lib/services/tiktok/comments/retry"
 import { getTikTokCommentAgentStatus } from "@/lib/services/tiktok/comments/status"
 import {
   listTikTokCommentAgentRuns,
@@ -32,12 +33,15 @@ export const listTikTokCommentActivityAction = createServerAction(
 )
 
 export const listTikTokCommentAgentRunsAction = createServerAction(async () =>
-  listTikTokCommentAgentRuns(20)
+  listTikTokCommentAgentRuns(12)
 )
 
-export const runTikTokCommentAgentNowAction = createServerAction(
-  async (input: { dryRun: boolean }) =>
-    runTikTokCommentAgent({ trigger: "manual", dryRun: input.dryRun })
+export const runTikTokCommentAgentNowAction = createServerAction(async () =>
+  runTikTokCommentAgent({ trigger: "manual" })
+)
+
+export const retryTikTokCommentDecisionAction = createServerAction(
+  async (decisionId: string) => retryTikTokCommentDecision(decisionId)
 )
 
 export const listTikTokLiveCommentsAction = createServerAction(async () => {

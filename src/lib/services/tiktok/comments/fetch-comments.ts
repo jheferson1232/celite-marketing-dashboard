@@ -5,6 +5,7 @@ import { mapWithConcurrency } from "../concurrency"
 import { getTikTokRequestContext } from "../tiktok-api.server"
 import { withTikTokDashboardAccount } from "../tiktok-dashboard-account.server"
 import type { TikTokApiResponse, TikTokPageInfo } from "../types"
+import { resolveUnitAd } from "./fetch-active-ads"
 import {
   matchesTikTokCommentSparkProfile,
   TIKTOK_COMMENT_ACCOUNT_CONCURRENCY,
@@ -263,13 +264,13 @@ async function unitsForDeliveringAdgroups(
     },
   })
 
-  const byAdgroup = new Map<string, TikTokActiveAdRef>()
+  const byAdgroup = new Map<string, TikTokActiveAdRef[]>()
   for (const row of data.data?.list ?? []) {
     const adgroupId = row.adgroup_id?.trim()
     const adId = row.ad_id?.trim()
-    if (!adgroupId || !adId || byAdgroup.has(adgroupId)) continue
+    if (!adgroupId || !adId) continue
     const profileName = row.display_name?.trim() || null
-    byAdgroup.set(adgroupId, {
+    const ad: TikTokActiveAdRef = {
       adId,
       adName: row.ad_name?.trim() || adId,
       adgroupId,
@@ -281,34 +282,38 @@ async function unitsForDeliveringAdgroups(
       isSparkTarget: matchesTikTokCommentSparkProfile(profileName),
       accountId: account.id,
       accountName: account.name,
-    })
+    }
+    const list = byAdgroup.get(adgroupId)
+    if (list) list.push(ad)
+    else byAdgroup.set(adgroupId, [ad])
   }
 
   for (const adgroupId of adgroupIds) {
     if (byAdgroup.has(adgroupId)) continue
-    byAdgroup.set(adgroupId, {
-      adId: adgroupId,
-      adName: adgroupId,
-      adgroupId,
-      tiktokItemId: null,
-      identityId: null,
-      identityType: null,
-      videoId: null,
-      profileName: null,
-      isSparkTarget: false,
-      accountId: account.id,
-      accountName: account.name,
-    })
+    byAdgroup.set(adgroupId, [
+      {
+        adId: adgroupId,
+        adName: adgroupId,
+        adgroupId,
+        tiktokItemId: null,
+        identityId: null,
+        identityType: null,
+        videoId: null,
+        profileName: null,
+        isSparkTarget: false,
+        accountId: account.id,
+        accountName: account.name,
+      },
+    ])
   }
 
-  const ads = [...byAdgroup.values()]
+  const units: TikTokCommentSearchUnit[] = [...byAdgroup.entries()].map(
+    ([adgroupId, ads]) => ({ adgroupId, ad: ads[0]!, ads })
+  )
 
   return {
-    sparkTargetAds: ads.filter((ad) => ad.isSparkTarget).length,
-    units: ads.map((ad) => ({
-      adgroupId: ad.adgroupId ?? ad.adId,
-      ad,
-    })),
+    sparkTargetAds: units.filter((unit) => unit.ad.isSparkTarget).length,
+    units,
   }
 }
 
@@ -334,14 +339,15 @@ async function fetchCommentsWithinBudget(
         })
         for (const row of rows) {
           if (byId.has(row.id)) continue
+          const ad = resolveUnitAd(unit, row.adId)
           byId.set(row.id, {
             ...row,
-            adId: row.adId || unit.ad.adId,
-            adName: unit.ad.adName,
+            adId: ad.adId,
+            adName: ad.adName,
             adgroupId: unit.adgroupId,
-            profileName: unit.ad.profileName,
-            tiktokItemId: unit.ad.tiktokItemId,
-            accountName: unit.ad.accountName,
+            profileName: ad.profileName,
+            tiktokItemId: ad.tiktokItemId,
+            accountName: ad.accountName,
             processed: false,
           })
           if (byId.size >= TIKTOK_LIVE_COMMENTS_LIMIT) break

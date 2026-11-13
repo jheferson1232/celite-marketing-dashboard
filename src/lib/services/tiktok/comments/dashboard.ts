@@ -1,7 +1,8 @@
 import "server-only"
 
 import prisma from "@/lib/prisma"
-import { listTikTokCommentSearchUnitsAllAccounts } from "./fetch-active-ads"
+import { addDaysToDateString, getDashboardToday } from "@/lib/date"
+import { TIKTOK_COMMENT_PENDING_CLASSIFICATION } from "./constants"
 import type {
   TikTokCommentActivityFilter,
   TikTokCommentDashboardMetrics,
@@ -9,30 +10,41 @@ import type {
   TikTokCommentDecisionRecord,
 } from "./types"
 
+/** Inicio del rango en hora de Lima (UTC−5 fijo, Perú no usa horario de verano). */
 function rangeStart(range: TikTokCommentDateRange): Date {
-  const now = new Date()
-  if (range === "today") {
-    const start = new Date(now)
-    start.setHours(0, 0, 0, 0)
-    return start
+  const today = getDashboardToday()
+  const day = range === "today" ? today : addDaysToDateString(today, -6)
+  return new Date(`${day}T00:00:00-05:00`)
+}
+
+function baseWhere(range: TikTokCommentDateRange) {
+  return {
+    createdAt: { gte: rangeStart(range) },
+    classification: { not: TIKTOK_COMMENT_PENDING_CLASSIFICATION },
   }
-  const start = new Date(now)
-  start.setDate(start.getDate() - 7)
-  start.setHours(0, 0, 0, 0)
-  return start
 }
 
-function actionFilterWhere(filter: TikTokCommentActivityFilter) {
-  if (filter === "replies") return { action: "reply" as const }
-  if (filter === "deleted") return { action: "hide" as const }
-  return {}
+function filterWhere(filter: TikTokCommentActivityFilter) {
+  switch (filter) {
+    case "replies":
+      return { action: "reply", applied: true }
+    case "hidden":
+      return { action: "hide", applied: true }
+    case "skipped":
+      return { action: "skip" }
+    case "errors":
+      return { errorMessage: { not: null } }
+    default:
+      return {}
+  }
 }
 
-function toDecisionRecord(row: {
+export function toTikTokCommentDecisionRecord(row: {
   id: string
   runId: string | null
   tiktokCommentId: string
   adId: string | null
+  accountId: string | null
   tiktokItemId: string | null
   identityId: string | null
   identityType: string | null
@@ -50,6 +62,7 @@ function toDecisionRecord(row: {
     runId: row.runId,
     tiktokCommentId: row.tiktokCommentId,
     adId: row.adId,
+    accountId: row.accountId,
     tiktokItemId: row.tiktokItemId,
     identityId: row.identityId,
     identityType: row.identityType,
@@ -68,43 +81,34 @@ function toDecisionRecord(row: {
 export async function getTikTokCommentDashboardMetrics(
   range: TikTokCommentDateRange
 ): Promise<TikTokCommentDashboardMetrics> {
-  const since = rangeStart(range)
+  const where = baseWhere(range)
+  const count = (filter: TikTokCommentActivityFilter) =>
+    prisma.tikTokCommentDecision.count({
+      where: { ...where, ...filterWhere(filter) },
+    })
 
-  const [totalActivity, deletedComments, repliedComments, errors, searchUnits] =
+  const [processed, replied, hidden, skipped, errors, lastRun] =
     await Promise.all([
-      prisma.tikTokCommentDecision.count({
-        where: { createdAt: { gte: since } },
+      count("all"),
+      count("replies"),
+      count("hidden"),
+      count("skipped"),
+      count("errors"),
+      prisma.tikTokCommentAgentRun.findFirst({
+        where: { status: "success" },
+        orderBy: { startedAt: "desc" },
+        select: { adsScanned: true },
       }),
-      prisma.tikTokCommentDecision.count({
-        where: { createdAt: { gte: since }, action: "hide" },
-      }),
-      prisma.tikTokCommentDecision.count({
-        where: { createdAt: { gte: since }, action: "reply" },
-      }),
-      prisma.tikTokCommentDecision.count({
-        where: {
-          createdAt: { gte: since },
-          OR: [
-            { errorMessage: { not: null } },
-            {
-              applied: false,
-              action: { in: ["hide", "reply"] },
-            },
-          ],
-        },
-      }),
-      listTikTokCommentSearchUnitsAllAccounts()
-        .then((r) => r.adsScanned)
-        .catch(() => 0),
     ])
 
   return {
     range,
-    totalActivity,
-    deletedComments,
-    repliedComments,
+    processed,
+    replied,
+    hidden,
+    skipped,
     errors,
-    monitoredAds: searchUnits,
+    monitoredAds: lastRun?.adsScanned ?? 0,
   }
 }
 
@@ -113,17 +117,10 @@ export async function listTikTokCommentActivity(input: {
   filter: TikTokCommentActivityFilter
   limit?: number
 }): Promise<TikTokCommentDecisionRecord[]> {
-  const since = rangeStart(input.range)
-  const limit = input.limit ?? 50
-
   const rows = await prisma.tikTokCommentDecision.findMany({
-    where: {
-      createdAt: { gte: since },
-      ...actionFilterWhere(input.filter),
-    },
+    where: { ...baseWhere(input.range), ...filterWhere(input.filter) },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    take: input.limit ?? 50,
   })
-
-  return rows.map(toDecisionRecord)
+  return rows.map(toTikTokCommentDecisionRecord)
 }
