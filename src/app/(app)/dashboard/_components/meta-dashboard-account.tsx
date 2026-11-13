@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils"
 import type { MetaAdAccountSummary } from "@/lib/services/meta/meta-ad-accounts"
 import { listMetaAdAccountsAction } from "../_actions/meta-ad-accounts"
 
-const STORAGE_KEY = "meta-dashboard-account:v1"
+// v2: descarta la selección guardada para que aplique la nueva cuenta por defecto.
+const STORAGE_KEY = "meta-dashboard-account:v2"
+
+/** Cuenta que abre el dashboard si no hay una elegida: Mokado Katy. */
+const PREFERRED_DEFAULT_ACCOUNT_ID = "870267208104445"
 
 const MetaDashboardAccountContext = createContext<string | null>(null)
 
@@ -42,6 +46,8 @@ function pickInitialAccountId(accounts: MetaAdAccountSummary[]): string | null {
   }
 
   return (
+    accounts.find((account) => account.accountId === PREFERRED_DEFAULT_ACCOUNT_ID)
+      ?.accountId ??
     accounts.find((account) => account.isDefault)?.accountId ??
     accounts[0]?.accountId ??
     null
