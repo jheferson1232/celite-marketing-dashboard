@@ -8,11 +8,11 @@ import {
 
 /**
  * Rutas que no pasan por el login. Cada una tiene su propia protección:
- * - /api/cron/*: Authorization: Bearer CRON_SECRET
+ * - /crons/*: Authorization: Bearer CRON_SECRET (Vercel Schedules lo envía)
  * - /api/telegram/webhook: x-telegram-bot-api-secret-token (obligatorio)
  * - /api/health/*: solo responden { configured: boolean }
  */
-const PUBLIC_PREFIXES = ["/api/cron/", "/api/health/"]
+const PUBLIC_PREFIXES = ["/crons/", "/api/health/"]
 const PUBLIC_PATHS = new Set(["/login", "/api/telegram/webhook"])
 
 function isPublicPath(pathname: string): boolean {

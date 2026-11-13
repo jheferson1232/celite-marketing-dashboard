@@ -1,8 +1,6 @@
 import prisma from "@/lib/prisma"
 import { ServerActionError } from "@/lib/server-action"
-import { activateTikTokCampaignComplete } from "@/lib/services/tiktok/manage"
 import { getTikTokAgentThresholds } from "./config"
-import type { TikTokAgentPlannedAction } from "./types"
 
 export type PendingActivateCampaign = {
   campaignId: string
@@ -56,7 +54,10 @@ async function readPendingRaw(): Promise<string> {
   return row?.pendingActivateCampaignIds ?? "[]"
 }
 
-async function writePending(items: PendingActivateCampaign[]): Promise<void> {
+/** Reemplaza la cola completa (la usa también el cron `/crons/tiktok-activate-6am`). */
+export async function writePendingActivateCampaigns(
+  items: PendingActivateCampaign[]
+): Promise<void> {
   assertSettings()
   await prisma.tikTokAgentSettings.upsert({
     where: { id: "default" },
@@ -88,7 +89,7 @@ export async function listPendingActivateCampaignsRaw(): Promise<
 }
 
 export async function clearPendingActivateCampaigns(): Promise<void> {
-  await writePending([])
+  await writePendingActivateCampaigns([])
 }
 
 export async function queueCampaignFor6amActivation(input: {
@@ -113,7 +114,7 @@ export async function queueCampaignFor6amActivation(input: {
       queuedAt: new Date().toISOString(),
     },
   ]
-  await writePending(next)
+  await writePendingActivateCampaigns(next)
   return next
 }
 
@@ -124,7 +125,7 @@ export async function removeCampaignFrom6amQueue(
   const next = parsePending(await readPendingRaw()).filter(
     (item) => item.campaignId !== id
   )
-  await writePending(next)
+  await writePendingActivateCampaigns(next)
   return next
 }
 
@@ -134,184 +135,4 @@ export async function isCampaignQueuedFor6am(
   const pending = await listPendingActivateCampaigns()
   const id = campaignId.trim()
   return pending.some((item) => item.campaignId === id)
-}
-
-/**
- * A las 6:00: activa en TikTok todas las campañas en cola (campaña + conjuntos)
- * y deja registro en «Últimas corridas» (TikTokAgentRun / trigger morning_6am).
- */
-export async function runPending6amActivations(input?: {
-  dryRun?: boolean
-}): Promise<{
-  activated: number
-  failed: number
-  skippedFeatureOff: boolean
-  runId: string | null
-  details: Array<{ campaignId: string; name: string; ok: boolean; error?: string }>
-}> {
-  const dryRun = input?.dryRun ?? false
-  const thresholds = await getTikTokAgentThresholds()
-  const pending = parsePending(await readPendingRaw())
-
-  const run = await prisma.tikTokAgentRun.create({
-    data: {
-      trigger: "morning_6am",
-      status: "running",
-      dryRun,
-      accountsScanned: 1,
-      campaignsScanned: pending.length,
-    },
-  })
-
-  const finishRun = async (data: {
-    status: "success" | "failed"
-    summary: string
-    errorMessage?: string
-    actions: TikTokAgentPlannedAction[]
-    actionsCount: number
-  }) => {
-    await prisma.tikTokAgentRun.update({
-      where: { id: run.id },
-      data: {
-        status: data.status,
-        finishedAt: new Date(),
-        campaignsScanned: pending.length,
-        actionsCount: data.actionsCount,
-        summary: data.summary,
-        errorMessage: data.errorMessage ?? null,
-        actions: data.actions,
-      },
-    })
-  }
-
-  if (!thresholds.activateAt6amEnabled) {
-    const details = pending.map((item) => ({
-      campaignId: item.campaignId,
-      name: item.name,
-      ok: false,
-      error: "Feature Activación 6:00 AM está apagada",
-    }))
-    const actions: TikTokAgentPlannedAction[] = details.map((item) => ({
-      kind: "activate_campaign",
-      entityId: item.campaignId,
-      entityName: item.name,
-      spendPen: 0,
-      purchases: 0,
-      cpaPen: 0,
-      reason: "Cola 6:00 AM (feature apagada)",
-      applied: false,
-      error: item.error,
-    }))
-    await finishRun({
-      status: "success",
-      summary:
-        pending.length === 0
-          ? "Activación 6am omitida: la feature está apagada."
-          : `Activación 6am omitida: feature apagada (${pending.length} en cola sin activar).`,
-      actions,
-      actionsCount: actions.length,
-    })
-    return {
-      activated: 0,
-      failed: 0,
-      skippedFeatureOff: true,
-      runId: run.id,
-      details,
-    }
-  }
-
-  if (pending.length === 0) {
-    await finishRun({
-      status: "success",
-      summary: "Activación 6am: cola vacía, nada que encender.",
-      actions: [],
-      actionsCount: 0,
-    })
-    return {
-      activated: 0,
-      failed: 0,
-      skippedFeatureOff: false,
-      runId: run.id,
-      details: [],
-    }
-  }
-
-  const details: Array<{
-    campaignId: string
-    name: string
-    ok: boolean
-    error?: string
-  }> = []
-  const remaining: PendingActivateCampaign[] = []
-
-  for (const item of pending) {
-    if (dryRun) {
-      details.push({
-        campaignId: item.campaignId,
-        name: item.name,
-        ok: true,
-      })
-      continue
-    }
-
-    try {
-      await activateTikTokCampaignComplete(item.campaignId)
-      details.push({
-        campaignId: item.campaignId,
-        name: item.name,
-        ok: true,
-      })
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Error al activar"
-      details.push({
-        campaignId: item.campaignId,
-        name: item.name,
-        ok: false,
-        error: message,
-      })
-      remaining.push(item)
-    }
-  }
-
-  if (!dryRun) {
-    await writePending(remaining)
-  }
-
-  const activated = details.filter((d) => d.ok).length
-  const failed = details.filter((d) => !d.ok).length
-  const actions: TikTokAgentPlannedAction[] = details.map((item) => ({
-    kind: "activate_campaign",
-    entityId: item.campaignId,
-    entityName: item.name,
-    spendPen: 0,
-    purchases: 0,
-    cpaPen: 0,
-    reason: dryRun
-      ? "Simulación activación 6:00 AM"
-      : "Activación programada 6:00 AM (Lima)",
-    applied: !dryRun && item.ok,
-    error: item.error,
-  }))
-
-  await finishRun({
-    status: failed > 0 && activated === 0 ? "failed" : "success",
-    summary: dryRun
-      ? `${activated} campaña(s) en cola (dry run).`
-      : `Activación 6am: ${activated} ok, ${failed} fallida(s).`,
-    errorMessage:
-      failed > 0 && activated === 0
-        ? "Ninguna campaña de la cola se pudo activar."
-        : undefined,
-    actions,
-    actionsCount: actions.length,
-  })
-
-  return {
-    activated,
-    failed,
-    skippedFeatureOff: false,
-    runId: run.id,
-    details,
-  }
 }

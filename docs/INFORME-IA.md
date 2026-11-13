@@ -6,7 +6,7 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 
 1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
 2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
-3. **Cron** — 2×/día a las **8:00** y **20:00** (America/Lima) vía GitHub Actions → `/api/cron/meta-telegram-reports`: conjuntos ON en Crítico.
+3. **Cron** — 2×/día a las **8:00** y **20:00** (America/Lima) vía Vercel Schedules → `/crons/meta-telegram-reports`: conjuntos ON en Crítico.
 4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule 8:00/20:00 no se envía solo.
 
 OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`; el informe horario y los umbrales son reglas fijas en código.
@@ -45,52 +45,39 @@ En Vercel, ejecuta `db push` contra la misma `DATABASE_URL` de producción.
 2. Obtén tu ID con @userinfobot → `TELEGRAM_ALLOWED_USER_IDS`.
 3. En la app: **Vista previa** (no envía) o **Enviar a Telegram** (mismo mensaje que el cron).
 
-## Cron diario (GitHub Actions — recomendado en Hobby)
+## Cron (Vercel Schedules)
 
-El plan **Hobby** de Vercel no permite crons más de una vez al día. El informe lo dispara [`.github/workflows/meta-telegram-daily.yml`](../.github/workflows/meta-telegram-daily.yml) **2×/día a las 8:00 y 20:00 America/Lima** (`0 13 * * *` y `0 1 * * *` UTC).
+Los crons viven en [`vercel.json`](../vercel.json) (`schedules`, plan Pro) con `timezone: America/Lima`. Vercel llama por GET a las rutas `/crons/*` y envía `Authorization: Bearer <CRON_SECRET>`.
+
+| Schedule | Ruta | Hora (Lima) |
+|----------|------|-------------|
+| `tiktok-activate-6am` | `/crons/tiktok-activate-6am` | 6:00 |
+| `meta-telegram-8am` / `meta-telegram-8pm` | `/crons/meta-telegram-reports` | 8:00 y 20:00 |
+| `tiktok-agent-8am` / `-2pm` / `-8pm` | `/crons/tiktok-agent` | 8:00, 14:00, 20:00 |
+| `meta-comments-2h` | `/crons/meta-comments-agent` | cada 2 h |
+| `tiktok-comments-2h` | `/crons/tiktok-comments-agent` | cada 2 h |
+
+El agente TikTok deduce el trigger del header `ce-vssschedulename`; en llamadas manuales usa `?trigger=morning_8am|afternoon_2pm|evening_8pm`.
 
 > Para reducir uso de Neon Free, el historial en BD/sync está limitado a **7 días** (`META_INFORME_MAX_DAYS`).
 
-### Configuración (una vez)
-
-1. En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
-   - `CRON_SECRET` — **el mismo valor** que en Vercel (sin espacios al inicio/final).
-2. (Opcional) **Variables → Actions → New repository variable**
-   - `META_CRON_APP_URL` — URL de producción si no es `https://celite-marketing-dashboard.vercel.app`
-3. **Actions** debe estar habilitado en el repo (pestaña Actions → el workflow aparece tras el push).
-
-Probar sin esperar la hora:
-
-- GitHub → **Actions** → **Meta Telegram daily** → **Run workflow**.
-
-El endpoint sincroniza el informe (ventana de 7 días) y envía Telegram. El **cierre nocturno** (23:00 Lima) solo corre si la llamada cae en esa hora.
-
-### Alternativa: cron-job.org
-
-Si prefieres no usar GitHub Actions:
-
-| Campo | Valor |
-|-------|--------|
-| URL | `https://celite-marketing-dashboard.vercel.app/api/cron/meta-telegram-reports` |
-| Método | GET |
-| Cabecera | `Authorization: Bearer <CRON_SECRET>` |
-| Intervalo | 2×/día: `0 13 * * *` UTC = 8:00 Lima; `0 1 * * *` UTC = 20:00 Lima |
-
-### Plan Vercel Pro
-
-Puedes volver a poner en `vercel.json` un cron `0 * * * *` (Pro) y desactivar el workflow de GitHub si quieres todo en Vercel.
-
 ### Variables en Vercel
 
-- `CRON_SECRET` — obligatorio para el endpoint (GitHub Actions y pruebas manuales).
+- `CRON_SECRET` — obligatorio (Production). Sin él, Vercel no envía el header y las rutas responden 401.
 - Resto de variables de la tabla superior.
 
-Probar manualmente:
+### Probar sin esperar la hora
 
 ```bash
+vercel schedules list
+vercel schedules invoke meta-telegram-8am
+
+# Manual / dry run (los agentes aceptan ?dryRun=1)
 curl -s -H "Authorization: Bearer $CRON_SECRET" \
-  "https://TU_DOMINIO/api/cron/meta-telegram-reports"
+  "https://celite-marketing-dashboard.vercel.app/crons/tiktok-agent?trigger=morning_8am&dryRun=1"
 ```
+
+El endpoint del informe sincroniza (ventana de 7 días) y envía Telegram. El **cierre nocturno** (23:00 Lima) solo corre si la llamada cae en esa hora.
 
 ## Reglas de puntos (resumen)
 
@@ -120,5 +107,5 @@ No incluye resumen de cuenta, campañas activas ni listas “a apagar”. Si no 
 | `src/lib/services/meta/meta-campaign-ai-estado.ts` | Veredicto IA campañas |
 | `src/lib/services/meta/meta-informe-alerts.ts` | Listas apagar / resumen campañas |
 | `src/lib/services/meta/meta-hourly-report.ts` | Mensaje horario + envío |
-| `src/lib/services/meta/meta-telegram-cron.ts` | Orquestación cron |
+| `src/app/crons/meta-telegram-reports/route.ts` | Cron: orquestación y cierre nocturno |
 | `src/app/(app)/informe-ia/` | UI |

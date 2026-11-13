@@ -1,1 +1,53 @@
-{}
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "schedules": {
+    "tiktok-activate-6am": {
+      "schedule": "0 6 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/tiktok-activate-6am",
+      "requestMethod": "GET"
+    },
+    "meta-telegram-8am": {
+      "schedule": "0 8 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/meta-telegram-reports",
+      "requestMethod": "GET"
+    },
+    "meta-telegram-8pm": {
+      "schedule": "0 20 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/meta-telegram-reports",
+      "requestMethod": "GET"
+    },
+    "tiktok-agent-8am": {
+      "schedule": "0 8 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/tiktok-agent",
+      "requestMethod": "GET"
+    },
+    "tiktok-agent-2pm": {
+      "schedule": "0 14 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/tiktok-agent",
+      "requestMethod": "GET"
+    },
+    "tiktok-agent-8pm": {
+      "schedule": "0 20 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/tiktok-agent",
+      "requestMethod": "GET"
+    },
+    "meta-comments-2h": {
+      "schedule": "0 */2 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/meta-comments-agent",
+      "requestMethod": "GET"
+    },
+    "tiktok-comments-2h": {
+      "schedule": "0 */2 * * *",
+      "timezone": "America/Lima",
+      "path": "/crons/tiktok-comments-agent",
+      "requestMethod": "GET"
+    }
+  }
+}
