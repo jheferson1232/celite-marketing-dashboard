@@ -12,7 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
+import {
+  formatCurrency,
+  META_DASHBOARD_CURRENCY,
+  type CurrencyCode,
+} from "@/lib/format"
 import { runServerAction } from "@/lib/server-action"
 import { getLastSevenDaysRange } from "@/lib/services/meta/campaign-daily-insights"
 import { isMetaRateLimitError } from "@/lib/services/meta/meta-errors"
@@ -24,11 +28,13 @@ import { TikTokCampaignDetailsChart } from "@/app/(app)/tiktok/_components/tikto
 interface MetaCampaignDetailsContentProps {
   campaignId: string
   objective: string
+  currency?: CurrencyCode
 }
 
 export function MetaCampaignDetailsContent({
   campaignId,
   objective,
+  currency = META_DASHBOARD_CURRENCY,
 }: MetaCampaignDetailsContentProps) {
   const dateRange = getLastSevenDaysRange()
   const accountId = useMetaDashboardAccountId()
@@ -104,7 +110,7 @@ export function MetaCampaignDetailsContent({
       <div className="grid grid-cols-3 gap-3">
         <SummaryCard
           label="Gasto total"
-          value={formatCurrency(data.totals.spend, META_DASHBOARD_CURRENCY)}
+          value={formatCurrency(data.totals.spend, currency)}
         />
         <SummaryCard
           label="Compras"
@@ -114,7 +120,7 @@ export function MetaCampaignDetailsContent({
           label="CPA"
           value={
             data.totals.cpa > 0
-              ? formatCurrency(data.totals.cpa, META_DASHBOARD_CURRENCY)
+              ? formatCurrency(data.totals.cpa, currency)
               : "—"
           }
         />
@@ -124,10 +130,10 @@ export function MetaCampaignDetailsContent({
         <h3 className="mb-2 text-sm font-medium">Gasto diario y compras</h3>
         <TikTokCampaignDetailsChart
           days={data.days}
-          currency={META_DASHBOARD_CURRENCY}
+          currency={currency}
         />
         <p className="text-muted-foreground mt-2 text-xs">
-          Barras: gasto ($) · Línea: compras
+          Barras: gasto · Línea: compras
         </p>
       </div>
 
@@ -151,7 +157,7 @@ export function MetaCampaignDetailsContent({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {day.spend > 0
-                      ? formatCurrency(day.spend, META_DASHBOARD_CURRENCY)
+                      ? formatCurrency(day.spend, currency)
                       : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -159,7 +165,7 @@ export function MetaCampaignDetailsContent({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {day.cpa > 0
-                      ? formatCurrency(day.cpa, META_DASHBOARD_CURRENCY)
+                      ? formatCurrency(day.cpa, currency)
                       : "—"}
                   </TableCell>
                 </TableRow>

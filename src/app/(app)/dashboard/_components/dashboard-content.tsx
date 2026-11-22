@@ -40,6 +40,7 @@ export function DashboardContent() {
     accounts,
     accountId,
     setAccountId,
+    currency,
     isLoading: isLoadingAccounts,
   } = useMetaDashboardAccount()
   const [isReloading, setIsReloading] = useState(false)
@@ -265,6 +266,7 @@ export function DashboardContent() {
         data={kpis}
         isLoading={isLoadingKpis || !accountId}
         lastMetric="addToCart"
+        currency={currency}
       />
 
       <MetaAudienceSection />
@@ -313,10 +315,16 @@ export function DashboardContent() {
             toolbarExtra={archivedMenu}
             onArchiveCampaign={archiveCampaign}
             originPlatform="meta"
+            currency={currency}
           />
         </TabsContent>
         <TabsContent value="ads" className="min-w-0 outline-none">
-          <AdsView data={adInsights} isLoading={isLoadingAdInsights} />
+          <AdsView
+            data={adInsights}
+            isLoading={isLoadingAdInsights}
+            currency={currency}
+            platform="meta"
+          />
         </TabsContent>
       </Tabs>
     </div>

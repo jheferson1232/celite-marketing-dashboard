@@ -4,6 +4,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useState } from "r
 import { useQuery } from "@tanstack/react-query"
 import { runServerAction } from "@/lib/server-action"
 import { cn } from "@/lib/utils"
+import type { CurrencyCode } from "@/lib/format"
 import type { MetaAdAccountSummary } from "@/lib/services/meta/meta-ad-accounts"
 import { listMetaAdAccountsAction } from "../_actions/meta-ad-accounts"
 
@@ -54,6 +55,20 @@ function pickInitialAccountId(accounts: MetaAdAccountSummary[]): string | null {
   )
 }
 
+/** Moneda de la cuenta en Meta (p. ej. Mokado CP = PEN); COP si no se conoce. */
+export function metaAccountCurrency(
+  account: MetaAdAccountSummary | null
+): CurrencyCode {
+  switch (account?.currency?.toUpperCase()) {
+    case "PEN":
+      return "PEN"
+    case "MXN":
+      return "MX"
+    default:
+      return "COP"
+  }
+}
+
 function accountOptionLabel(account: MetaAdAccountSummary): string {
   return account.statusLabel
     ? `${account.name} · ${account.statusLabel}`
@@ -100,6 +115,7 @@ export function useMetaDashboardAccount() {
     accountId,
     setAccountId,
     selectedAccount,
+    currency: metaAccountCurrency(selectedAccount),
     isLoading: accountsQuery.isLoading,
     error: accountsQuery.error,
   }

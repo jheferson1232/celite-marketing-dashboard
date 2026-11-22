@@ -53,6 +53,7 @@ export function CampaignDetailsSheet({
           <MetaCampaignDetailsContent
             campaignId={campaign.id}
             objective={campaign.objective ?? ""}
+            currency={currency}
           />
         ) : null}
       </SheetContent>
