@@ -95,7 +95,7 @@ async function fetchAdInsights(dateRange: DateRange): Promise<AdInsightRow[]> {
   const CREATIVE_FIELDS =
     "id,effective_status,created_time,creative{id,thumbnail_url,image_url,image_hash,video_id,link_url,object_url," +
     "object_story_spec{photo_data{url,image_hash},video_data{video_id,image_url,call_to_action{value{link}}}," +
-    "link_data{picture,image_url,link,call_to_action{value{link}},child_attachments{link}},template_data{link}}," +
+    "link_data{picture,link,call_to_action{value{link}},child_attachments{link}},template_data{link}}," +
     "asset_feed_spec{link_urls{website_url},videos{video_id}}}"
   const BATCH_SIZE = 25
   const BATCH_DELAY_MS = 600

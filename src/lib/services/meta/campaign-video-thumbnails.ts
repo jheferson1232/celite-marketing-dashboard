@@ -18,7 +18,7 @@ const MAX_AD_PAGES = 4
 const AD_EDGE_FIELDS =
   "id,name,creative{id,thumbnail_url,image_url," +
   "object_story_spec{photo_data{url},video_data{image_url}," +
-  "link_data{picture,image_url}}}"
+  "link_data{picture}}}"
 
 export type MetaCampaignVideoThumbnail = {
   id: string

@@ -47,7 +47,7 @@ async function fetchAdsWithCreativeAndInsights(
       fields:
         "creative{id,name,thumbnail_url,image_url,image_hash,video_id,body,title," +
         "object_story_spec{photo_data{url,image_hash},video_data{video_id,image_url}," +
-        "link_data{picture,image_url}}}," +
+        "link_data{picture}}}," +
         "insights{spend,impressions,clicks,ctr,frequency,actions,cost_per_action_type}",
       "time_range[since]": dateRange.from,
       "time_range[until]": dateRange.to,
