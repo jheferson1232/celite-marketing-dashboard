@@ -1,8 +1,12 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import { formatDashboardDayLong } from "@/lib/date"
+import { runServerAction } from "@/lib/server-action"
+import type { CurrencyCode } from "@/lib/format"
 import {
   informeDayTone,
   INFORME_ACCION_ORDER,
@@ -13,12 +17,25 @@ import type {
   InformeEntityRow,
   MetaInformePayload,
 } from "@/lib/services/meta/meta-operative-service"
-import type { CurrencyCode } from "@/lib/format"
+import { getInformeAdsetAdsAction } from "../_actions/meta-informe"
 import { ACCION_STYLE, compactMoney, moneyFormatter, TONE_CELL } from "./informe-format"
 
 const ACTION_ACCIONES = new Set<InformeAccion>(["apagar", "revisar", "reactivar"])
 
-function AccionPill({ accion }: { accion: InformeAccion }) {
+type DayCellData = { date: string; spend: number; purchases: number }
+
+type RowData = {
+  key: string
+  level: 0 | 1 | 2
+  name: string
+  isActive: boolean
+  status: React.ReactNode
+  spendPeriod: number
+  cpaPeriod: number
+  dayCells: DayCellData[]
+}
+
+function Pill({ accion, text }: { accion: InformeAccion; text?: string }) {
   const style = ACCION_STYLE[accion]
   return (
     <span
@@ -27,30 +44,24 @@ function AccionPill({ accion }: { accion: InformeAccion }) {
         style.pill
       )}
     >
-      {style.label}
+      {text ?? style.label}
     </span>
   )
 }
 
-function CampaignSummaryPill({ group }: { group: InformeCampaignGroup }) {
-  const entries = Object.entries(group.accionCounts) as [InformeAccion, number][]
-  const urgent = entries
+function CampaignStatus({ group }: { group: InformeCampaignGroup }) {
+  const urgent = (Object.entries(group.accionCounts) as [InformeAccion, number][])
     .filter(([accion]) => ACTION_ACCIONES.has(accion))
     .sort((a, b) => INFORME_ACCION_ORDER[a[0]] - INFORME_ACCION_ORDER[b[0]])[0]
   if (urgent) {
-    const style = ACCION_STYLE[urgent[0]]
     return (
-      <span
-        className={cn(
-          "rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
-          style.pill
-        )}
-      >
-        {urgent[1]} {style.label.toLowerCase()}
-      </span>
+      <Pill
+        accion={urgent[0]}
+        text={`${urgent[1]} ${ACCION_STYLE[urgent[0]].label.toLowerCase()}`}
+      />
     )
   }
-  return <AccionPill accion={group.campaign.accion} />
+  return <Pill accion={group.campaign.accion} />
 }
 
 function DayCell({
@@ -58,7 +69,7 @@ function DayCell({
   target,
   currency,
 }: {
-  cell: InformeEntityRow["dayCells"][number] | undefined
+  cell: DayCellData | undefined
   target: number
   currency: CurrencyCode
 }) {
@@ -77,9 +88,7 @@ function DayCell({
       ) : (
         <>
           {compactMoney(purchases > 0 ? spend / purchases : spend, currency)}
-          <span className="block text-[10px] opacity-80">
-            {purchases > 0 ? `${purchases} c` : "0 c"}
-          </span>
+          <span className="block text-[10px] opacity-80">{purchases} c</span>
         </>
       )}
     </td>
@@ -88,46 +97,64 @@ function DayCell({
 
 function MatrixRow({
   row,
-  dateKeys,
   data,
-  isCampaign,
-  group,
+  expanded,
+  onToggle,
 }: {
-  row: InformeEntityRow
-  dateKeys: string[]
+  row: RowData
   data: MetaInformePayload
-  isCampaign: boolean
-  group: InformeCampaignGroup
+  expanded?: boolean
+  onToggle?: () => void
 }) {
   const money = moneyFormatter(data.account.currency)
+  const stickyBg =
+    row.level === 0 ? "bg-muted" : row.level === 1 ? "bg-card" : "bg-muted/30"
   return (
-    <tr className={cn(isCampaign && "bg-muted/50 font-medium")}>
+    <tr className={cn(row.level === 0 && "bg-muted/50 font-medium", row.level === 2 && "bg-muted/20")}>
       <td
         className={cn(
-          "sticky left-0 z-[1] max-w-[260px] truncate border-b px-2 py-1.5 text-xs",
-          isCampaign ? "bg-muted" : "bg-card pl-5"
+          "sticky left-0 z-[1] max-w-[300px] border-b py-1.5 pr-2 text-xs",
+          stickyBg,
+          row.level === 0 ? "pl-1" : row.level === 1 ? "pl-5" : "pl-10"
         )}
-        title={row.name}
       >
-        {!isCampaign && !row.metaWasActive ? (
-          <span className="text-muted-foreground mr-1">○</span>
-        ) : null}
-        {row.name}
+        <div className="flex min-w-0 items-center gap-1">
+          {onToggle ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-label={expanded ? "Contraer" : "Desplegar"}
+              className="text-muted-foreground hover:text-foreground shrink-0 rounded p-0.5"
+            >
+              {expanded ? (
+                <RiArrowDownSLine className="size-4" />
+              ) : (
+                <RiArrowRightSLine className="size-4" />
+              )}
+            </button>
+          ) : (
+            <span className="w-5 shrink-0" />
+          )}
+          {!row.isActive ? (
+            <span className="text-muted-foreground shrink-0" title="Apagado">
+              ○
+            </span>
+          ) : null}
+          <span className="truncate" title={row.name}>
+            {row.level === 2 ? <span className="text-muted-foreground">Anuncio · </span> : null}
+            {row.name}
+          </span>
+        </div>
       </td>
-      <td className="border-b px-2 py-1.5">
-        {isCampaign ? (
-          <CampaignSummaryPill group={group} />
-        ) : (
-          <AccionPill accion={row.accion} />
-        )}
+      <td className="border-b px-2 py-1.5">{row.status}</td>
+      <td className="border-b px-2 py-1.5 text-right text-xs tabular-nums">
+        {money(row.spendPeriod)}
       </td>
       <td className="border-b px-2 py-1.5 text-right text-xs tabular-nums">
-        {money(row.spendInformeTotal)}
+        {row.cpaPeriod > 0 ? money(row.cpaPeriod) : "—"}
       </td>
-      <td className="border-b px-2 py-1.5 text-right text-xs tabular-nums">
-        {row.cpaInformeTotal > 0 ? money(row.cpaInformeTotal) : "—"}
-      </td>
-      {dateKeys.map((date) => (
+      {data.dateKeys.map((date) => (
         <DayCell
           key={date}
           cell={row.dayCells.find((c) => c.date === date)}
@@ -139,9 +166,90 @@ function MatrixRow({
   )
 }
 
+function entityRow(row: InformeEntityRow, level: 0 | 1, status: React.ReactNode): RowData {
+  return {
+    key: row.entityId,
+    level,
+    name: row.name,
+    isActive: row.metaWasActive,
+    status,
+    spendPeriod: row.spendInformeTotal,
+    cpaPeriod: row.cpaInformeTotal,
+    dayCells: row.dayCells,
+  }
+}
+
+function AdRows({ data, adsetId }: { data: MetaInformePayload; adsetId: string }) {
+  const accountId = data.account.accountId
+  const adsQuery = useQuery({
+    queryKey: ["meta-informe-adset-ads", accountId, adsetId],
+    queryFn: () => runServerAction(getInformeAdsetAdsAction({ accountId, adsetId })),
+    staleTime: 5 * 60 * 1000,
+  })
+  const colSpan = 4 + data.dateKeys.length
+
+  if (adsQuery.isLoading) {
+    return (
+      <tr>
+        <td colSpan={colSpan} className="text-muted-foreground border-b py-2 pl-12 text-xs">
+          Cargando anuncios…
+        </td>
+      </tr>
+    )
+  }
+  if (adsQuery.isError) {
+    return (
+      <tr>
+        <td colSpan={colSpan} className="text-destructive border-b py-2 pl-12 text-xs">
+          {adsQuery.error instanceof Error ? adsQuery.error.message : "No se pudieron cargar los anuncios."}
+        </td>
+      </tr>
+    )
+  }
+  const ads = adsQuery.data ?? []
+  if (ads.length === 0) {
+    return (
+      <tr>
+        <td colSpan={colSpan} className="text-muted-foreground border-b py-2 pl-12 text-xs">
+          Sin anuncios con gasto en el periodo.
+        </td>
+      </tr>
+    )
+  }
+  return (
+    <>
+      {ads.map((ad) => (
+        <MatrixRow
+          key={ad.metaId}
+          data={data}
+          row={{
+            key: ad.metaId,
+            level: 2,
+            name: ad.name,
+            isActive: ad.isActive,
+            status: <Pill accion={ad.accion} />,
+            spendPeriod: ad.spendPeriod,
+            cpaPeriod: ad.cpaPeriod,
+            dayCells: ad.dayCells,
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
+/** Campañas con algo pasando hoy arrancan desplegadas. */
+function startsExpanded(group: InformeCampaignGroup): boolean {
+  return group.adsets.some(
+    (a) => a.metaWasActive || a.spendToday > 0 || ACTION_ACCIONES.has(a.accion)
+  )
+}
+
 export function InformeMatrix({ data }: { data: MetaInformePayload }) {
   const [onlyOn, setOnlyOn] = useState(false)
   const [onlyActions, setOnlyActions] = useState(false)
+  const [campaignOverride, setCampaignOverride] = useState<Record<string, boolean>>({})
+  const [openAdsets, setOpenAdsets] = useState<Set<string>>(() => new Set())
 
   const groups = useMemo(
     () =>
@@ -158,6 +266,23 @@ export function InformeMatrix({ data }: { data: MetaInformePayload }) {
     [data.groups, onlyOn, onlyActions]
   )
 
+  const isCampaignOpen = (group: InformeCampaignGroup) =>
+    campaignOverride[group.campaign.entityId] ?? startsExpanded(group)
+
+  const toggleAdset = (metaId: string) =>
+    setOpenAdsets((prev) => {
+      const next = new Set(prev)
+      if (next.has(metaId)) next.delete(metaId)
+      else next.add(metaId)
+      return next
+    })
+
+  const allOpen = groups.length > 0 && groups.every(isCampaignOpen)
+  const setAllCampaigns = (open: boolean) =>
+    setCampaignOverride(
+      Object.fromEntries(groups.map((g) => [g.campaign.entityId, open]))
+    )
+
   const toggleClass = (active: boolean) =>
     cn(
       "rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -169,21 +294,14 @@ export function InformeMatrix({ data }: { data: MetaInformePayload }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={onlyOn}
-          className={toggleClass(onlyOn)}
-          onClick={() => setOnlyOn((v) => !v)}
-        >
+        <button type="button" aria-pressed={onlyOn} className={toggleClass(onlyOn)} onClick={() => setOnlyOn((v) => !v)}>
           Solo ON
         </button>
-        <button
-          type="button"
-          aria-pressed={onlyActions}
-          className={toggleClass(onlyActions)}
-          onClick={() => setOnlyActions((v) => !v)}
-        >
+        <button type="button" aria-pressed={onlyActions} className={toggleClass(onlyActions)} onClick={() => setOnlyActions((v) => !v)}>
           Solo con acción
+        </button>
+        <button type="button" className={toggleClass(false)} onClick={() => setAllCampaigns(!allOpen)}>
+          {allOpen ? "Contraer campañas" : "Desplegar campañas"}
         </button>
         <span className="text-muted-foreground ml-auto flex flex-wrap items-center gap-3 text-xs">
           <span className="flex items-center gap-1">
@@ -198,7 +316,7 @@ export function InformeMatrix({ data }: { data: MetaInformePayload }) {
             <i className="inline-block size-2.5 rounded-sm bg-red-500/40" />
             &gt; 1.5× o gasto sin compras
           </span>
-          <span>«c» = compras · ○ = apagado</span>
+          <span>«c» = compras · ○ = apagado · ▸ conjunto = ver anuncios</span>
         </span>
       </div>
 
@@ -212,15 +330,11 @@ export function InformeMatrix({ data }: { data: MetaInformePayload }) {
             <thead>
               <tr className="text-muted-foreground text-[11px]">
                 <th className="bg-card sticky left-0 z-[2] border-b px-2 py-2 text-left font-medium">
-                  Campaña / conjunto
+                  Campaña / conjunto / anuncio
                 </th>
                 <th className="border-b px-2 py-2 text-left font-medium">Estado hoy</th>
-                <th className="border-b px-2 py-2 text-right font-medium">
-                  Gasto periodo
-                </th>
-                <th className="border-b px-2 py-2 text-right font-medium">
-                  CPA periodo
-                </th>
+                <th className="border-b px-2 py-2 text-right font-medium">Gasto periodo</th>
+                <th className="border-b px-2 py-2 text-right font-medium">CPA periodo</th>
                 {data.dateKeys.map((date) => (
                   <th
                     key={date}
@@ -236,27 +350,40 @@ export function InformeMatrix({ data }: { data: MetaInformePayload }) {
               </tr>
             </thead>
             <tbody>
-              {groups.map((group) => (
-                <Fragment key={group.campaign.entityId}>
-                  <MatrixRow
-                    row={group.campaign}
-                    dateKeys={data.dateKeys}
-                    data={data}
-                    isCampaign
-                    group={group}
-                  />
-                  {group.adsets.map((adset) => (
+              {groups.map((group) => {
+                const open = isCampaignOpen(group)
+                return (
+                  <Fragment key={group.campaign.entityId}>
                     <MatrixRow
-                      key={adset.entityId}
-                      row={adset}
-                      dateKeys={data.dateKeys}
                       data={data}
-                      isCampaign={false}
-                      group={group}
+                      row={entityRow(group.campaign, 0, <CampaignStatus group={group} />)}
+                      expanded={open}
+                      onToggle={() =>
+                        setCampaignOverride((prev) => ({
+                          ...prev,
+                          [group.campaign.entityId]: !open,
+                        }))
+                      }
                     />
-                  ))}
-                </Fragment>
-              ))}
+                    {open
+                      ? group.adsets.map((adset) => {
+                          const adsOpen = openAdsets.has(adset.metaId)
+                          return (
+                            <Fragment key={adset.entityId}>
+                              <MatrixRow
+                                data={data}
+                                row={entityRow(adset, 1, <Pill accion={adset.accion} />)}
+                                expanded={adsOpen}
+                                onToggle={() => toggleAdset(adset.metaId)}
+                              />
+                              {adsOpen ? <AdRows data={data} adsetId={adset.metaId} /> : null}
+                            </Fragment>
+                          )
+                        })
+                      : null}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -741,7 +741,7 @@ export function resolveInformeAccountId(accountId?: string): string {
   return id
 }
 
-async function resolveInformeAccountInfo(
+export async function resolveInformeAccountInfo(
   accountId: string
 ): Promise<InformeAccountInfo> {
   const accounts = await listMetaAdAccounts().catch(() => [])

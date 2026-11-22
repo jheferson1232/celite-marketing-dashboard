@@ -1,79 +1,118 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  RiAlertLine,
-  RiArrowDownSLine,
-  RiArrowRightSLine,
-  RiEyeLine,
-  RiRefreshLine,
-  RiSendPlaneLine,
-} from "@remixicon/react"
-import {
-  MetaAccountSelect,
-  useMetaDashboardAccount,
-} from "@/app/(app)/dashboard/_components/meta-dashboard-account"
-import { MetaConfigErrorHint } from "@/components/meta-config-error-hint"
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
+import { RiEyeLine, RiRefreshLine, RiSendPlaneLine } from "@remixicon/react"
+import { listMetaAdAccountsAction } from "@/app/(app)/dashboard/_actions/meta-ad-accounts"
 import { MetaApiStatusIndicator } from "@/components/meta-api-status-indicator"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 import { getMetaInformeApiStatus } from "@/lib/meta-api-status"
-import { isMetaConfigError } from "@/lib/services/meta/meta-errors"
 import { runServerAction } from "@/lib/server-action"
-import type { MetaInformePayload } from "@/lib/services/meta/meta-operative-service"
+import type { MetaAdAccountSummary } from "@/lib/services/meta/meta-ad-accounts"
 import {
   getMetaInformeAction,
   previewMetaInformeHourlyAction,
   sendMetaInformeHourlyToTelegramAction,
-  setInformeAdsetStatusAction,
-  setInformeCpaTargetAction,
   syncMetaInformeAction,
 } from "../_actions/meta-informe"
-import { InformeActions } from "./informe-actions"
-import { InformeCpaTarget } from "./informe-cpa-target"
-import { InformeKpis } from "./informe-kpis"
-import { InformeMatrix } from "./informe-matrix"
-import { InformeSide } from "./informe-side"
+import {
+  InformeAccountSection,
+  informeQueryKey,
+} from "./informe-account-section"
+
+const STORAGE_KEY = "informe-ia-accounts:v1"
+/** Cuentas que abre el informe si no hay selección guardada: Mokado Katy y Mokado CP. */
+const DEFAULT_ACCOUNT_IDS = ["870267208104445", "428704200222227"]
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback
 }
 
+function readStoredSelection(): string[] | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : null
+  } catch {
+    return null
+  }
+}
+
+function defaultSelection(accounts: MetaAdAccountSummary[]): string[] {
+  const defaults = DEFAULT_ACCOUNT_IDS.filter((id) =>
+    accounts.some((a) => a.accountId === id)
+  )
+  if (defaults.length > 0) return defaults
+  const firstActive = accounts.find((a) => !a.statusLabel) ?? accounts[0]
+  return firstActive ? [firstActive.accountId] : []
+}
+
 export function InformeIaContent() {
   const queryClient = useQueryClient()
-  const { accounts, accountId, setAccountId, isLoading: accountsLoading } =
-    useMetaDashboardAccount()
-  const [matrixOpen, setMatrixOpen] = useState(false)
+  const [chosen, setChosen] = useState<string[] | null>(null)
   const [telegramText, setTelegramText] = useState<string | null>(null)
   const [telegramSent, setTelegramSent] = useState<number | null>(null)
 
-  const queryKey = ["meta-informe-ia", accountId] as const
+  const accountsQuery = useQuery({
+    queryKey: ["meta-ad-accounts"],
+    queryFn: () => runServerAction(listMetaAdAccountsAction()),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+  const accounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data])
 
-  const informeQuery = useQuery({
-    queryKey,
-    queryFn: () => runServerAction(getMetaInformeAction(accountId!)),
-    enabled: Boolean(accountId),
-    staleTime: 2 * 60 * 1000,
+  // Las cuentas llegan solo en el cliente, así que leer localStorage aquí no
+  // genera diferencias de hidratación.
+  const selectedIds = useMemo(() => {
+    if (accounts.length === 0) return []
+    const base = chosen ?? readStoredSelection() ?? defaultSelection(accounts)
+    const valid = accounts
+      .map((a) => a.accountId)
+      .filter((id) => base.includes(id))
+    return valid.length > 0 ? valid : defaultSelection(accounts)
+  }, [accounts, chosen])
+
+  const toggleAccount = (accountId: string) => {
+    const next = selectedIds.includes(accountId)
+      ? selectedIds.filter((id) => id !== accountId)
+      : [...selectedIds, accountId]
+    if (next.length === 0) return
+    setChosen(next)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // ignore
+    }
+  }
+
+  const informeQueries = useQueries({
+    queries: selectedIds.map((accountId) => ({
+      queryKey: informeQueryKey(accountId),
+      queryFn: () => runServerAction(getMetaInformeAction(accountId)),
+      staleTime: 2 * 60 * 1000,
+    })),
   })
 
-  const syncMutation = useMutation({
-    mutationFn: () => runServerAction(syncMetaInformeAction(accountId!)),
-    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
-  })
-
-  const targetMutation = useMutation({
-    mutationFn: (cpaTarget: number) =>
-      runServerAction(setInformeCpaTargetAction({ accountId: accountId!, cpaTarget })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
-  })
-
-  const statusMutation = useMutation({
-    mutationFn: (input: { adsetId: string; status: "ACTIVE" | "PAUSED" }) =>
-      runServerAction(
-        setInformeAdsetStatusAction({ accountId: accountId!, ...input })
+  const syncAllMutation = useMutation({
+    mutationFn: () =>
+      Promise.all(
+        selectedIds.map(async (accountId) => {
+          const data = await runServerAction(syncMetaInformeAction(accountId))
+          queryClient.setQueryData(informeQueryKey(accountId), data)
+        })
       ),
-    onSuccess: () => syncMutation.mutate(),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["meta-informe-adset-ads"] }),
   })
 
   const previewMutation = useMutation({
@@ -92,75 +131,44 @@ export function InformeIaContent() {
     },
   })
 
-  const data: MetaInformePayload | undefined = informeQuery.data
   const telegramPending = previewMutation.isPending || sendMutation.isPending
   const telegramError = previewMutation.error ?? sendMutation.error
 
-  const metaApiStatus = useMemo(
-    () =>
-      getMetaInformeApiStatus({
-        informe: {
-          isLoading: informeQuery.isLoading,
-          isFetching: informeQuery.isFetching,
-          isError: informeQuery.isError || syncMutation.isError,
-          isSuccess: informeQuery.isSuccess && !syncMutation.isError,
-          error:
-            (informeQuery.error as Error | null) ??
-            (syncMutation.error as Error | null),
-        },
-        isSyncing: syncMutation.isPending,
-        hourlyError: telegramError ? errorText(telegramError, "") : null,
-      }),
-    [
-      informeQuery.isLoading,
-      informeQuery.isFetching,
-      informeQuery.isError,
-      informeQuery.isSuccess,
-      informeQuery.error,
-      syncMutation.isError,
-      syncMutation.isPending,
-      syncMutation.error,
-      telegramError,
-    ]
-  )
+  const firstError =
+    (informeQueries.find((q) => q.isError)?.error as Error | undefined) ??
+    (syncAllMutation.error as Error | null) ??
+    null
+  const metaApiStatus = getMetaInformeApiStatus({
+    informe: {
+      isLoading: informeQueries.some((q) => q.isLoading),
+      isFetching: informeQueries.some((q) => q.isFetching),
+      isError: Boolean(firstError),
+      isSuccess:
+        informeQueries.length > 0 &&
+        informeQueries.every((q) => q.isSuccess) &&
+        !syncAllMutation.isError,
+      error: firstError,
+    },
+    isSyncing: syncAllMutation.isPending,
+    hourlyError: telegramError ? errorText(telegramError, "") : null,
+  })
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4 p-4 pb-10 sm:p-6">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Informe IA</h1>
-          <MetaAccountSelect
-            accounts={accounts}
-            value={accountId}
-            onChange={setAccountId}
-            disabled={accountsLoading}
-          />
           <MetaApiStatusIndicator status={metaApiStatus} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {data ? (
-            <InformeCpaTarget
-              key={`${data.account.accountId}:${data.cpaTarget}`}
-              value={data.cpaTarget}
-              currency={data.account.currency}
-              accountName={data.account.name}
-              saving={targetMutation.isPending}
-              error={
-                targetMutation.isError
-                  ? errorText(targetMutation.error, "No se pudo guardar")
-                  : null
-              }
-              onSave={(value) => targetMutation.mutate(value)}
-            />
-          ) : null}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || !accountId}
+            onClick={() => syncAllMutation.mutate()}
+            disabled={syncAllMutation.isPending || selectedIds.length === 0}
           >
             <RiRefreshLine
-              className={syncMutation.isPending ? "size-4 animate-spin" : "size-4"}
+              className={syncAllMutation.isPending ? "size-4 animate-spin" : "size-4"}
             />
             Sincronizar
           </Button>
@@ -173,35 +181,47 @@ export function InformeIaContent() {
             <RiEyeLine className="size-4" />
             Vista previa
           </Button>
-          <Button
-            size="sm"
-            onClick={() => sendMutation.mutate()}
-            disabled={telegramPending}
-          >
+          <Button size="sm" onClick={() => sendMutation.mutate()} disabled={telegramPending}>
             <RiSendPlaneLine className="size-4" />
             {sendMutation.isPending ? "Enviando…" : "Enviar a Telegram"}
           </Button>
         </div>
       </header>
 
-      <p className="text-muted-foreground -mt-2 text-xs">
-        Telegram 8:00 y 20:00 (Lima) con todas las cuentas: qué apagar, revisar y
-        reactivar según el CPA objetivo de cada una.
-      </p>
-
-      {data?.account.statusLabel ? (
-        <div className="flex gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm">
-          <RiAlertLine className="mt-0.5 size-4 shrink-0 text-red-600" />
-          <p>
-            <span className="font-medium">
-              {data.account.name}: {data.account.statusLabel}.
-            </span>{" "}
-            <span className="text-muted-foreground">
-              Meta no entrega gasto de esta cuenta; elige otra en el selector.
-            </span>
-          </p>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-xs">Cuentas:</span>
+        {accountsQuery.isLoading ? (
+          <Skeleton className="h-7 w-64" />
+        ) : (
+          accounts.map((account) => {
+            const active = selectedIds.includes(account.accountId)
+            return (
+              <button
+                key={account.accountId}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleAccount(account.accountId)}
+                className={cn(
+                  "focus-visible:ring-ring/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium outline-none focus-visible:ring-3",
+                  active
+                    ? "border-foreground bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {account.name}
+                {account.statusLabel ? (
+                  <span className={active ? "opacity-70" : "text-red-600 dark:text-red-400"}>
+                    · {account.statusLabel}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })
+        )}
+        <span className="text-muted-foreground text-xs">
+          · Telegram 8:00 y 20:00 (Lima) incluye todas las cuentas.
+        </span>
+      </div>
 
       {telegramPending ? (
         <p className="text-muted-foreground text-xs">
@@ -213,9 +233,9 @@ export function InformeIaContent() {
           {errorText(telegramError, "No se pudo generar el informe de Telegram.")}
         </p>
       ) : null}
-      {targetMutation.isError ? (
+      {syncAllMutation.isError ? (
         <p className="text-destructive text-sm">
-          {errorText(targetMutation.error, "No se pudo guardar el CPA objetivo.")}
+          {errorText(syncAllMutation.error, "No se pudo sincronizar.")}
         </p>
       ) : null}
       {telegramText ? (
@@ -231,81 +251,16 @@ export function InformeIaContent() {
         </div>
       ) : null}
 
-      {!accountId || informeQuery.isLoading ? (
-        <div className="flex flex-col gap-4">
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <Skeleton className="h-64 w-full rounded-xl" />
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
-        </div>
-      ) : informeQuery.isError ? (
-        <div className="border-destructive/30 bg-destructive/5 rounded-lg border px-4 py-3 text-sm">
-          <p className="text-destructive font-medium">
-            {isMetaConfigError(informeQuery.error)
-              ? "Meta no está configurado en este entorno."
-              : "No se pudo cargar el informe."}
-          </p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            {errorText(informeQuery.error, "Revisa Meta y la base de datos.")}
-          </p>
-          {isMetaConfigError(informeQuery.error) ? <MetaConfigErrorHint /> : null}
-        </div>
-      ) : data ? (
-        <>
-          <InformeKpis data={data} />
-
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <div className="flex min-w-0 flex-col gap-2">
-              <h2 className="text-sm font-semibold">
-                Qué hacer ahora
-                {data.actions.length > 0 ? ` · ${data.actions.length}` : ""}
-              </h2>
-              <InformeActions
-                data={data}
-                onChangeStatus={(input) => statusMutation.mutate(input)}
-                pendingAdsetId={
-                  statusMutation.isPending
-                    ? (statusMutation.variables?.adsetId ?? null)
-                    : null
-                }
-                error={
-                  statusMutation.isError
-                    ? errorText(statusMutation.error, "No se pudo cambiar el conjunto.")
-                    : null
-                }
-              />
-            </div>
-            <InformeSide data={data} />
-          </div>
-
-          <section className="flex min-w-0 flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setMatrixOpen((open) => !open)}
-              aria-expanded={matrixOpen}
-              className="hover:text-foreground text-muted-foreground flex w-fit items-center gap-1 text-sm font-medium"
-            >
-              {matrixOpen ? (
-                <RiArrowDownSLine className="size-4" />
-              ) : (
-                <RiArrowRightSLine className="size-4" />
-              )}
-              Tabla por campaña y día · {data.groups.length} campaña
-              {data.groups.length === 1 ? "" : "s"}
-            </button>
-            {matrixOpen ? (
-              data.groups.length === 0 ? (
-                <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
-                  Ninguna campaña con gasto en los últimos {data.dateKeys.length} días.
-                </p>
-              ) : (
-                <InformeMatrix data={data} />
-              )
-            ) : null}
-          </section>
-        </>
-      ) : null}
+      {selectedIds.map((accountId, index) => (
+        <InformeAccountSection
+          key={accountId}
+          accountId={accountId}
+          accountName={
+            accounts.find((a) => a.accountId === accountId)?.name ?? accountId
+          }
+          query={informeQueries[index]!}
+        />
+      ))}
     </div>
   )
 }

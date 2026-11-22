@@ -12,6 +12,7 @@ import {
   buildMetaHourlyTelegramMessage,
   sendMetaHourlyReportToTelegram,
 } from "@/lib/services/meta/meta-hourly-report"
+import { getInformeAdsetAds } from "@/lib/services/meta/meta-informe-ads"
 import {
   setInformeAdsetStatus,
   type InformeAdsetStatus,
@@ -37,6 +38,12 @@ export const syncMetaInformeAction = createServerAction(
     invalidateMetaGraphCache()
     return getMetaInformePayload({ accountId })
   }
+)
+
+/** Anuncios de un conjunto (se cargan al desplegarlo en la tabla). */
+export const getInformeAdsetAdsAction = createServerAction(
+  async (input: { accountId: string; adsetId: string }) =>
+    getInformeAdsetAds(input)
 )
 
 export const setInformeCpaTargetAction = createServerAction(
