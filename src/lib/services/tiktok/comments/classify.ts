@@ -1,6 +1,6 @@
 import "server-only"
 
-import { COMMENT_AGENT_MODEL } from "@/lib/services/ai/comment-model"
+import { getCommentAgentModel } from "@/lib/services/ai/comment-model"
 import { getOrCreateMetaCommentAgentSettings } from "@/lib/services/meta/comments/agent-settings"
 import {
   classifyMetaComment,
@@ -31,5 +31,5 @@ export async function classifyTikTokComment(
   action: TikTokCommentActionKind
   replyText: string | null
 }> {
-  return classifyMetaComment(message, context, { model: COMMENT_AGENT_MODEL })
+  return classifyMetaComment(message, context, { model: getCommentAgentModel() })
 }

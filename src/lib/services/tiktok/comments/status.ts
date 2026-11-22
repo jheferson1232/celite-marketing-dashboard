@@ -2,7 +2,7 @@ import "server-only"
 
 import {
   AI_GATEWAY_API_KEY_ENV,
-  COMMENT_AGENT_MODEL_LABEL,
+  getCommentAgentModelLabel,
   isAiGatewayConfigured,
 } from "@/lib/services/ai/comment-model"
 import { listTikTokAdAccounts } from "../ad-accounts"
@@ -24,7 +24,7 @@ export async function getTikTokCommentAgentStatus(): Promise<TikTokCommentAgentS
 
   return {
     aiConfigured,
-    aiModelLabel: COMMENT_AGENT_MODEL_LABEL,
+    aiModelLabel: getCommentAgentModelLabel(),
     tiktokConfigured,
     accountsCount: tiktokConfigured ? Math.max(accounts.length, 1) : 0,
     missing,
