@@ -48,6 +48,18 @@ function formatAmount(value: number, config: CurrencyFormatConfig): string {
   return `${sign}${formattedInteger}`
 }
 
+/** Moneda de una cuenta Meta (`currency` de Graph API); COP si no se conoce. */
+export function currencyFromMetaCode(code: string | null | undefined): CurrencyCode {
+  switch (code?.trim().toUpperCase()) {
+    case "PEN":
+      return "PEN"
+    case "MXN":
+      return "MX"
+    default:
+      return "COP"
+  }
+}
+
 export function formatCurrency(value: number, currency: CurrencyCode): string {
   const config = CURRENCY_FORMAT[currency]
   return `${config.symbol}${formatAmount(value, config)}`

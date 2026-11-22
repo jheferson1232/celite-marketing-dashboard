@@ -1,15 +1,5 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
-import type { InformeCriticoActivoItem } from "./meta-informe-alerts"
-import type { MetaHourlyReportPayload } from "./meta-hourly-report"
-import { formatCop } from "./meta-operative-service"
-
-/** @deprecated El mensaje horario se arma en meta-hourly-report (solo ON + Crítico). */
-export async function generateHourlyOperativeCommentary(
-  payload: MetaHourlyReportPayload
-): Promise<string> {
-  return buildTemplateHourly(payload)
-}
 
 export async function generateNightlyCommentary(payload: {
   sinVentas: {
@@ -44,22 +34,6 @@ Sugiere qué revisar mañana si aplica. No ejecutes cambios. Máximo 12 líneas.
     console.error("Meta nightly OpenAI:", error)
     return buildTemplateNightly(payload)
   }
-}
-
-function formatCriticoActivoLine(item: InformeCriticoActivoItem): string {
-  const base = `• **${item.name}** (${item.campaignName})`
-  if (item.purchases > 0 && item.cpa > 0) {
-    return `${base} · ${formatCop(item.spend)} hoy · ${item.purchases} compra(s) · CPA ${formatCop(item.cpa)}`
-  }
-  return `${base} · ${formatCop(item.spend)} hoy · 0 compras`
-}
-
-function buildTemplateHourly(payload: MetaHourlyReportPayload): string {
-  if (payload.adsetsCriticoActivos.length === 0) {
-    return "✅ Nada que revisar ahora."
-  }
-
-  return payload.adsetsCriticoActivos.map(formatCriticoActivoLine).join("\n")
 }
 
 function buildTemplateNightly(payload: {

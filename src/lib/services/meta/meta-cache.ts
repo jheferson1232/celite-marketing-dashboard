@@ -37,6 +37,11 @@ export function claimMetaOnce(key: string, ttlMs: number): boolean {
   return true
 }
 
+/** Borra una clave de la caché de la cuenta del request actual. */
+export function deleteMetaCacheKey(key: string) {
+  cache.delete(scopeKey(key))
+}
+
 export function clearMetaCache(prefix?: string) {
   if (!prefix) {
     cache.clear()

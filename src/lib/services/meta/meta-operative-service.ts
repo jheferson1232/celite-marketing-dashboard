@@ -11,7 +11,12 @@ import {
   getMetaInformeDateRange,
   getMetaInformeStartDate,
 } from "@/lib/meta-informe"
-import { formatCurrency, META_DASHBOARD_CURRENCY } from "@/lib/format"
+import {
+  currencyFromMetaCode,
+  formatCurrency,
+  META_DASHBOARD_CURRENCY,
+  type CurrencyCode,
+} from "@/lib/format"
 import {
   getMetaAccountDailyInsights,
   type MetaDailyEntityRow,
@@ -34,6 +39,15 @@ import {
   type InformeEstadoKind,
 } from "./meta-informe-scoring"
 import type { MetaAdSet } from "./types"
+import { listMetaAdAccounts } from "./meta-ad-accounts"
+import { withMetaDashboardAccount } from "./meta-dashboard-account.server"
+import {
+  computeInformeAccion,
+  defaultInformeCpaTarget,
+  INFORME_ACCION_ORDER,
+  type InformeAccion,
+  type InformeAccionReason,
+} from "./meta-informe-rules"
 
 export type InformeEntityRow = {
   entityId: string
@@ -63,6 +77,9 @@ export type InformeEntityRow = {
     points: number | null
     saleStatus: "green" | "red" | "neutral"
   }[]
+  /** Acción recomendada según el CPA objetivo de la cuenta. */
+  accion: InformeAccion
+  accionReason: InformeAccionReason
 }
 
 export function sumInformePeriodFromDayCells(
@@ -112,9 +129,47 @@ export type InformeCampaignGroup = {
   adSetsCount: number
   /** Conjuntos con estado activo en Meta (misma regla que el dashboard). */
   activeAdSetsCount: number
+  /** Conjuntos del informe por acción recomendada. */
+  accionCounts: Partial<Record<InformeAccion, number>>
+}
+
+export type InformeAccountInfo = {
+  accountId: string
+  name: string
+  currency: CurrencyCode
+  accountStatus: number | null
+  /** null = activa; si no, «Bloqueada», «Pago pendiente», etc. */
+  statusLabel: string | null
+}
+
+export type InformeActionItem = {
+  metaId: string
+  name: string
+  campaignName: string
+  accion: "apagar" | "revisar" | "reactivar"
+  reason: InformeAccionReason
+  spendToday: number
+  purchasesToday: number
+  spendPeriod: number
+  purchasesPeriod: number
+}
+
+export type InformeEstadoSummary = {
+  accion: InformeAccion
+  count: number
+  spendToday: number
 }
 
 export type MetaInformePayload = {
+  account: InformeAccountInfo
+  /** CPA objetivo de la cuenta, en su moneda. */
+  cpaTarget: number
+  /** Conjuntos a apagar / revisar / reactivar, por urgencia. */
+  actions: InformeActionItem[]
+  /** Conjuntos ON por acción (para el resumen lateral). */
+  estadoSummary: InformeEstadoSummary[]
+  /** Gasto y compras de la cuenta por día (más viejo primero). */
+  accountDays: { date: string; spend: number; purchases: number }[]
   date: string
   informeStartDate: string
   dateRange: { from: string; to: string }
@@ -233,7 +288,8 @@ function collectSpendingInRange(
 }
 
 async function upsertTrackEntitiesBatch(
-  inputs: TrackEntityInput[]
+  inputs: TrackEntityInput[],
+  accountId: string
 ): Promise<void> {
   if (inputs.length === 0) return
   const { metaTrackEntity } = getInformePrisma()
@@ -245,6 +301,7 @@ async function upsertTrackEntitiesBatch(
         metaTrackEntity.upsert({
           where: { metaId_type: { metaId: input.metaId, type: input.type } },
           create: {
+            accountId,
             metaId: input.metaId,
             type: input.type,
             name: input.name,
@@ -252,6 +309,7 @@ async function upsertTrackEntitiesBatch(
             objective: "",
           },
           update: {
+            accountId,
             name: input.name,
             campaignMetaId: input.campaignMetaId,
           },
@@ -300,14 +358,15 @@ async function upsertOperativeDay(
 }
 
 async function upsertInformeAccountDay(
+  accountId: string,
   date: string,
   accountSpend: number,
   accountPurchases: number
 ): Promise<void> {
   const { metaInformeAccountDay } = getInformePrisma()
   await metaInformeAccountDay.upsert({
-    where: { date },
-    create: { date, accountSpend, accountPurchases },
+    where: { accountId_date: { accountId, date } },
+    create: { accountId, date, accountSpend, accountPurchases },
     update: { accountSpend, accountPurchases },
   })
 }
@@ -376,6 +435,7 @@ function operativeRowToSnapshot(row: {
  * Una sola consulta de estados ON/OFF; KPIs de cuenta por día precargados.
  */
 async function syncMetaOperativeStateBatch(
+  accountId: string,
   dateKeys: string[],
   metaIds: string[],
   daily: Awaited<ReturnType<typeof getMetaAccountDailyInsights>>,
@@ -387,7 +447,7 @@ async function syncMetaOperativeStateBatch(
   const today = getDashboardToday()
   const { metaTrackEntity } = getInformePrisma()
   const entities = await metaTrackEntity.findMany({
-    where: { metaId: { in: metaIds } },
+    where: { accountId, metaId: { in: metaIds } },
   })
   if (entities.length === 0) return
 
@@ -457,24 +517,38 @@ async function syncMetaOperativeStateBatch(
     }
 
     const account = accountKpisByDay.get(date) ?? { totalSpend: 0, purchases: 0 }
-    await upsertInformeAccountDay(date, account.totalSpend, account.purchases)
+    await upsertInformeAccountDay(
+      accountId,
+      date,
+      account.totalSpend,
+      account.purchases
+    )
   }
 }
 
 /** Sincroniza un solo día (p. ej. pruebas); en producción usar el batch del informe. */
 export async function syncMetaOperativeStateForDate(
   date: string,
-  metaIds: string[]
+  metaIds: string[],
+  accountId = resolveInformeAccountId()
 ): Promise<void> {
   if (date < getMetaInformeStartDate() || metaIds.length === 0) return
 
-  const range = { from: date, to: date }
-  const [daily, accountKpisByDay] = await Promise.all([
-    getMetaAccountDailyInsights(range),
-    getAccountKpisByDay(range),
-  ])
+  await withMetaDashboardAccount(accountId, async () => {
+    const range = { from: date, to: date }
+    const [daily, accountKpisByDay] = await Promise.all([
+      getMetaAccountDailyInsights(range),
+      getAccountKpisByDay(range),
+    ])
 
-  await syncMetaOperativeStateBatch([date], metaIds, daily, accountKpisByDay)
+    await syncMetaOperativeStateBatch(
+      accountId,
+      [date],
+      metaIds,
+      daily,
+      accountKpisByDay
+    )
+  })
 }
 
 function getDailyCell(
@@ -593,6 +667,8 @@ function buildInformeRow(
     rowHighlight: todayDay.rowHighlight,
     ...informePeriod,
     dayCells,
+    accion: "sin_gasto",
+    accionReason: { kind: "sin_gasto" },
   }
 }
 
@@ -638,25 +714,192 @@ async function pruneOperativeDaysBeforeInformeStart(): Promise<void> {
   }
 }
 
-async function pruneStaleTrackEntities(keepMetaIds: string[]): Promise<void> {
+async function pruneStaleTrackEntities(
+  accountId: string,
+  keepMetaIds: string[]
+): Promise<void> {
   if (keepMetaIds.length === 0) return
 
   try {
     const { metaTrackEntity } = getInformePrisma()
     await metaTrackEntity.deleteMany({
-      where: { metaId: { notIn: keepMetaIds } },
+      where: { accountId, metaId: { notIn: keepMetaIds } },
     })
   } catch {
     // Sin tablas o sin filas previas
   }
 }
 
-export async function getMetaInformePayload(): Promise<MetaInformePayload> {
+/** Cuenta que abre el informe si no se indica otra: Mokado Katy (o META_INFORME_ACCOUNT_ID). */
+export const META_INFORME_DEFAULT_ACCOUNT_ID = "870267208104445"
+
+export function resolveInformeAccountId(accountId?: string): string {
+  const id =
+    accountId?.replace(/^act_/i, "").trim() ||
+    process.env.META_INFORME_ACCOUNT_ID?.replace(/^act_/i, "").trim() ||
+    META_INFORME_DEFAULT_ACCOUNT_ID
+  return id
+}
+
+async function resolveInformeAccountInfo(
+  accountId: string
+): Promise<InformeAccountInfo> {
+  const accounts = await listMetaAdAccounts().catch(() => [])
+  const account = accounts.find((a) => a.accountId === accountId)
+  return {
+    accountId,
+    name: account?.name ?? `Cuenta ${accountId.slice(-4)}`,
+    currency: currencyFromMetaCode(account?.currency),
+    accountStatus: account?.accountStatus ?? null,
+    statusLabel: account?.statusLabel ?? null,
+  }
+}
+
+function dayMetrics(row: InformeEntityRow, date: string) {
+  const cell = row.dayCells.find((d) => d.date === date)
+  return { spend: cell?.spend ?? 0, purchases: cell?.purchases ?? 0 }
+}
+
+function withAccion(
+  row: InformeEntityRow,
+  target: number,
+  yesterday: string
+): InformeEntityRow {
+  const result = computeInformeAccion(
+    {
+      isActive: row.metaWasActive,
+      today: { spend: row.spendToday, purchases: row.purchasesToday },
+      yesterday: dayMetrics(row, yesterday),
+      period: {
+        spend: row.spendInformeTotal,
+        purchases: row.purchasesInformeTotal,
+      },
+    },
+    target
+  )
+  return { ...row, accion: result.accion, accionReason: result.reason }
+}
+
+function emptyTotals(dateKeys: string[]): InformeTableTotals {
+  return {
+    spendToday: 0,
+    purchasesToday: 0,
+    cpaToday: 0,
+    pointsTotal: 0,
+    dayTotals: dateKeys.map((date) => ({
+      date,
+      spend: 0,
+      purchases: 0,
+      points: 0,
+    })),
+  }
+}
+
+function buildInformeActions(groups: InformeCampaignGroup[]): InformeActionItem[] {
+  const items: InformeActionItem[] = []
+  for (const group of groups) {
+    for (const adset of group.adsets) {
+      if (
+        adset.accion !== "apagar" &&
+        adset.accion !== "revisar" &&
+        adset.accion !== "reactivar"
+      ) {
+        continue
+      }
+      items.push({
+        metaId: adset.metaId,
+        name: adset.name,
+        campaignName: group.campaign.name,
+        accion: adset.accion,
+        reason: adset.accionReason,
+        spendToday: adset.spendToday,
+        purchasesToday: adset.purchasesToday,
+        spendPeriod: adset.spendInformeTotal,
+        purchasesPeriod: adset.purchasesInformeTotal,
+      })
+    }
+  }
+  return items.sort(
+    (a, b) =>
+      INFORME_ACCION_ORDER[a.accion] - INFORME_ACCION_ORDER[b.accion] ||
+      b.spendToday - a.spendToday
+  )
+}
+
+function buildEstadoSummary(groups: InformeCampaignGroup[]): InformeEstadoSummary[] {
+  const byAccion = new Map<InformeAccion, InformeEstadoSummary>()
+  for (const group of groups) {
+    for (const adset of group.adsets) {
+      if (!adset.metaWasActive) continue
+      const entry = byAccion.get(adset.accion) ?? {
+        accion: adset.accion,
+        count: 0,
+        spendToday: 0,
+      }
+      entry.count += 1
+      entry.spendToday += adset.spendToday
+      byAccion.set(adset.accion, entry)
+    }
+  }
+  return [...byAccion.values()].sort(
+    (a, b) => INFORME_ACCION_ORDER[a.accion] - INFORME_ACCION_ORDER[b.accion]
+  )
+}
+
+/** CPA objetivo guardado para la cuenta (o el de su moneda por defecto). */
+export async function getInformeCpaTarget(
+  accountId: string,
+  currency: CurrencyCode
+): Promise<number> {
+  try {
+    const row = await prisma.metaInformeAccountSettings.findUnique({
+      where: { accountId },
+      select: { cpaTarget: true },
+    })
+    if (row && row.cpaTarget > 0) return row.cpaTarget
+  } catch {
+    // Tabla aún no migrada
+  }
+  return defaultInformeCpaTarget(currency)
+}
+
+export async function setInformeCpaTarget(input: {
+  accountId: string
+  cpaTarget: number
+}): Promise<{ accountId: string; cpaTarget: number }> {
+  const accountId = resolveInformeAccountId(input.accountId)
+  const cpaTarget = Number(input.cpaTarget)
+  if (!Number.isFinite(cpaTarget) || cpaTarget <= 0) {
+    throw new Error("El CPA objetivo debe ser un número mayor que 0.")
+  }
+  await prisma.metaInformeAccountSettings.upsert({
+    where: { accountId },
+    create: { accountId, cpaTarget },
+    update: { cpaTarget },
+  })
+  return { accountId, cpaTarget }
+}
+
+export async function getMetaInformePayload(options?: {
+  accountId?: string
+}): Promise<MetaInformePayload> {
+  const accountId = resolveInformeAccountId(options?.accountId)
+  return withMetaDashboardAccount(accountId, () =>
+    buildMetaInformePayload(accountId)
+  )
+}
+
+async function buildMetaInformePayload(
+  accountId: string
+): Promise<MetaInformePayload> {
   const today = getDashboardToday()
   const yesterday = getDashboardYesterday()
   const informeStartDate = getMetaInformeStartDate()
   const dateRange = getMetaInformeDateRange()
   const dateKeys = getMetaInformeDateKeys()
+
+  const account = await resolveInformeAccountInfo(accountId)
+  const cpaTarget = await getInformeCpaTarget(accountId, account.currency)
 
   await pruneOperativeDaysBeforeInformeStart()
 
@@ -666,17 +909,27 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     getAccountKpisByDay(dateRange),
   ])
 
+  const accountDays = [...dateKeys].sort().map((date) => {
+    const kpi = accountKpisByDay.get(date)
+    return {
+      date,
+      spend: kpi?.totalSpend ?? 0,
+      purchases: kpi?.purchases ?? 0,
+    }
+  })
+
   const { campaignRows, adsetRows, trackInputs } = collectSpendingInRange(
     daily,
     dateKeys
   )
   const metaIds = [...new Set(trackInputs.map((t) => t.metaId))]
 
-  await upsertTrackEntitiesBatch(trackInputs)
-  await pruneStaleTrackEntities(metaIds)
+  await upsertTrackEntitiesBatch(trackInputs, accountId)
+  await pruneStaleTrackEntities(accountId, metaIds)
 
   if (metaIds.length > 0) {
     await syncMetaOperativeStateBatch(
+      accountId,
       dateKeys,
       metaIds,
       daily,
@@ -684,48 +937,47 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
     )
   }
 
+  const base = {
+    account,
+    cpaTarget,
+    date: today,
+    informeStartDate,
+    dateRange,
+    dateKeys,
+    yesterday,
+    accountDays,
+    accountSpendToday: accountKpis.totalSpend,
+    accountPurchasesToday: accountKpis.purchases,
+  }
+
   const metaIdSet = new Set(metaIds)
   if (metaIdSet.size === 0) {
     return {
-      date: today,
-      informeStartDate,
-      dateRange,
-      dateKeys,
+      ...base,
       groups: [],
+      actions: [],
+      estadoSummary: [],
       forgotten: [],
       olvidoAlerts: [],
       sinVentasAlerts: [],
       cpaAltoAlerts: [],
       adsetsToPause: [],
       campaignsToPause: [],
-      yesterday,
-      totals: {
-        spendToday: 0,
-        purchasesToday: 0,
-        cpaToday: 0,
-        pointsTotal: 0,
-        dayTotals: dateKeys.map((date) => ({
-          date,
-          spend: 0,
-          purchases: 0,
-          points: 0,
-        })),
-      },
-      accountSpendToday: accountKpis.totalSpend,
-      accountPurchasesToday: accountKpis.purchases,
+      totals: emptyTotals(dateKeys),
     }
   }
 
   const { metaTrackEntity, metaOperativeDay } = getInformePrisma()
-  const [entities, operativeRows] = await Promise.all([
-    metaTrackEntity.findMany({
-      where: { metaId: { in: [...metaIdSet] } },
-      orderBy: { name: "asc" },
-    }),
-    metaOperativeDay.findMany({
-      where: { date: { gte: dateRange.from, lte: dateRange.to } },
-    }),
-  ])
+  const entities = await metaTrackEntity.findMany({
+    where: { accountId, metaId: { in: [...metaIdSet] } },
+    orderBy: { name: "asc" },
+  })
+  const operativeRows = await metaOperativeDay.findMany({
+    where: {
+      entityId: { in: entities.map((e) => e.id) },
+      date: { gte: dateRange.from, lte: dateRange.to },
+    },
+  })
 
   const storedByEntityDate = new Map<string, StoredOperativeDay>()
   for (const row of operativeRows) {
@@ -763,54 +1015,78 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
       ? await getAdsetsByCampaignMap(getMetaClient(), campaignMetaIds)
       : new Map<string, MetaAdSet[]>()
 
+  const buildRow = (entity: (typeof entities)[number]) =>
+    withAccion(
+      buildInformeRow(
+        entity,
+        dateKeys,
+        yesterday,
+        today,
+        storedByEntityDate,
+        campaignDaily,
+        adsetDaily
+      ),
+      cpaTarget,
+      yesterday
+    )
+
   for (const cRow of sortedCampaignRows) {
     const campaign = entityByKey.get(`campaign:${cRow.metaId}`)
     if (!campaign) continue
 
-    const campaignRow = buildInformeRow(
-      campaign,
-      dateKeys,
-      yesterday,
-      today,
-      storedByEntityDate,
-      campaignDaily,
-      adsetDaily
-    )
+    const campaignRow = buildRow(campaign)
 
     const campaignId = normalizeMetaId(cRow.metaId)
     const adsets = adsetRows
       .filter(
         (a) => normalizeMetaId(a.campaignMetaId ?? "") === campaignId
       )
-      .sort((a, b) => spendOnDate(b, today) - spendOnDate(a, today))
       .map((aRow) => {
         const adset = entityByKey.get(`adset:${aRow.metaId}`)
         if (!adset) return null
-        return buildInformeRow(
-          adset,
-          dateKeys,
-          yesterday,
-          today,
-          storedByEntityDate,
-          campaignDaily,
-          adsetDaily
-        )
+        const row = buildRow(adset)
+        // Activar el conjunto no sirve si la campaña está pausada.
+        if (row.accion === "reactivar" && !campaignRow.metaWasActive) {
+          return { ...row, accion: "apagado" as const, accionReason: { kind: "apagado" as const } }
+        }
+        return row
       })
       .filter((row): row is InformeEntityRow => row !== null)
+      .sort(
+        (a, b) =>
+          INFORME_ACCION_ORDER[a.accion] - INFORME_ACCION_ORDER[b.accion] ||
+          b.spendToday - a.spendToday
+      )
 
     const catalogAdsets =
       adsetsByCampaign.get(normalizeMetaId(cRow.metaId)) ?? []
     const { total: adSetsCount, active: activeAdSetsCount } =
       countAdSetsForCampaign(catalogAdsets)
 
+    const accionCounts: Partial<Record<InformeAccion, number>> = {}
+    for (const adset of adsets) {
+      accionCounts[adset.accion] = (accionCounts[adset.accion] ?? 0) + 1
+    }
+
     groups.push({
       campaign: campaignRow,
       adsets,
       adSetsCount,
       activeAdSetsCount,
+      accionCounts,
     })
     allRows.push(campaignRow, ...adsets)
   }
+
+  const urgency = (group: InformeCampaignGroup) =>
+    Math.min(
+      ...group.adsets.map((a) => INFORME_ACCION_ORDER[a.accion]),
+      INFORME_ACCION_ORDER.apagado
+    )
+  groups.sort(
+    (a, b) =>
+      urgency(a) - urgency(b) || b.campaign.spendToday - a.campaign.spendToday
+  )
 
   const olvidoAlerts: InformeEntityRow[] = []
   const sinVentasAlerts = allRows.filter((r) => r.estadoKind === "sin_ventas")
@@ -821,21 +1097,17 @@ export async function getMetaInformePayload(): Promise<MetaInformePayload> {
   const totals = computeInformeTotals(allRows, dateKeys, today)
 
   return {
-    date: today,
-    informeStartDate,
-    dateRange,
-    dateKeys,
+    ...base,
     groups,
+    actions: buildInformeActions(groups),
+    estadoSummary: buildEstadoSummary(groups),
     forgotten: olvidoAlerts,
     olvidoAlerts,
     sinVentasAlerts,
     cpaAltoAlerts,
     adsetsToPause,
     campaignsToPause,
-    yesterday,
     totals,
-    accountSpendToday: accountKpis.totalSpend,
-    accountPurchasesToday: accountKpis.purchases,
   }
 }
 

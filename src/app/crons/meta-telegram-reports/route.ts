@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server"
 import { isValidCronRequest, unauthorizedCronResponse } from "@/lib/cron-auth"
-import {
-  getDashboardHour,
-  getDashboardToday,
-  getTodayDateRange,
-} from "@/lib/date"
+import { getDashboardHour, getDashboardToday } from "@/lib/date"
 import { getAllowedTelegramUserIds } from "@/lib/telegram/config"
 import { sendTelegramLongMessage } from "@/lib/telegram/bot"
-import { getAccountKpis } from "@/lib/services/meta/account-kpis"
 import {
   formatCop,
   getMetaInformePayload,
-  type MetaInformePayload,
 } from "@/lib/services/meta/meta-operative-service"
 import { generateNightlyCommentary } from "@/lib/services/meta/meta-cron-commentary"
 import {
@@ -28,9 +22,8 @@ export async function GET(request: Request) {
 
   try {
     const hour = getDashboardHour()
-    const informe = await getMetaInformePayload()
-    const hourly = await runOperativeReport(informe)
-    const nightly = await runNightlyReport(informe, hour)
+    const hourly = await runOperativeReport()
+    const nightly = await runNightlyReport(hour)
     return NextResponse.json({ ok: true, hour, hourly, nightly })
   } catch (error) {
     console.error("Meta telegram cron:", error)
@@ -40,26 +33,30 @@ export async function GET(request: Request) {
   }
 }
 
-/** Informe operativo (conjuntos ON en Crítico). */
-async function runOperativeReport(informe: MetaInformePayload) {
-  const payload = await buildMetaHourlyReportPayload(informe)
+/** Informe operativo: una sección por cuenta Meta (apagar / revisar / reactivar). */
+async function runOperativeReport() {
+  const payload = await buildMetaHourlyReportPayload()
   const result = await sendMetaHourlyReportToTelegram(payload)
   return {
     skipped: false,
     sent: result.sent,
     adsetsToPause: result.adsetsToPause,
-    campaignsToPause: result.campaignsToPause,
+    adsetsToReview: result.adsetsToReview,
   }
 }
 
 /** Cierre nocturno: solo si la llamada cae a las 23:00 Lima (p. ej. manual). */
-async function runNightlyReport(informe: MetaInformePayload, hour: number) {
+async function runNightlyReport(hour: number) {
   if (hour !== 23) {
     return { skipped: true, sent: 0 }
   }
 
+  const informe = await getMetaInformePayload()
   const today = getDashboardToday()
-  const kpis = await getAccountKpis(getTodayDateRange())
+  const kpis = {
+    totalSpend: informe.accountSpendToday,
+    purchases: informe.accountPurchasesToday,
+  }
 
   const soldAdsets = informe.groups.flatMap((group) =>
     group.adsets
@@ -71,7 +68,7 @@ async function runNightlyReport(informe: MetaInformePayload, hour: number) {
       }))
   )
 
-  const mapRowWithCampaign = (row: (typeof informe.sinVentasAlerts)[0]) => ({
+  const mapRowWithCampaign = (row: { name: string; type: string; entityId: string; spendToday: number; cpaToday: number }) => ({
     name: row.name,
     campaignName:
       row.type === "adset"

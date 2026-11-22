@@ -4,19 +4,25 @@ Pestaña `/informe-ia` y cron horario a Telegram. **No modifica** el dashboard p
 
 ## Qué hace
 
-1. **Tabla** — Campañas y conjuntos con gasto (ayer o hoy), puntos por día, estado automático, filas rojas/naranjas.
-2. **Persistencia** — `MetaOperativeDay` y `MetaInformeAccountDay` en PostgreSQL.
-3. **Cron** — 2×/día a las **8:00** y **20:00** (America/Lima) vía Vercel Schedules → `/crons/meta-telegram-reports`: conjuntos ON en Crítico.
-4. **Cierre 23:00** (America/Lima) — Solo si el cron corre a esa hora (p. ej. manual); con el schedule 8:00/20:00 no se envía solo.
+1. **Por cuenta** — Selector de cuenta Meta (Mokado Katy por defecto, Mokado CP, …) con la moneda de cada una.
+2. **CPA objetivo** — Un número por cuenta (`MetaInformeAccountSettings`, editable en la página). De él salen los estados de cada conjunto:
+   - **Excelente**: CPA &lt; 0.8× objetivo · **En curso**: entre 0.8× y 1.5×
+   - **Revisar**: CPA &gt; 1.5× o gasto ≥ 1× objetivo sin compras
+   - **Apagar**: gasto ≥ 1.5× objetivo sin compras, o «Revisar» dos días seguidos
+   - **Reactivar**: conjunto apagado (campaña activa) con CPA del periodo &lt; objetivo y ≥ 3 compras
+3. **Qué hacer ahora** — Lista de conjuntos a apagar / revisar / reactivar con botón (cambia el estado en Meta tras confirmar). Debajo, la tabla por campaña y día coloreada por CPA vs objetivo.
+4. **Persistencia** — `MetaTrackEntity` (con `accountId`), `MetaOperativeDay` y `MetaInformeAccountDay` (clave `accountId + date`).
+5. **Telegram** — 8:00 y 20:00 (Lima): una sección por cuenta activa con gasto, compras, CPA vs objetivo y acciones; cuentas sin gasto y bloqueadas también se mencionan.
 
-OpenAI (`gpt-4o-mini`) solo redacta el **cierre nocturno** de Telegram si existe `OPENAI_API_KEY`; el informe horario y los umbrales son reglas fijas en código.
+«ON» en el informe = el conjunto entrega (`effective_status` ACTIVE): un conjunto encendido en una campaña pausada cuenta como apagado.
 
 ## Variables de entorno
 
 | Variable | Requerida | Uso |
 |----------|-----------|-----|
 | `META_ACCESS_TOKEN` | Sí | API Meta Ads |
-| `META_AD_ACCOUNT_ID` | Sí | Cuenta publicitaria |
+| `META_AD_ACCOUNT_ID` | Sí | Cuenta por defecto del resto de la app |
+| `META_INFORME_ACCOUNT_ID` | No | Cuenta que abre el informe/cierre nocturno (default Mokado Katy) |
 | `DATABASE_URL` | Sí | Prisma / historial |
 | `CRON_SECRET` | Sí (prod) | `Authorization: Bearer …` en el cron |
 | `TELEGRAM_BOT_TOKEN` | Sí (alertas) | Bot de @BotFather |

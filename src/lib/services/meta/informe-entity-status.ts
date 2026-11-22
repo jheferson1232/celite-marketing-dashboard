@@ -1,7 +1,9 @@
 import { metaGraphGet } from "./meta-graph-retry"
 import { withMetaCache } from "./meta-cache"
 import { isMetaCampaignActiveForCount } from "./meta-campaign-status"
-import { isMetaAdSetActiveForCount } from "./meta-adset-status"
+
+/** Estados en los que el conjunto entrega (campaña y conjunto encendidos). */
+const ADSET_DELIVERING_STATUSES = new Set(["ACTIVE", "IN_PROCESS", "WITH_ISSUES"])
 
 const INFORME_STATUS_TTL_MS = 2 * 60 * 1000
 
@@ -27,10 +29,9 @@ async function fetchInformeEntityStatus(
     return isMetaCampaignActiveForCount(data)
   }
 
-  return isMetaAdSetActiveForCount({
-    status: data.status ?? "",
-    effective_status: data.effective_status,
-  })
+  // En el informe, «ON» = entrega de verdad: un conjunto encendido dentro de
+  // una campaña pausada no gasta, así que cuenta como apagado.
+  return ADSET_DELIVERING_STATUSES.has((data.effective_status ?? "").toUpperCase())
 }
 
 /** Estado ON/OFF solo para filas del informe; no usa catálogo del dashboard. */

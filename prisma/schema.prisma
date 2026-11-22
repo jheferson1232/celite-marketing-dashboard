@@ -36,6 +36,8 @@ model Message {
 /** Campaña o conjunto Meta para Informe IA y cron de activación. */
 model MetaTrackEntity {
   id             String   @id @default(cuid())
+  /// Cuenta publicitaria Meta (sin act_).
+  accountId      String   @default("")
   metaId         String
   type           String
   name           String
@@ -46,6 +48,7 @@ model MetaTrackEntity {
 
   @@unique([metaId, type])
   @@index([type, campaignMetaId])
+  @@index([accountId])
 }
 
 /** Snapshot diario por campaña/conjunto: gasto, ventas, puntos y estado (Informe IA). */
@@ -74,10 +77,20 @@ model MetaOperativeDay {
 
 /** Totales de cuenta Meta guardados por día (Informe IA). */
 model MetaInformeAccountDay {
-  date             String   @id
+  accountId        String   @default("")
+  date             String
   accountSpend     Float    @default(0)
   accountPurchases Int      @default(0)
   syncedAt         DateTime @updatedAt
+
+  @@id([accountId, date])
+}
+
+/// CPA objetivo por cuenta Meta (moneda de la cuenta); de él salen los estados del Informe IA.
+model MetaInformeAccountSettings {
+  accountId String   @id
+  cpaTarget Float
+  updatedAt DateTime @updatedAt
 }
 
 enum ProductStatus {
