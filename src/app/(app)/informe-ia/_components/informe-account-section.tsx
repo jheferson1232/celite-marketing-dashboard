@@ -10,6 +10,8 @@ import {
 import { MetaConfigErrorHint } from "@/components/meta-config-error-hint"
 import { Skeleton } from "@/components/ui/skeleton"
 import { isMetaConfigError } from "@/lib/services/meta/meta-errors"
+import { informeCpaTone } from "@/lib/services/meta/meta-informe-rules"
+import { cn } from "@/lib/utils"
 import { runServerAction } from "@/lib/server-action"
 import type { MetaInformePayload } from "@/lib/services/meta/meta-operative-service"
 import {
@@ -19,12 +21,44 @@ import {
 } from "../_actions/meta-informe"
 import { InformeActions } from "./informe-actions"
 import { InformeCpaTarget } from "./informe-cpa-target"
+import { moneyFormatter, TONE_TEXT } from "./informe-format"
 import { InformeKpis } from "./informe-kpis"
 import { InformeMatrix } from "./informe-matrix"
 import { InformeSide } from "./informe-side"
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback
+}
+
+/** Resumen de hoy en la cabecera: se ve con la cuenta plegada. */
+function TodaySummary({ data }: { data: MetaInformePayload }) {
+  const money = moneyFormatter(data.account.currency)
+  const spend = data.accountSpendToday
+  const purchases = data.accountPurchasesToday
+  const cpa = purchases > 0 ? spend / purchases : 0
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm tabular-nums">
+      <span>
+        <span className="text-muted-foreground text-xs">Gasto hoy </span>
+        <span className="font-semibold">{money(spend)}</span>
+      </span>
+      <span>
+        <span className="text-muted-foreground text-xs">Compras </span>
+        <span className="font-semibold">{purchases}</span>
+      </span>
+      <span>
+        <span className="text-muted-foreground text-xs">CPA </span>
+        <span
+          className={cn(
+            "font-semibold",
+            TONE_TEXT[informeCpaTone(cpa, data.cpaTarget)]
+          )}
+        >
+          {cpa > 0 ? money(cpa) : "—"}
+        </span>
+      </span>
+    </div>
+  )
 }
 
 export function informeQueryKey(accountId: string) {
@@ -41,7 +75,7 @@ export function InformeAccountSection({
   query: UseQueryResult<MetaInformePayload | undefined>
 }) {
   const queryClient = useQueryClient()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const queryKey = informeQueryKey(accountId)
   const data = query.data
 
@@ -94,6 +128,7 @@ export function InformeAccountSection({
             <span className="text-muted-foreground text-xs">· actualizando…</span>
           ) : null}
         </button>
+        {data ? <TodaySummary data={data} /> : null}
         {data ? (
           <InformeCpaTarget
             key={`${data.account.accountId}:${data.cpaTarget}`}
